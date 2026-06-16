@@ -138,8 +138,15 @@ function detectSource(url: string): string {
 }
 
 function buildProduct(rec: MockRecord): Product {
-  const base = MOCK_PRODUCTS[rec.seed % MOCK_PRODUCTS.length];
   const titleFromUrl = prettyTitle(rec.product_url);
+  // If the URL slug names a product we know, use its full record so the image
+  // matches the title; otherwise keep the URL title over a hashed stock image.
+  const matched = titleFromUrl
+    ? MOCK_PRODUCTS.find(
+        (p) => p.title.toLowerCase() === titleFromUrl.toLowerCase(),
+      )
+    : undefined;
+  const base = matched ?? MOCK_PRODUCTS[rec.seed % MOCK_PRODUCTS.length];
   return {
     ...base,
     title: titleFromUrl || base.title,

@@ -80,7 +80,8 @@
   --dur-slow: 420ms;
 }
 
-/* ── Reset / base ─────────────────────────────────────────── */
+/* ── Reset / base (in @layer base so Tailwind utilities win) ─ */
+@layer base {
 *,
 *::before,
 *::after {
@@ -151,6 +152,7 @@ h3 {
   outline: 2px solid var(--color-ink);
   outline-offset: 2px;
   border-radius: 2px;
+}
 }
 
 /* ── Type role utilities ──────────────────────────────────── */
