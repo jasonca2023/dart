@@ -215,6 +215,66 @@ h3 {
   }
 }
 
+/* ── Hero 3D centerpiece ──────────────────────────────────── */
+.hero-canvas-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.hero-canvas {
+  height: 100%;
+  width: 100%;
+  animation: hero-canvas-in 700ms var(--ease-out) both;
+}
+@keyframes hero-canvas-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Soft chromatic bloom behind the orb — the brand's only ambient color wash. */
+.hero-glow {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(72%, 460px);
+  aspect-ratio: 1;
+  border-radius: var(--radius-full);
+  background:
+    radial-gradient(
+      circle at 38% 40%,
+      color-mix(in oklab, var(--color-violet) 38%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 66% 62%,
+      color-mix(in oklab, var(--color-ember) 32%, transparent),
+      transparent 58%
+    );
+  filter: blur(48px);
+  opacity: 0.5;
+  z-index: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-glow {
+    animation: hero-glow-pulse 8s var(--ease-in-out) infinite;
+  }
+}
+@keyframes hero-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.58;
+    transform: scale(1.06);
+  }
+}
+
 /* ── Ambient ad-mood orb (the only chromatic element) ─────── */
 /* Color appears only as ad energy made visible — violet↔ember spectrum,
  * blended through pink/peach midtones via color-mix of the two tokens. */

@@ -44,6 +44,7 @@ instead of the mock — no other code changes needed.
 
 - `app/` — routes (App Router) + `globals.css` (the locked design tokens)
 - `components/ui/` — primitives (Button, Card, Field, Orb, StatusPill, …)
-- `components/site/` — marketing sections
+- `components/site/` — marketing sections (the hero centerpiece is a code-split
+  React Three Fiber scene: glass orb + orbiting motion graphics, `HeroScene.tsx`)
 - `components/app/` — dashboard / job-review components
 - `lib/` — `types.ts` (mirrors the contract), `api.ts`, `mock.ts`, `format.ts`, `hooks.ts`
