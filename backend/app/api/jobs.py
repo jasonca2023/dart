@@ -1,0 +1,85 @@
+"""Job routes — implements docs/API_CONTRACT.md."""
+
+from __future__ import annotations
+
+from datetime import timedelta
+
+from fastapi import APIRouter, Request
+
+from ..errors import CONFLICT, DartError
+from ..models import (
+    CreateJobRequest,
+    ExportRequest,
+    ExportResponse,
+    Job,
+    JobListResponse,
+    JobStatus,
+    utcnow,
+)
+from ..pipeline import Orchestrator
+from ..store import JobStore
+
+router = APIRouter()
+
+
+def _store(request: Request) -> JobStore:
+    return request.app.state.store
+
+
+def _orchestrator(request: Request) -> Orchestrator:
+    return request.app.state.orchestrator
+
+
+@router.post("/jobs", status_code=201, response_model=Job)
+async def create_job(body: CreateJobRequest, request: Request) -> Job:
+    job = _store(request).create(
+        product_url=body.product_url,
+        target_audience=body.target_audience,
+        aspect_ratio=body.aspect_ratio,
+        duration_sec=body.duration_sec,
+        resolution=body.resolution,
+    )
+    _orchestrator(request).schedule(job.id)
+    return job
+
+
+@router.get("/jobs", response_model=JobListResponse)
+async def list_jobs(request: Request) -> JobListResponse:
+    return JobListResponse(jobs=_store(request).list())
+
+
+@router.get("/jobs/{job_id}", response_model=Job)
+async def get_job(job_id: str, request: Request) -> Job:
+    return _store(request).get(job_id)
+
+
+@router.post("/jobs/{job_id}/regenerate", status_code=201, response_model=Job)
+async def regenerate_job(job_id: str, request: Request) -> Job:
+    src = _store(request).get(job_id)
+    job = _store(request).create(
+        product_url=src.product_url,
+        target_audience=src.target_audience,
+        aspect_ratio=src.aspect_ratio,
+        duration_sec=src.duration_sec,
+        resolution=src.resolution,
+    )
+    _orchestrator(request).schedule(job.id)
+    return job
+
+
+@router.post("/jobs/{job_id}/export", response_model=ExportResponse)
+async def export_job(job_id: str, body: ExportRequest, request: Request) -> ExportResponse:
+    job = _store(request).get(job_id)
+    if job.status != JobStatus.ready or not job.video_url:
+        raise DartError(CONFLICT, "Job is not ready to export.", status=409)
+    # v1 export is assisted: download returns the asset; platforms get a handoff link.
+    handoff_url = (
+        job.video_url
+        if body.destination == "download"
+        else f"https://app.dart.studio/export/{body.destination}/{job.id}"
+    )
+    return ExportResponse(
+        destination=body.destination,
+        handoff_url=handoff_url,
+        expires_at=utcnow() + timedelta(hours=1),
+    )
