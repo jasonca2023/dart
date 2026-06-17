@@ -9,9 +9,10 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .api.jobs import router as jobs_router
-from .config import Settings, get_settings
+from .config import Settings, get_settings, media_root
 from .errors import DartError, dart_error_handler
 from .pipeline import Orchestrator
 from .providers.factory import build_providers
@@ -39,6 +40,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.add_exception_handler(DartError, dart_error_handler)
     app.include_router(jobs_router)
+
+    # Serve generated videos (LTX writes mp4s here) at /media/<file>.mp4.
+    media = media_root()
+    media.mkdir(parents=True, exist_ok=True)
+    app.mount("/media", StaticFiles(directory=str(media)), name="media")
 
     @app.get("/health")
     async def health() -> dict:

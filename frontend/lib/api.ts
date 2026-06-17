@@ -89,8 +89,7 @@ export const api = {
       if (destination === "download") {
         return {
           destination,
-          handoff_url:
-            "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+          handoff_url: "https://media.w3.org/2010/05/sintel/trailer.mp4",
           expires_at: new Date(Date.now() + 36e5).toISOString(),
         };
       }

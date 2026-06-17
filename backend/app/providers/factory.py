@@ -8,17 +8,17 @@ from __future__ import annotations
 
 import logging
 
-from ..config import Settings
+from ..config import Settings, media_root
 from .base import ProductScraper, ScriptGenerator, VideoGenerator
 from .scraper import JsonLdProductScraper, MockProductScraper
 from .script import AnthropicScriptGenerator, MockScriptGenerator
-from .video import KlingVideoGenerator, MockVideoGenerator
+from .video import KlingVideoGenerator, LtxVideoGenerator, MockVideoGenerator
 
 log = logging.getLogger("dart.providers")
 
 
 def build_scraper(s: Settings) -> ProductScraper:
-    if s.scraper_provider == "jsonld":
+    if s.scraper_provider in ("jsonld", "web"):
         return JsonLdProductScraper(timeout=s.request_timeout_sec)
     return MockProductScraper(delay=s.mock_stage_delay_sec)
 
@@ -36,6 +36,19 @@ def build_script_generator(s: Settings) -> ScriptGenerator:
 
 
 def build_video_generator(s: Settings) -> VideoGenerator:
+    if s.video_provider == "ltx":
+        if not s.ltx_api_key:
+            log.warning("video_provider=ltx but LTX_API_KEY missing; using mock.")
+            return MockVideoGenerator(delay=s.mock_stage_delay_sec)
+        return LtxVideoGenerator(
+            api_key=s.ltx_api_key,
+            media_dir=media_root(),
+            public_base_url=s.public_base_url,
+            model=s.ltx_model,
+            fps=s.ltx_fps,
+            generate_audio=s.ltx_generate_audio,
+            timeout=s.video_timeout_sec,
+        )
     if s.video_provider == "kling":
         if not s.kling_secret_key:
             log.warning("video_provider=kling but KLING_SECRET_KEY missing; using mock.")

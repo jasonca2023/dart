@@ -8,6 +8,7 @@ set the relevant env vars to switch a stage to its real adapter.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -35,9 +36,19 @@ class Settings(BaseSettings):
     # Model id is configurable per the PRD; never hard-code in source.
     script_model: str = "claude-opus-4-8"
 
-    # --- Video provider (Kling) ---
+    # --- Video provider: Kling ---
     kling_secret_key: str | None = None
     kling_api_base: str = "https://api.klingai.com"
+
+    # --- Video provider: LTX Video (Lightricks) ---
+    ltx_api_key: str | None = None
+    ltx_model: str = "ltx-2-fast"
+    ltx_fps: int = 25  # ltx-2 models want 25fps at 1080p (24 is rejected there)
+    ltx_generate_audio: bool = False
+
+    # Public base URL the browser uses to fetch generated videos served from /media.
+    public_base_url: str = "http://localhost:8000"
+    video_timeout_sec: float = 300.0
 
     # --- Scraper ---
     mcp_scraper_url: str | None = None
@@ -50,3 +61,8 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def media_root() -> Path:
+    """Directory where generated videos are written and served from (/media)."""
+    return Path(__file__).resolve().parent.parent / "media"

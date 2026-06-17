@@ -1,7 +1,12 @@
 """Product scrapers.
 
-MockProductScraper   — deterministic, no network. Default for the vertical slice.
-JsonLdProductScraper — best-effort real scraper using JSON-LD / OpenGraph metadata.
+MockProductScraper — deterministic, no network. Used when SCRAPER_PROVIDER=mock.
+WebProductScraper  — real scraper: fetches the page and extracts product data from
+                     JSON-LD, OpenGraph, or (as a fallback) the <title> + common
+                     product-image patterns (handles Amazon, Shopify, generic OG).
+
+Note: respect each site's robots/ToS. This issues a single user-initiated fetch of
+the URL the user pasted; it is not a crawler.
 """
 
 from __future__ import annotations
@@ -9,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 from html.parser import HTMLParser
 from typing import Optional
 from urllib.parse import urlparse
@@ -16,6 +22,24 @@ from urllib.parse import urlparse
 from ..errors import INVALID_URL, NO_PRODUCT_IMAGE, SCRAPE_FAILED, DartError
 from ..models import Product
 from .base import ProductScraper
+
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    # gzip/deflate only — httpx decodes these without the optional brotli dep.
+    "Accept-Encoding": "gzip, deflate",
+}
+
+# Common main-image patterns, in priority order (Amazon hiRes/landing, then generic).
+_IMAGE_PATTERNS = [
+    re.compile(r'"hiRes":"(https://[^"]+\.jpg)"'),
+    re.compile(r'data-old-hires="(https://[^"]+\.jpg)"'),
+    re.compile(r'id="landingImage"[^>]*\bsrc="(https://[^"]+)"'),
+]
 
 
 def _validate_url(url: str) -> None:
@@ -31,6 +55,13 @@ def _source_for(host: str) -> str:
     if "amazon" in host:
         return "amazon"
     return "web"
+
+
+def _to_cents(value: object) -> Optional[int]:
+    try:
+        return round(float(str(value)) * 100)
+    except (TypeError, ValueError):
+        return None
 
 
 class MockProductScraper(ProductScraper):
@@ -49,7 +80,7 @@ class MockProductScraper(ProductScraper):
         title = slug.replace("-", " ").replace("_", " ").title() or "Premium Product"
         return Product(
             title=title,
-            price=1999 + seed % 8000,  # $19.99–$99.99
+            price=1999 + seed % 8000,
             currency="USD",
             images=[f"https://picsum.photos/seed/{seed % 100000}/1024/1024"],
             specs={"vendor": parsed.netloc},
@@ -57,7 +88,7 @@ class MockProductScraper(ProductScraper):
         )
 
 
-# --- JSON-LD / OpenGraph scraper -------------------------------------------------
+# --- Real scraper ----------------------------------------------------------------
 
 
 class _MetaParser(HTMLParser):
@@ -98,13 +129,6 @@ class _MetaParser(HTMLParser):
             self.title = data.strip()
 
 
-def _to_cents(value: object) -> Optional[int]:
-    try:
-        return round(float(str(value)) * 100)
-    except (TypeError, ValueError):
-        return None
-
-
 def _iter_ld_nodes(raw_blocks: list[str]):
     for raw in raw_blocks:
         try:
@@ -130,10 +154,11 @@ def _from_ld(raw_blocks: list[str], url: str) -> Optional[Product]:
         offers = node.get("offers") or {}
         if isinstance(offers, list):
             offers = offers[0] if offers else {}
+        offers = offers if isinstance(offers, dict) else {}
         return Product(
             title=str(node.get("name") or "Product"),
-            price=_to_cents(offers.get("price")) if isinstance(offers, dict) else None,
-            currency=str(offers.get("priceCurrency", "USD")) if isinstance(offers, dict) else "USD",
+            price=_to_cents(offers.get("price")),
+            currency=str(offers.get("priceCurrency", "USD")),
             images=[str(i) for i in images if i],
             specs={"brand": str(node["brand"])} if isinstance(node.get("brand"), str) else {},
             source=_source_for(urlparse(url).netloc),
@@ -141,20 +166,42 @@ def _from_ld(raw_blocks: list[str], url: str) -> Optional[Product]:
     return None
 
 
-def _from_meta(meta: dict[str, str], title: Optional[str], url: str) -> Optional[Product]:
-    image = meta.get("og:image")
+def _clean_title(raw: str, host: str) -> str:
+    title = (raw or "").strip()
+    if "amazon" in host.lower():
+        # "Amazon.com: <name> | <marketing> | <brand> : Electronics" -> "<name>"
+        title = re.sub(r"^Amazon\.com\s*:\s*", "", title)
+        title = title.split(" | ")[0]
+        title = title.split(" : ")[0]
+    return title.strip() or "Product"
+
+
+def _find_image(html: str, meta: dict[str, str]) -> Optional[str]:
+    if meta.get("og:image"):
+        return meta["og:image"]
+    for pattern in _IMAGE_PATTERNS:
+        m = pattern.search(html)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _from_page(html: str, meta: dict[str, str], page_title: Optional[str], url: str) -> Optional[Product]:
+    host = urlparse(url).netloc
+    image = _find_image(html, meta)
     if not image:
         return None
+    title = _clean_title(meta.get("og:title") or page_title or "", host)
     return Product(
-        title=meta.get("og:title") or title or "Product",
+        title=title,
         price=_to_cents(meta.get("product:price:amount")),
         currency=meta.get("product:price:currency", "USD"),
         images=[image],
-        source=_source_for(urlparse(url).netloc),
+        source=_source_for(host),
     )
 
 
-class JsonLdProductScraper(ProductScraper):
+class WebProductScraper(ProductScraper):
     def __init__(self, timeout: float = 20.0) -> None:
         self.timeout = timeout
 
@@ -167,9 +214,7 @@ class JsonLdProductScraper(ProductScraper):
 
         try:
             async with httpx.AsyncClient(
-                timeout=self.timeout,
-                follow_redirects=True,
-                headers={"User-Agent": "DartBot/0.1 (+https://dart.studio)"},
+                timeout=self.timeout, follow_redirects=True, headers=_BROWSER_HEADERS
             ) as client:
                 resp = await client.get(url)
                 resp.raise_for_status()
@@ -184,11 +229,15 @@ class JsonLdProductScraper(ProductScraper):
 
         parser = _MetaParser()
         parser.feed(html)
-        product = _from_ld(parser.ld_blocks, url) or _from_meta(parser.meta, parser.title, url)
+        product = _from_ld(parser.ld_blocks, url) or _from_page(html, parser.meta, parser.title, url)
         if product is None or not product.images:
             raise DartError(
                 NO_PRODUCT_IMAGE,
-                "No usable product image found on the page.",
+                "Could not find product data (title + image) on the page.",
                 status=422,
             )
         return product
+
+
+# Back-compat alias (factory historically referenced JsonLdProductScraper).
+JsonLdProductScraper = WebProductScraper

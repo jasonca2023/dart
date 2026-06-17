@@ -69,8 +69,8 @@ const MOCK_PRODUCTS: Omit<Product, "source">[] = [
   },
 ];
 
-const SAMPLE_VIDEO =
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
+// (The old gtv-videos-bucket samples now 403; W3C-hosted media is stable.)
+const SAMPLE_VIDEO = "https://media.w3.org/2010/05/sintel/trailer.mp4";
 
 interface MockRecord extends CreateJobInput {
   id: string;

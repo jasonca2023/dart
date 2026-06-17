@@ -60,10 +60,12 @@ class MockScriptGenerator(ScriptGenerator):
         if self.delay:
             await asyncio.sleep(self.delay)
         d = duration_sec
+        # Image-to-video friendly: describe camera/product motion, not a person
+        # (the renderer animates the product photo).
         prompt = (
-            f"Cinematic {aspect_ratio} product commercial for '{product.title}'. A stylish "
-            f"person representing {target_audience} interacts naturally with the product in a "
-            "bright modern setting; studio lighting, photorealistic 4K, smooth camera motion."
+            f"Cinematic {aspect_ratio} product commercial. Slow, smooth push-in on the "
+            f"{product.title} with soft studio lighting, subtle reflections and gentle parallax; "
+            f"shallow depth of field, warm premium grade, tailored for {target_audience}."
         )
         scenes = [
             Scene(t_start=0, t_end=max(2, d // 3), description=f"Hero reveal of {product.title}", camera="slow push-in"),

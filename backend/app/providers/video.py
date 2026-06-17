@@ -10,12 +10,15 @@ KlingVideoGenerator — submits image + prompt to Kling and polls for completion
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
+from uuid import uuid4
 
-from ..errors import RENDER_FAILED, DartError
+from ..errors import NO_PRODUCT_IMAGE, RENDER_FAILED, DartError
 from .base import VideoGenerator, VideoResult
 
 # Public sample clip — lets the frontend exercise the full flow end-to-end.
-_SAMPLE_VIDEO = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+# (The old gtv-videos-bucket samples now 403; W3C-hosted media is stable + CORS-open.)
+_SAMPLE_VIDEO = "https://media.w3.org/2010/05/sintel/trailer.mp4"
 
 
 class MockVideoGenerator(VideoGenerator):
@@ -115,3 +118,100 @@ class KlingVideoGenerator(VideoGenerator):
                 delay = min(delay * 1.5, 30.0)  # exponential backoff
 
         raise DartError(RENDER_FAILED, "Video render timed out.", status=504, retryable=True)
+
+
+class LtxVideoGenerator(VideoGenerator):
+    """LTX Video (Lightricks) image-to-video.
+
+    Animates the scraped product image into a short ad. The /v1 endpoint is
+    synchronous and returns the mp4 bytes directly; we save them under media_dir
+    and return a URL the backend serves from /media.
+    """
+
+    _ENDPOINT = "https://api.ltx.video/v1/image-to-video"
+    # (aspect_ratio, resolution) -> "WxH" (ltx-2 supports 16:9 and 9:16).
+    _RESOLUTION = {
+        ("16:9", "1080p"): "1920x1080",
+        ("16:9", "2160p"): "3840x2160",
+        ("9:16", "1080p"): "1080x1920",
+        ("9:16", "2160p"): "2160x3840",
+        ("1:1", "1080p"): "1080x1080",
+        ("1:1", "2160p"): "2160x2160",
+    }
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        media_dir: Path,
+        public_base_url: str,
+        model: str = "ltx-2-fast",
+        fps: int = 25,
+        generate_audio: bool = False,
+        timeout: float = 300.0,
+    ) -> None:
+        self.api_key = api_key
+        self.media_dir = Path(media_dir)
+        self.media_dir.mkdir(parents=True, exist_ok=True)
+        self.public_base_url = public_base_url.rstrip("/")
+        self.model = model
+        self.fps = fps
+        self.generate_audio = generate_audio
+        self.timeout = timeout
+
+    async def generate(
+        self,
+        *,
+        image_url: str,
+        prompt: str,
+        duration_sec: int,
+        resolution: str,
+        aspect_ratio: str,
+    ) -> VideoResult:
+        if not image_url:
+            raise DartError(NO_PRODUCT_IMAGE, "No product image to animate.", status=422)
+
+        try:
+            import httpx
+        except ImportError as e:  # pragma: no cover - dependency guard
+            raise DartError(RENDER_FAILED, "httpx is not installed.", status=500) from e
+
+        body = {
+            "image_uri": image_url,
+            "prompt": prompt,
+            "model": self.model,
+            "duration": int(duration_sec),
+            "resolution": self._RESOLUTION.get((aspect_ratio, resolution), "1920x1080"),
+            "fps": self.fps,
+            "generate_audio": self.generate_audio,
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.post(self._ENDPOINT, json=body, headers=headers)
+        except Exception as e:
+            raise DartError(
+                RENDER_FAILED, "Could not reach the video provider.", status=502, retryable=True
+            ) from e
+
+        if resp.status_code != 200:
+            raise DartError(
+                RENDER_FAILED,
+                f"Video provider error: {_ltx_error(resp)}",
+                status=502,
+                retryable=resp.status_code in (429, 500, 503, 504),
+            )
+
+        filename = f"{uuid4().hex}.mp4"
+        (self.media_dir / filename).write_bytes(resp.content)
+        return VideoResult(video_url=f"{self.public_base_url}/media/{filename}", cost_cents=0)
+
+
+def _ltx_error(resp) -> str:
+    try:
+        data = resp.json()
+        err = data.get("error", data)
+        return str(err.get("message") or err)[:200]
+    except Exception:
+        return f"HTTP {resp.status_code}"
