@@ -1,7 +1,13 @@
 "use client";
 
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Float, Sparkles, MeshDistortMaterial } from "@react-three/drei";
+import {
+  Float,
+  Sparkles,
+  MeshDistortMaterial,
+  Environment,
+  Lightformer,
+} from "@react-three/drei";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
@@ -12,7 +18,10 @@ const EMBER = "#ff4704";
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 // The hero asset: a soft glass orb, lit violet on one flank and ember on the
-// other so the brand gradient is painted by real light, not a texture.
+// other so the brand gradient is painted by real light, not a texture. A studio
+// reflection rig (Environment + Lightformers, no network fetch) gives the
+// surface gentle specular streaks so it reads as polished glass — kept soft, not
+// glaring.
 function Core({ reduced }: { reduced: boolean }) {
   const ref = useRef<THREE.Mesh>(null);
   const intro = useRef(0);
@@ -21,99 +30,107 @@ function Core({ reduced }: { reduced: boolean }) {
     if (!m) return;
     intro.current = Math.min(1, intro.current + dt / 1.1);
     m.scale.setScalar(0.55 + 0.45 * easeOutCubic(intro.current));
-    if (!reduced) m.rotation.y += dt * 0.12;
+    if (!reduced) m.rotation.y += dt * 0.1;
   });
   return (
     <mesh ref={ref}>
-      <icosahedronGeometry args={[1, 8]} />
+      <icosahedronGeometry args={[1, 12]} />
       <MeshDistortMaterial
-        color="#efeaff"
-        distort={reduced ? 0 : 0.34}
-        speed={reduced ? 0 : 1.5}
-        roughness={0.12}
-        metalness={0.06}
+        color="#f1edff"
+        distort={reduced ? 0 : 0.26}
+        speed={reduced ? 0 : 1.2}
+        roughness={0.16}
+        metalness={0.18}
+        envMapIntensity={0.6}
       />
     </mesh>
   );
 }
 
-// A motion-graphic ring that drifts around the core on its own tilt.
-function Ring({
-  radius,
-  tilt,
-  speed,
-  color,
-  reduced,
-}: {
-  radius: number;
-  tilt: number;
-  speed: number;
-  color: string;
-  reduced: boolean;
-}) {
-  const ref = useRef<THREE.Mesh>(null);
-  useFrame((_, dt) => {
-    if (ref.current && !reduced) ref.current.rotation.z += dt * speed;
-  });
+// A soft chromatic halo hugging the silhouette — energy bleeding off the glass.
+function Halo({ color, scale }: { color: string; scale: number }) {
   return (
-    <mesh ref={ref} rotation={[tilt, 0.3, 0]}>
-      <torusGeometry args={[radius, 0.007, 12, 180]} />
-      <meshBasicMaterial color={color} transparent opacity={0.4} />
+    <mesh scale={scale}>
+      <sphereGeometry args={[1, 48, 48]} />
+      <meshBasicMaterial
+        color={color}
+        transparent
+        opacity={0.13}
+        side={THREE.BackSide}
+        depthWrite={false}
+        toneMapped={false}
+      />
     </mesh>
   );
 }
 
-// Small bodies that fly in from beyond the frame and settle into orbit.
-function Orbit({
+// One orbital plane: a thin ring with small bodies riding *on* the ring line.
+// Ring + dots live in the same local XY plane (the torus lies in XY, so a circle
+// of the same radius sits exactly on its centerline). Spinning the shared group
+// about Z carries the dots along the ring while the ring itself — rotationally
+// symmetric about Z — appears to hold still.
+function OrbitalRing({
   radius,
+  orient,
+  spin,
   count,
-  tilt,
-  speed,
-  size,
+  dotSize,
   color,
   reduced,
 }: {
   radius: number;
+  orient: [number, number, number];
+  spin: number;
   count: number;
-  tilt: number;
-  speed: number;
-  size: number;
+  dotSize: number;
   color: string;
   reduced: boolean;
 }) {
-  const group = useRef<THREE.Group>(null);
+  const spinRef = useRef<THREE.Group>(null);
+  const dotsRef = useRef<THREE.Group>(null);
   const intro = useRef(0);
   const phases = useMemo(
     () => Array.from({ length: count }, (_, i) => (i / count) * Math.PI * 2),
     [count],
   );
-  useFrame((state, dt) => {
-    const g = group.current;
-    if (!g) return;
-    intro.current = Math.min(1, intro.current + dt / 1.5);
+  useFrame((_, dt) => {
+    if (spinRef.current && !reduced) spinRef.current.rotation.z += dt * spin;
+    // Entrance: dots pop onto the line rather than flying through the frame.
+    intro.current = Math.min(1, intro.current + dt / 1.2);
     const e = easeOutCubic(intro.current);
-    const r = THREE.MathUtils.lerp(radius * 1.9, radius, e); // converge to center
-    const t = reduced ? 0 : state.clock.elapsedTime * speed;
-    g.children.forEach((child, i) => {
-      const a = phases[i] + t;
-      child.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
-      child.scale.setScalar(e);
-    });
+    dotsRef.current?.children.forEach((c) => c.scale.setScalar(e));
   });
   return (
-    <group ref={group} rotation={[tilt, 0, 0.2]}>
-      {phases.map((_, i) => (
-        <mesh key={i}>
-          <sphereGeometry args={[size, 24, 24]} />
-          <meshStandardMaterial
+    <group rotation={orient}>
+      <group ref={spinRef}>
+        <mesh>
+          <torusGeometry args={[radius, 0.01, 16, 220]} />
+          <meshBasicMaterial
             color={color}
-            emissive={color}
-            emissiveIntensity={0.35}
-            roughness={0.25}
-            metalness={0.1}
+            transparent
+            opacity={0.5}
+            toneMapped={false}
           />
         </mesh>
-      ))}
+        <group ref={dotsRef}>
+          {phases.map((p, i) => (
+            <mesh
+              key={i}
+              position={[Math.cos(p) * radius, Math.sin(p) * radius, 0]}
+            >
+              <sphereGeometry args={[dotSize, 24, 24]} />
+              <meshStandardMaterial
+                color={color}
+                emissive={color}
+                emissiveIntensity={0.7}
+                roughness={0.25}
+                metalness={0.1}
+                toneMapped={false}
+              />
+            </mesh>
+          ))}
+        </group>
+      </group>
     </group>
   );
 }
@@ -144,10 +161,20 @@ export function HeroScene({ reduced }: { reduced: boolean }) {
       gl={{ antialias: true, alpha: true }}
       style={{ background: "transparent" }}
     >
-      <ambientLight intensity={0.55} />
+      <ambientLight intensity={0.45} />
       <pointLight color={VIOLET} intensity={2.4} decay={0} position={[-3.5, 2, 3]} />
       <pointLight color={EMBER} intensity={2.4} decay={0} position={[3.5, -1.5, 2.5]} />
-      <directionalLight color="#ffffff" intensity={0.5} position={[0, 3, 5]} />
+      <directionalLight color="#ffffff" intensity={0.35} position={[0, 3, 5]} />
+      {/* Rim back-light — a soft crescent on the orb's edge, not a hotspot. */}
+      <pointLight color="#ffffff" intensity={0.8} decay={0} position={[0, 0.6, -3.6]} />
+
+      {/* Studio reflection rig — baked once, no network. Soft specular streaks. */}
+      <Environment resolution={256} frames={1}>
+        <Lightformer form="rect" intensity={1.3} color="#ffffff" position={[0, 2.5, 3]} scale={[5, 2, 1]} />
+        <Lightformer form="rect" intensity={2} color={VIOLET} position={[-4, 1, 2]} scale={[3, 5, 1]} />
+        <Lightformer form="rect" intensity={2} color={EMBER} position={[4, -1.2, 2]} scale={[3, 5, 1]} />
+        <Lightformer form="ring" intensity={0.9} color="#ffffff" position={[0, 0, -4]} scale={5} />
+      </Environment>
 
       <Rig reduced={reduced}>
         <Float
@@ -155,13 +182,15 @@ export function HeroScene({ reduced }: { reduced: boolean }) {
           rotationIntensity={reduced ? 0 : 0.3}
           floatIntensity={reduced ? 0 : 0.5}
         >
+          <Halo color={VIOLET} scale={1.05} />
+          <Halo color={EMBER} scale={1.12} />
           <Core reduced={reduced} />
         </Float>
-        <Ring radius={1.65} tilt={1.3} speed={0.3} color={VIOLET} reduced={reduced} />
-        <Ring radius={2.05} tilt={-0.6} speed={-0.22} color={EMBER} reduced={reduced} />
-        <Orbit radius={1.8} count={3} tilt={0.5} speed={0.5} size={0.085} color={VIOLET} reduced={reduced} />
-        <Orbit radius={2.15} count={2} tilt={-0.45} speed={-0.4} size={0.065} color={EMBER} reduced={reduced} />
-        <Sparkles count={36} scale={6} size={2.2} speed={reduced ? 0 : 0.3} color={VIOLET} opacity={0.5} />
+        {/* Each color's dots ride its own ring line. */}
+        <OrbitalRing radius={1.65} orient={[1.3, 0.3, 0]} spin={0.35} count={3} dotSize={0.085} color={VIOLET} reduced={reduced} />
+        <OrbitalRing radius={2.05} orient={[-0.6, 0.3, 0]} spin={-0.26} count={2} dotSize={0.065} color={EMBER} reduced={reduced} />
+        <Sparkles count={34} scale={6} size={2.2} speed={reduced ? 0 : 0.3} color={VIOLET} opacity={0.5} />
+        <Sparkles count={18} scale={5} size={1.5} speed={reduced ? 0 : 0.25} color={EMBER} opacity={0.4} />
       </Rig>
     </Canvas>
   );

@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { useJobPolling } from "@/lib/hooks";
+import { useAuth } from "@/lib/auth";
+import { saveAd } from "@/lib/ads";
 import { cost, relativeTime, isTerminal } from "@/lib/format";
 import type { Job } from "@/lib/types";
 import { StatusPill } from "../ui/StatusPill";
@@ -69,6 +72,16 @@ function ScanningCard() {
 
 export function JobReview({ id }: { id: string }) {
   const { job, error, loading } = useJobPolling(id);
+  const { user } = useAuth();
+  const savedRef = useRef(false);
+
+  // Once the ad is rendered, persist it to the signed-in user's library.
+  useEffect(() => {
+    if (user && job && job.status === "ready" && job.video_url && !savedRef.current) {
+      savedRef.current = true;
+      void saveAd(job);
+    }
+  }, [user, job]);
 
   if (loading && !job) {
     return (
@@ -140,7 +153,7 @@ export function JobReview({ id }: { id: string }) {
                 {job.error?.message ?? "Something went wrong during generation."}
               </p>
               <div className="mt-6">
-                <JobActions jobId={job.id} />
+                <JobActions jobId={job.id} failed />
               </div>
             </div>
           )}

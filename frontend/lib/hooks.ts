@@ -42,11 +42,13 @@ export function useJobPolling(id: string | null, intervalMs = 2000) {
     if (!id) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
+    let fails = 0; // tolerate transient network blips before giving up
 
     const poll = async () => {
       try {
         const next = await api.getJob(id);
         if (!active) return;
+        fails = 0;
         setJob(next);
         setError(null);
         setLoading(false);
@@ -55,8 +57,13 @@ export function useJobPolling(id: string | null, intervalMs = 2000) {
         }
       } catch (e) {
         if (!active) return;
-        setError(e instanceof Error ? e.message : "Could not load job.");
-        setLoading(false);
+        fails += 1;
+        if (fails >= 5) {
+          setError(e instanceof Error ? e.message : "Could not load job.");
+          setLoading(false);
+        } else {
+          timer = setTimeout(poll, intervalMs); // retry through the blip
+        }
       }
     };
 

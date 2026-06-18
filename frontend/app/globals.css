@@ -21,10 +21,10 @@
   --color-white: #ffffff; /* elevated card */
 
   /* ── Type families (wired to next/font in layout.tsx) ────── */
-  --font-display: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system,
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
   --font-wordmark: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, monospace;
@@ -274,6 +274,65 @@ h3 {
   50% {
     opacity: 0.58;
     transform: scale(1.06);
+  }
+}
+
+/* ── Hero copy — liveliness without slop ──────────────────── */
+/* Payoff phrase carries a single solid brand hue (violet = the primary
+ * chromatic, "ad energy made visible") — nudged a touch deeper than the orb's
+ * violet so the headline reads richer without dimming the 3D scene. */
+.hero-accent {
+  color: color-mix(in oklab, var(--color-violet) 85%, #000);
+}
+
+/* Key phrases lift out of the secondary-grey subhead into full ink. */
+.hero-em {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+/* Live indicator on the eyebrow — a slow violet pulse, "the factory is on." */
+.hero-live-dot {
+  display: inline-block;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-violet);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-live-dot {
+    animation: hero-live 2.4s var(--ease-in-out) infinite;
+  }
+}
+@keyframes hero-live {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-violet) 55%, transparent);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-violet) 0%, transparent);
+    opacity: 0.65;
+  }
+}
+
+/* One-shot staggered entrance for the hero stack (eyebrow → head → sub → CTA). */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-rise {
+    opacity: 0;
+    animation: hero-rise var(--dur-slow) var(--ease-out) forwards;
+    animation-delay: var(--d, 0ms);
+  }
+}
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 

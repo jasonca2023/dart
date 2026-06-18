@@ -55,7 +55,13 @@ export function Button({
       {...rest}
     >
       {loading && <Spinner className="size-4" />}
-      <span className={loading ? "opacity-80" : undefined}>{children}</span>
+      <span
+        className={
+          "inline-flex items-center gap-2" + (loading ? " opacity-80" : "")
+        }
+      >
+        {children}
+      </span>
     </button>
   );
 }

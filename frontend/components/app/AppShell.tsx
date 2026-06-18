@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "../ui/Logo";
 import { ButtonLink } from "../ui/Button";
+import { AccountMenu } from "./AccountMenu";
 import { USING_MOCK } from "@/lib/api";
 
 // Chrome shared by every signed-in screen. Sticky low-height bar, parchment
@@ -30,6 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 Demo data
               </span>
             )}
+            <AccountMenu />
             <ButtonLink href="/dashboard" variant="primary" size="sm">
               New ad
             </ButtonLink>

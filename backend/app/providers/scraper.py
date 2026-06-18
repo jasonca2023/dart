@@ -143,14 +143,30 @@ def _iter_ld_nodes(raw_blocks: list[str]):
                 yield node
 
 
+def _ld_image_urls(image: object) -> list[str]:
+    """JSON-LD `image` may be a string, an ImageObject dict, or a list of either."""
+    items = image if isinstance(image, list) else [image]
+    urls: list[str] = []
+    for i in items:
+        if isinstance(i, str):
+            urls.append(i)
+        elif isinstance(i, dict):
+            u = i.get("url") or i.get("contentUrl")
+            if isinstance(u, str):
+                urls.append(u)
+    return urls
+
+
 def _from_ld(raw_blocks: list[str], url: str) -> Optional[Product]:
     for node in _iter_ld_nodes(raw_blocks):
         types = node.get("@type")
         types = types if isinstance(types, list) else [types]
         if "Product" not in types:
             continue
-        images = node.get("image") or []
-        images = images if isinstance(images, list) else [images]
+        images = _ld_image_urls(node.get("image"))
+        if not images:
+            # Imageless LD product — let the OpenGraph/page fallback supply the image.
+            continue
         offers = node.get("offers") or {}
         if isinstance(offers, list):
             offers = offers[0] if offers else {}
@@ -159,7 +175,7 @@ def _from_ld(raw_blocks: list[str], url: str) -> Optional[Product]:
             title=str(node.get("name") or "Product"),
             price=_to_cents(offers.get("price")),
             currency=str(offers.get("priceCurrency", "USD")),
-            images=[str(i) for i in images if i],
+            images=images,
             specs={"brand": str(node["brand"])} if isinstance(node.get("brand"), str) else {},
             source=_source_for(urlparse(url).netloc),
         )

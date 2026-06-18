@@ -21,6 +21,15 @@ from ..store import JobStore
 
 router = APIRouter()
 
+# Assisted handoff (v1): download returns the rendered asset itself; the platform
+# destinations open that platform's real ad/upload manager so the operator can
+# finish posting with the file in hand. (No silent auto-publish.)
+_PLATFORM_HANDOFF = {
+    "tiktok": "https://ads.tiktok.com/",
+    "meta": "https://business.facebook.com/adsmanager/",
+    "youtube": "https://studio.youtube.com/",
+}
+
 
 def _store(request: Request) -> JobStore:
     return request.app.state.store
@@ -72,11 +81,10 @@ async def export_job(job_id: str, body: ExportRequest, request: Request) -> Expo
     job = _store(request).get(job_id)
     if job.status != JobStatus.ready or not job.video_url:
         raise DartError(CONFLICT, "Job is not ready to export.", status=409)
-    # v1 export is assisted: download returns the asset; platforms get a handoff link.
     handoff_url = (
         job.video_url
         if body.destination == "download"
-        else f"https://app.dart.studio/export/{body.destination}/{job.id}"
+        else _PLATFORM_HANDOFF.get(body.destination, "https://app.dart.studio/")
     )
     return ExportResponse(
         destination=body.destination,

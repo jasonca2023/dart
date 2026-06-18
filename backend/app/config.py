@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     scraper_provider: str = "mock"
     # script:  "auto" (anthropic if key present, else mock) | "mock" | "anthropic"
     script_provider: str = "auto"
-    # video:   "mock" | "kling"
+    # video:   "mock" | "ltx" | "kling"
     video_provider: str = "mock"
 
     # --- LLM (script generation) ---
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     ltx_api_key: str | None = None
     ltx_model: str = "ltx-2-fast"
     ltx_fps: int = 25  # ltx-2 models want 25fps at 1080p (24 is rejected there)
-    ltx_generate_audio: bool = False
+    ltx_generate_audio: bool = True  # let LTX score the clip (music + sound design)
 
     # Public base URL the browser uses to fetch generated videos served from /media.
     public_base_url: str = "http://localhost:8000"

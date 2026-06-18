@@ -17,6 +17,13 @@ const AUDIENCES = [
   "Luxury gift shoppers",
 ];
 
+const DURATION_MIN = 3;
+const DURATION_MAX = 20;
+const DURATION_PRESETS = [5, 10, 15, 20];
+
+const clampDuration = (n: number, max = DURATION_MAX) =>
+  Math.min(max, Math.max(DURATION_MIN, Math.round(n)));
+
 // Deterministic, decorative-only mapping so the preview orb has personality.
 function toneFor(text: string) {
   const tones = ["cinematic", "energetic", "luxe", "playful", "calm"] as const;
@@ -36,6 +43,8 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
   const [error, setError] = useState<string | null>(null);
 
   const estCents = resolution === "2160p" ? 100 : 58;
+  // LTX-2 fast renders 4K at ≤10s; only 1080p goes the full 20s.
+  const maxDuration = resolution === "2160p" ? 10 : DURATION_MAX;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,7 +59,7 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
         product_url: url.trim(),
         target_audience: audience.trim() || "a broad consumer audience",
         aspect_ratio: aspect,
-        duration_sec: duration,
+        duration_sec: clampDuration(duration, maxDuration),
         resolution,
       });
       router.push(`/jobs/${job.id}`);
@@ -122,20 +131,52 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
               options={[
                 { value: "16:9", label: "16:9" },
                 { value: "9:16", label: "9:16" },
-                { value: "1:1", label: "1:1" },
               ]}
             />
           </Field>
-          <Field label="Duration">
-            <Segmented
-              ariaLabel="Duration"
-              value={duration}
-              onChange={setDuration}
-              options={[
-                { value: 5, label: "5s" },
-                { value: 10, label: "10s" },
-              ]}
-            />
+          <Field
+            label="Duration"
+            htmlFor="duration"
+            hint={
+              `Any length from ${DURATION_MIN} to ${maxDuration} seconds.` +
+              (resolution === "2160p" ? " (4K caps at 10s.)" : "")
+            }
+          >
+            <div className="flex items-center gap-2">
+              <Input
+                id="duration"
+                type="number"
+                inputMode="numeric"
+                min={DURATION_MIN}
+                max={maxDuration}
+                step={1}
+                value={Number.isFinite(duration) ? duration : ""}
+                onChange={(e) => setDuration(Number(e.target.value))}
+                onBlur={(e) =>
+                  setDuration(clampDuration(Number(e.target.value) || 10, maxDuration))
+                }
+                className="w-24"
+                aria-label="Duration in seconds"
+              />
+              <span className="text-[14px] text-driftwood">seconds</span>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {DURATION_PRESETS.filter((d) => d <= maxDuration).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDuration(d)}
+                  className={
+                    "rounded-full border px-2.5 py-1 text-[12px] transition-colors duration-150 ease-out " +
+                    (duration === d
+                      ? "border-ink bg-ink text-parchment"
+                      : "border-ash bg-white text-driftwood hover:text-ink")
+                  }
+                >
+                  {d}s
+                </button>
+              ))}
+            </div>
           </Field>
         </div>
 
@@ -143,7 +184,11 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
           <Segmented
             ariaLabel="Resolution"
             value={resolution}
-            onChange={setResolution}
+            onChange={(r) => {
+              setResolution(r);
+              // 4K is capped at 10s — pull an over-long duration back in.
+              if (r === "2160p" && duration > 10) setDuration(10);
+            }}
             options={[
               { value: "1080p", label: "1080p" },
               { value: "2160p", label: "2160p · 4K" },
@@ -179,7 +224,8 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
             <div className="flex justify-between">
               <dt className="text-driftwood">Format</dt>
               <dd className="font-mono text-ink">
-                {aspect} · {duration}s · {resolution}
+                {aspect} · {Number.isFinite(duration) ? duration : "—"}s ·{" "}
+                {resolution}
               </dd>
             </div>
             <div className="flex justify-between">

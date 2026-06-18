@@ -8,10 +8,11 @@ export type JobStatus =
   | "ready"
   | "failed";
 
-export type AspectRatio = "16:9" | "9:16" | "1:1";
+export type AspectRatio = "16:9" | "9:16";
 export type Resolution = "1080p" | "2160p";
-export type Duration = 5 | 10;
-export type ExportDestination = "tiktok" | "meta" | "download";
+// Custom ad length in seconds (backend accepts 3–20).
+export type Duration = number;
+export type ExportDestination = "tiktok" | "meta" | "youtube" | "download";
 
 export interface Product {
   title: string;

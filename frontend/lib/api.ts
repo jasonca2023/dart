@@ -93,12 +93,14 @@ export const api = {
           expires_at: new Date(Date.now() + 36e5).toISOString(),
         };
       }
+      const platforms: Record<string, string> = {
+        tiktok: "https://ads.tiktok.com/",
+        meta: "https://business.facebook.com/adsmanager/",
+        youtube: "https://studio.youtube.com/",
+      };
       return {
         destination,
-        handoff_url:
-          destination === "tiktok"
-            ? "https://ads.tiktok.com/"
-            : "https://business.facebook.com/adsmanager/",
+        handoff_url: platforms[destination] ?? "https://ads.tiktok.com/",
         expires_at: new Date(Date.now() + 36e5).toISOString(),
       };
     }

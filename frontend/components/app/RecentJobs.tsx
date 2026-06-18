@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { listAds, savedAdToJob } from "@/lib/ads";
 import { cost, relativeTime, isTerminal } from "@/lib/format";
 import type { Job } from "@/lib/types";
 import { StatusPill } from "../ui/StatusPill";
@@ -22,20 +24,29 @@ function label(job: Job): string {
 const toneCycle = ["cinematic", "energetic", "luxe", "playful", "calm"] as const;
 
 export function RecentJobs() {
+  const { user, loading: authLoading } = useAuth();
   const [jobs, setJobs] = useState<Job[] | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
 
     const load = async () => {
       try {
-        const next = await api.listJobs();
-        if (!active) return;
-        setJobs(next);
-        // Keep refreshing while anything is still in flight.
-        if (next.some((j) => !isTerminal(j.status))) {
-          timer = setTimeout(load, 2500);
+        if (user) {
+          // Signed in: the persistent library from Supabase.
+          const ads = await listAds();
+          if (!active) return;
+          setJobs(ads.map(savedAdToJob));
+        } else {
+          // Signed out: this session's jobs from the backend (ephemeral).
+          const next = await api.listJobs();
+          if (!active) return;
+          setJobs(next);
+          if (next.some((j) => !isTerminal(j.status))) {
+            timer = setTimeout(load, 2500); // refresh while in flight
+          }
         }
       } catch {
         if (active) setJobs([]);
@@ -47,7 +58,7 @@ export function RecentJobs() {
       active = false;
       clearTimeout(timer);
     };
-  }, []);
+  }, [user, authLoading]);
 
   if (jobs === null) {
     return (

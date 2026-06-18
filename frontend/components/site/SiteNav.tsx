@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "../ui/Logo";
-import { Button, ButtonLink } from "../ui/Button";
+import { ButtonLink } from "../ui/Button";
+import { AccountMenu } from "../app/AccountMenu";
 
 const LINKS = [
   { href: "/#pipeline", label: "Pipeline" },
@@ -27,9 +28,7 @@ export function SiteNav() {
           ))}
         </ul>
         <div className="ml-auto flex items-center gap-2">
-          <ButtonLink href="/auth" variant="ghost" size="sm" className="hidden sm:inline-flex">
-            Log in
-          </ButtonLink>
+          <AccountMenu />
           <ButtonLink href="/dashboard" variant="primary" size="sm">
             Start free
           </ButtonLink>

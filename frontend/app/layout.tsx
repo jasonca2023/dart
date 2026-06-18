@@ -1,18 +1,27 @@
 import type { Metadata } from "next";
-import { DM_Sans, Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import {
+  Bricolage_Grotesque,
+  Hanken_Grotesk,
+  Space_Grotesk,
+  JetBrains_Mono,
+} from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth";
 
-const dmSans = DM_Sans({
+// Display — a characterful modern grotesque (varied terminals + width) so
+// headlines read made, not defaulted.
+const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
-  variable: "--font-dm-sans",
+  weight: ["300", "400", "500", "600"],
+  variable: "--font-bricolage",
   display: "swap",
 });
 
-const inter = Inter({
+// Body — warmer + more humanist than Inter, still highly readable at text sizes.
+const hanken = Hanken_Grotesk({
   subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-inter",
+  weight: ["400", "500", "600"],
+  variable: "--font-hanken",
   display: "swap",
 });
 
@@ -51,9 +60,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+      className={`${bricolage.variable} ${hanken.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

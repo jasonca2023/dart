@@ -7,13 +7,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-AspectRatio = Literal["16:9", "9:16", "1:1"]
+AspectRatio = Literal["16:9", "9:16"]
 Resolution = Literal["1080p", "2160p"]
-Duration = Literal[5, 10]
+# Custom ad length in seconds. LTX's fast model tops out near 20s at 1080p, so
+# we accept any whole number in [3, 20] rather than a fixed pair of presets.
+Duration = Annotated[int, Field(ge=3, le=20)]
 
 
 def utcnow() -> datetime:
@@ -50,6 +52,14 @@ class Script(BaseModel):
     scenes: list[Scene] = Field(default_factory=list)
 
 
+class ApiError(BaseModel):
+    """Structured job-failure detail (matches docs/API_CONTRACT.md § Error model)."""
+
+    code: str
+    message: str
+    retryable: bool = False
+
+
 class Job(BaseModel):
     id: str
     status: JobStatus = JobStatus.queued
@@ -61,7 +71,7 @@ class Job(BaseModel):
     product: Optional[Product] = None
     script: Optional[Script] = None
     video_url: Optional[str] = None
-    error: Optional[str] = None
+    error: Optional[ApiError] = None
     cost_cents: int = 0
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
@@ -79,7 +89,7 @@ class CreateJobRequest(BaseModel):
 
 
 class ExportRequest(BaseModel):
-    destination: Literal["tiktok", "meta", "download"] = "download"
+    destination: Literal["tiktok", "meta", "youtube", "download"] = "download"
 
 
 class JobListResponse(BaseModel):

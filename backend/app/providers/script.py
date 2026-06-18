@@ -65,7 +65,9 @@ class MockScriptGenerator(ScriptGenerator):
         prompt = (
             f"Cinematic {aspect_ratio} product commercial. Slow, smooth push-in on the "
             f"{product.title} with soft studio lighting, subtle reflections and gentle parallax; "
-            f"shallow depth of field, warm premium grade, tailored for {target_audience}."
+            f"shallow depth of field, warm premium grade, tailored for {target_audience}. "
+            f"Audio: upbeat modern background music with a gentle whoosh on the push-in and "
+            f"crisp product sound design; no spoken voiceover."
         )
         scenes = [
             Scene(t_start=0, t_end=max(2, d // 3), description=f"Hero reveal of {product.title}", camera="slow push-in"),

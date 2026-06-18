@@ -135,8 +135,6 @@ class LtxVideoGenerator(VideoGenerator):
         ("16:9", "2160p"): "3840x2160",
         ("9:16", "1080p"): "1080x1920",
         ("9:16", "2160p"): "2160x3840",
-        ("1:1", "1080p"): "1080x1080",
-        ("1:1", "2160p"): "2160x2160",
     }
 
     def __init__(
@@ -176,11 +174,13 @@ class LtxVideoGenerator(VideoGenerator):
         except ImportError as e:  # pragma: no cover - dependency guard
             raise DartError(RENDER_FAILED, "httpx is not installed.", status=500) from e
 
+        # LTX-2 fast renders 4K (2160p) at ≤10s; only 1080p supports the full 20s.
+        max_duration = 10 if resolution == "2160p" else 20
         body = {
             "image_uri": image_url,
             "prompt": prompt,
             "model": self.model,
-            "duration": int(duration_sec),
+            "duration": min(int(duration_sec), max_duration),
             "resolution": self._RESOLUTION.get((aspect_ratio, resolution), "1920x1080"),
             "fps": self.fps,
             "generate_audio": self.generate_audio,
@@ -195,6 +195,14 @@ class LtxVideoGenerator(VideoGenerator):
                 RENDER_FAILED, "Could not reach the video provider.", status=502, retryable=True
             ) from e
 
+        if resp.status_code == 402:
+            raise DartError(
+                RENDER_FAILED,
+                f"LTX account is out of credits ({_ltx_error(resp)}). "
+                "Top up at https://app.ltx.video to resume rendering.",
+                status=502,
+                retryable=False,
+            )
         if resp.status_code != 200:
             raise DartError(
                 RENDER_FAILED,

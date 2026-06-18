@@ -3,7 +3,6 @@ import type { AspectRatio } from "@/lib/types";
 const RATIO: Record<AspectRatio, string> = {
   "16:9": "16 / 9",
   "9:16": "9 / 16",
-  "1:1": "1 / 1",
 };
 
 // Native <video> — real chrome, no hand-built player frame (Hallmark gate 57).

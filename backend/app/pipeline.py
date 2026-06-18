@@ -10,8 +10,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from .errors import DartError
-from .models import JobStatus
+from .errors import INTERNAL, DartError
+from .models import ApiError, JobStatus
 from .providers.base import ProductScraper, ScriptGenerator, VideoGenerator
 from .store import JobStore
 
@@ -71,10 +71,12 @@ class Orchestrator:
 
             self._advance(job, JobStatus.ready)
         except DartError as e:
-            job.error = e.message
+            job.error = ApiError(code=e.code, message=e.message, retryable=e.retryable)
             self._advance(job, JobStatus.failed)
             log.warning("job %s failed: %s", job_id, e.message)
         except Exception:  # pragma: no cover - defensive
-            job.error = "Internal error during generation."
+            job.error = ApiError(
+                code=INTERNAL, message="Internal error during generation.", retryable=False
+            )
             self._advance(job, JobStatus.failed)
             log.exception("job %s crashed", job_id)
