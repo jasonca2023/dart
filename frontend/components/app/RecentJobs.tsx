@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, USING_MOCK } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { listAds, savedAdToJob } from "@/lib/ads";
 import { cost, relativeTime, isTerminal } from "@/lib/format";
@@ -39,14 +39,18 @@ export function RecentJobs() {
           const ads = await listAds();
           if (!active) return;
           setJobs(ads.map(savedAdToJob));
-        } else {
-          // Signed out: this session's jobs from the backend (ephemeral).
+        } else if (USING_MOCK) {
+          // Local demo (no backend): the in-browser mock jobs.
           const next = await api.listJobs();
           if (!active) return;
           setJobs(next);
           if (next.some((j) => !isTerminal(j.status))) {
             timer = setTimeout(load, 2500); // refresh while in flight
           }
+        } else {
+          // Signed out against a real backend: don't expose other users' jobs.
+          if (!active) return;
+          setJobs([]);
         }
       } catch {
         if (active) setJobs([]);

@@ -56,7 +56,9 @@ async def create_job(
 
 
 @router.get("/jobs", response_model=JobListResponse)
-async def list_jobs(request: Request) -> JobListResponse:
+async def list_jobs(request: Request, user: str = Depends(require_user)) -> JobListResponse:
+    # Auth-gated: the in-memory store is global, so don't let anonymous callers
+    # enumerate everyone's jobs. (The signed-in dashboard reads from Supabase.)
     return JobListResponse(jobs=_store(request).list())
 
 

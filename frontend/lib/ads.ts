@@ -46,34 +46,39 @@ async function persistVideo(
 }
 
 // Upsert a finished job into the signed-in user's library (idempotent on id).
+// Best-effort and never throws — it's called fire-and-forget from the UI.
 export async function saveAd(job: Job): Promise<void> {
   if (!supabase) return;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
 
-  const videoUrl = job.video_url
-    ? await persistVideo(supabase, user.id, job.id, job.video_url)
-    : null;
+    const videoUrl = job.video_url
+      ? await persistVideo(supabase, user.id, job.id, job.video_url)
+      : null;
 
-  await supabase.from("dart_ads").upsert(
-    {
-      id: job.id,
-      user_id: user.id,
-      product_url: job.product_url,
-      target_audience: job.target_audience,
-      product_title: job.product?.title ?? null,
-      product_image: job.product?.images?.[0] ?? null,
-      video_url: videoUrl,
-      aspect_ratio: job.aspect_ratio,
-      duration_sec: job.duration_sec,
-      resolution: job.resolution,
-      status: job.status,
-      cost_cents: job.cost_cents,
-    },
-    { onConflict: "id" },
-  );
+    await supabase.from("dart_ads").upsert(
+      {
+        id: job.id,
+        user_id: user.id,
+        product_url: job.product_url,
+        target_audience: job.target_audience,
+        product_title: job.product?.title ?? null,
+        product_image: job.product?.images?.[0] ?? null,
+        video_url: videoUrl,
+        aspect_ratio: job.aspect_ratio,
+        duration_sec: job.duration_sec,
+        resolution: job.resolution,
+        status: job.status,
+        cost_cents: job.cost_cents,
+      },
+      { onConflict: "id" },
+    );
+  } catch {
+    // best-effort: a failed save shouldn't surface as an unhandled rejection
+  }
 }
 
 export async function listAds(): Promise<SavedAd[]> {
