@@ -14,6 +14,7 @@ RENDER_FAILED = "render_failed"
 RATE_LIMITED = "rate_limited"
 NOT_FOUND = "not_found"
 CONFLICT = "conflict"
+UNAUTHORIZED = "unauthorized"
 INTERNAL = "internal"
 
 

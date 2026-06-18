@@ -4,9 +4,10 @@ browser. Single global key (fine for the single-tenant/demo deployment)."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
+from ..auth import require_user
 from ..providers.factory import build_video_generator
 
 router = APIRouter()
@@ -32,7 +33,9 @@ async def get_settings_status(request: Request) -> dict:
 
 
 @router.post("/settings/ltx-key")
-async def set_ltx_key(body: LtxKeyRequest, request: Request) -> dict:
+async def set_ltx_key(
+    body: LtxKeyRequest, request: Request, user: str = Depends(require_user)
+) -> dict:
     s = request.app.state.settings
     key = body.api_key.strip()
     s.ltx_api_key = key or None

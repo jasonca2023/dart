@@ -16,6 +16,7 @@ def make_client() -> TestClient:
         scraper_provider="mock",
         script_provider="mock",
         video_provider="mock",
+        supabase_url=None,  # auth disabled in tests
     )
     return TestClient(create_app(settings))
 

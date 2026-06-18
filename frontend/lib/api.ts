@@ -3,6 +3,7 @@
 // the whole frontend is functional standalone (per frontend README + AGENTS.md).
 
 import { mock } from "./mock";
+import { supabase } from "./supabase";
 import type {
   CreateJobInput,
   ExportDestination,
@@ -17,10 +18,23 @@ export const USING_MOCK = !BASE;
 // A small artificial latency on the mock so loading states are exercised.
 const tick = () => new Promise<void>((r) => setTimeout(r, 280));
 
+// The logged-in user's Supabase access token, so the backend can authorize
+// write calls. Empty when signed out / Supabase not configured.
+async function authHeader(): Promise<Record<string, string>> {
+  if (!supabase) return {};
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(await authHeader()),
+      ...(init?.headers as Record<string, string> | undefined),
+    },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);

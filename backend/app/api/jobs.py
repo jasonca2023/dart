@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
+from ..auth import require_user
 from ..errors import CONFLICT, DartError
 from ..models import (
     CreateJobRequest,
@@ -40,7 +41,9 @@ def _orchestrator(request: Request) -> Orchestrator:
 
 
 @router.post("/jobs", status_code=201, response_model=Job)
-async def create_job(body: CreateJobRequest, request: Request) -> Job:
+async def create_job(
+    body: CreateJobRequest, request: Request, user: str = Depends(require_user)
+) -> Job:
     job = _store(request).create(
         product_url=body.product_url,
         target_audience=body.target_audience,
@@ -63,7 +66,9 @@ async def get_job(job_id: str, request: Request) -> Job:
 
 
 @router.post("/jobs/{job_id}/regenerate", status_code=201, response_model=Job)
-async def regenerate_job(job_id: str, request: Request) -> Job:
+async def regenerate_job(
+    job_id: str, request: Request, user: str = Depends(require_user)
+) -> Job:
     src = _store(request).get(job_id)
     job = _store(request).create(
         product_url=src.product_url,
@@ -77,7 +82,9 @@ async def regenerate_job(job_id: str, request: Request) -> Job:
 
 
 @router.post("/jobs/{job_id}/export", response_model=ExportResponse)
-async def export_job(job_id: str, body: ExportRequest, request: Request) -> ExportResponse:
+async def export_job(
+    job_id: str, body: ExportRequest, request: Request, user: str = Depends(require_user)
+) -> ExportResponse:
     job = _store(request).get(job_id)
     if job.status != JobStatus.ready or not job.video_url:
         raise DartError(CONFLICT, "Job is not ready to export.", status=409)
