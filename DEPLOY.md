@@ -45,6 +45,7 @@ Docker → add the same env vars above → Create. Note the `*.onrender.com` URL
 | `SCRAPER_PROVIDER` | `jsonld` |
 | `PUBLIC_BASE_URL` | the backend's own public URL — so video links resolve |
 | `CORS_ORIGINS` | JSON array incl. the frontend URL, e.g. `'["https://dart-frontend.x.workers.dev"]'` |
+| `SUPABASE_URL` | your Supabase project URL — **required for auth**: makes write endpoints (jobs, LTX-key) require a valid login. Omit and the public backend is open to anyone. |
 | `ANTHROPIC_API_KEY` | optional — real Claude scripts |
 
 ---

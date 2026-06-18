@@ -18,10 +18,11 @@ app/
   config.py          # env-driven settings (provider selection, keys, model id)
   models.py          # Pydantic shapes mirroring docs/API_CONTRACT.md
   errors.py          # DartError + contract error envelope
+  auth.py            # Supabase JWT verification (require_user dependency)
   store.py           # in-memory JobStore (Postgres swap in M3)
   pipeline.py        # async orchestrator: scrape -> script -> render
-  api/jobs.py        # job routes
-  api/settings.py    # runtime LTX key: GET /settings, POST /settings/ltx-key
+  api/jobs.py        # job routes (write routes require login)
+  api/settings.py    # runtime LTX key: GET /settings, POST /settings/ltx-key (auth)
   providers/         # swappable seams: scraper, script (Claude), video (LTX/Kling)
 tests/               # end-to-end API tests against the mock pipeline
 ```
@@ -55,3 +56,11 @@ so the app always runs. `GET /health` reports which providers are active.
 The LTX key can also be set **at runtime** — `POST /settings/ltx-key {"api_key": "..."}`
 rebuilds the video provider in place (the in-app "LTX key" menu uses this). The key
 is held in memory only and reverts to `.env` on restart.
+
+## Auth
+Write endpoints (`POST /jobs`, regenerate, export, `POST /settings/ltx-key`) require a
+valid **Supabase login**. The frontend sends the user's access token as
+`Authorization: Bearer <token>`; `auth.py` verifies its ES256 signature against the
+project's JWKS. Enforced only when **`SUPABASE_URL`** is set (e.g. the deployed
+backend); unset locally → endpoints are open for dev. Reads (`/health`, `GET /jobs`,
+`GET /settings`) stay public.

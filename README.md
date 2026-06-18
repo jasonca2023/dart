@@ -23,7 +23,7 @@ real product — then saves it to your library.
 - **Backend** — FastAPI pipeline (scrape → script → render) with swappable providers and an in-memory job store.
 - **Frontend** — Next.js 15 + React 19 + Tailwind v4; a code-split React Three Fiber hero.
 - **Video** — LTX Video (Lightricks) image-to-video, with generated audio.
-- **Auth + storage** — Supabase: email/password auth and per-user saved ads (Postgres + Storage, row-level secured).
+- **Auth + storage** — Supabase email/password auth; per-user saved ads (Postgres + Storage, row-level secured). The backend verifies the Supabase token on write endpoints, so generation requires sign-in.
 
 ## Quick start
 
@@ -60,11 +60,13 @@ Copy `.env.example` → `.env` (repo root — the backend reads it) and create
 | Script (optional) | `.env`: `ANTHROPIC_API_KEY` | Otherwise a templated script that names the product. |
 | Backend URL | `frontend/.env.local`: `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` | Unset → frontend uses its local mock. |
 | Supabase | `frontend/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Auth + saved-ads library. |
+| Auth (backend) | `.env`: `SUPABASE_URL` | Set it → backend requires a valid login (Supabase JWT) on write endpoints. Unset → open, for local dev. |
 
 ## What it does
 - Paste a product URL → scrape, script, and render a **3–20s** ad (16:9 / 9:16, 1080p / 4K).
 - LTX renders with generated audio. Paste your LTX key from the top-bar **LTX key** menu — it's applied at runtime, no restart.
 - Sign in (Supabase) and every finished ad is **saved to your library** and uploaded to Storage, so it plays on any device.
+- **Generating requires sign-in** — the backend verifies your Supabase token on the write endpoints, so the public API can't be driven (or have its LTX key changed) anonymously.
 - Review page: download the MP4, or open a handoff to TikTok / Meta / YouTube.
 
 ## Repository layout
