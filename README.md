@@ -4,6 +4,17 @@
 scrapes the page, directs a scene, and renders a short cinematic commercial of your
 real product — then saves it to your library.
 
+## 🚀 Live
+| | URL |
+|---|---|
+| **App** (try it) | https://dart-frontend.blink-cursor.workers.dev |
+| **Backend API** | https://dart-backend-r891.onrender.com |
+
+> Frontend on Cloudflare, backend on Render, auth + saved ads on Supabase. The
+> backend free tier sleeps when idle, so the first request after a while takes
+> ~50s to wake. Real video rendering needs an LTX key with credits (paste it from
+> the in-app **LTX key** menu); without one, renders use a placeholder clip.
+
 ```
 [ Product URL ] → [ Scrape ] → [ Script (LLM) ] → [ Video render (LTX) ] → [ Review · download · export ]
 ```
