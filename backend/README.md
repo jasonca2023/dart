@@ -20,8 +20,9 @@ app/
   errors.py          # DartError + contract error envelope
   store.py           # in-memory JobStore (Postgres swap in M3)
   pipeline.py        # async orchestrator: scrape -> script -> render
-  api/jobs.py        # routes
-  providers/         # swappable seams: scraper, script (Claude), video (Kling)
+  api/jobs.py        # job routes
+  api/settings.py    # runtime LTX key: GET /settings, POST /settings/ltx-key
+  providers/         # swappable seams: scraper, script (Claude), video (LTX/Kling)
 tests/               # end-to-end API tests against the mock pipeline
 ```
 
@@ -45,8 +46,12 @@ stage to its real adapter by copying `../.env.example` → `../.env` and setting
 | Stage | Env | Real adapter |
 |---|---|---|
 | Script | `ANTHROPIC_API_KEY` (+ `SCRIPT_MODEL`) | Claude Messages API (`claude-opus-4-8`) |
-| Video | `VIDEO_PROVIDER=kling` + `KLING_SECRET_KEY` | Kling video API |
+| Video | `VIDEO_PROVIDER=ltx` + `LTX_API_KEY` (`LTX_MODEL=ltx-2-fast`) | LTX Video image-to-video, with audio (`kling` adapter also present) |
 | Scraper | `SCRAPER_PROVIDER=jsonld` | JSON-LD / OpenGraph scraper |
 
 A real provider selected without its key falls back to mock with a logged warning,
 so the app always runs. `GET /health` reports which providers are active.
+
+The LTX key can also be set **at runtime** — `POST /settings/ltx-key {"api_key": "..."}`
+rebuilds the video provider in place (the in-app "LTX key" menu uses this). The key
+is held in memory only and reverts to `.env` on restart.

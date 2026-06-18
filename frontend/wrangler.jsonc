@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dart-frontend",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  }
+  // Build-time public env (NEXT_PUBLIC_API_BASE_URL, NEXT_PUBLIC_SUPABASE_*) are
+  // inlined by `next build` — set them in the deploy environment, not here.
+}

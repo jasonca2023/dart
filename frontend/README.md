@@ -26,19 +26,24 @@ To talk to the real backend, set the base URL (only `NEXT_PUBLIC_*` reaches the 
 ```bash
 # .env.local
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+
+# Supabase — auth + saved-ads library (the publishable key is browser-safe)
+NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable key>
 ```
 
 `lib/api.ts` then calls the contract endpoints in [`../docs/API_CONTRACT.md`](../docs/API_CONTRACT.md)
-instead of the mock — no other code changes needed.
+instead of the mock — no other code changes needed. With Supabase set, signing in
+saves every finished ad to the user's library (Postgres + Storage, row-level secured).
 
 ## Routes
 
 | Path | Screen |
 |---|---|
 | `/` | Marketing landing — hero, pipeline switcher, ad-mood orbs, dashboard preview |
-| `/dashboard` | Launch form (URL + audience + format) and recent-ads history |
-| `/jobs/[id]` | Live four-stage status, video player, scraped product, script, export |
-| `/auth` | Placeholder sign-in (no real auth yet — see PRD §13 / contract Auth) |
+| `/dashboard` | Launch form (URL · audience · duration · format), the top-bar **LTX key** menu, and your saved-ads library |
+| `/jobs/[id]` | Live four-stage status, video player, scraped product, script, download/export |
+| `/auth` | Sign in / sign up — Supabase email + password |
 
 ## Layout
 
@@ -47,4 +52,5 @@ instead of the mock — no other code changes needed.
 - `components/site/` — marketing sections (the hero centerpiece is a code-split
   React Three Fiber scene: glass orb + orbiting motion graphics, `HeroScene.tsx`)
 - `components/app/` — dashboard / job-review components
-- `lib/` — `types.ts` (mirrors the contract), `api.ts`, `mock.ts`, `format.ts`, `hooks.ts`
+- `lib/` — `types.ts` (mirrors the contract), `api.ts`, `mock.ts`, `format.ts`, `hooks.ts`;
+  `supabase.ts` + `auth.tsx` (client + auth context), `ads.ts` (saved-ads library)
