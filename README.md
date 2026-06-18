@@ -4,7 +4,7 @@
 scrapes the page, directs a scene, and renders a short cinematic commercial of your
 real product — then saves it to your library.
 
-## 🚀 Live
+## Live
 | | URL |
 |---|---|
 | **App** (try it) | https://dart-frontend.blink-cursor.workers.dev |
