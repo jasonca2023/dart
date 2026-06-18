@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useJobPolling } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
-import { saveAd } from "@/lib/ads";
+import { saveAd, getAd, savedAdToJob, type SavedAd } from "@/lib/ads";
 import { cost, relativeTime, isTerminal } from "@/lib/format";
 import type { Job } from "@/lib/types";
 import { StatusPill } from "../ui/StatusPill";
@@ -14,7 +14,7 @@ import { ProductCard } from "./ProductCard";
 import { ScriptView } from "./ScriptView";
 import { JobActions } from "./JobActions";
 import { Button } from "../ui/Button";
-import { ArrowRight, Alert } from "../icons";
+import { ArrowRight, Alert, Download } from "../icons";
 
 function title(job: Job): string {
   if (job.product?.title) return job.product.title;
@@ -28,7 +28,7 @@ function title(job: Job): string {
 
 function MetaCard({ job }: { job: Job }) {
   const rows: [string, string][] = [
-    ["Audience", job.target_audience],
+    ["Audience", job.target_audience || "—"],
     ["Format", `${job.aspect_ratio} · ${job.duration_sec}s · ${job.resolution}`],
     ["Cost", cost(job.cost_cents)],
     ["Created", relativeTime(job.created_at)],
@@ -70,10 +70,96 @@ function ScanningCard() {
   );
 }
 
+// Read-only view of an ad loaded from the user's saved library (used when the
+// backend no longer has the live job — e.g. a past session or after a restart).
+function SavedAdView({ ad }: { ad: SavedAd }) {
+  const job = savedAdToJob(ad);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setDone(msg);
+    setTimeout(() => setDone(null), 2400);
+  }
+
+  async function download() {
+    if (!ad.video_url) return;
+    setBusy(true);
+    try {
+      const r = await fetch(ad.video_url);
+      if (!r.ok) throw new Error("fetch failed");
+      const blob = await r.blob();
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = u;
+      a.download = `dart-ad-${ad.id.slice(0, 8)}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(u);
+      flash("Downloaded");
+    } catch {
+      window.open(ad.video_url, "_blank", "noopener");
+      flash("Opened in new tab");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-8">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-1.5 text-[13px] text-driftwood transition-colors duration-150 ease-out hover:text-ink"
+        >
+          <ArrowRight className="rotate-180 text-[15px]" />
+          Dashboard
+        </Link>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <h1 className="t-heading">{title(job)}</h1>
+          <StatusPill status={job.status} />
+        </div>
+        <p className="mt-2 break-all font-mono text-[12px] text-fog">
+          {job.product_url}
+        </p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="flex flex-col gap-6">
+          {ad.video_url ? (
+            <>
+              <VideoPlayer src={ad.video_url} aspect={job.aspect_ratio} />
+              <div className="flex flex-wrap items-center gap-2.5">
+                <Button onClick={download} loading={busy}>
+                  <Download className="text-[18px]" />
+                  Download
+                </Button>
+                {done && <span className="text-[13px] text-driftwood">{done}</span>}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-card bg-sand p-8 text-[14px] text-driftwood">
+              This saved ad has no video.
+            </div>
+          )}
+        </div>
+        <aside className="flex flex-col gap-6">
+          {job.product ? <ProductCard product={job.product} /> : null}
+          <MetaCard job={job} />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 export function JobReview({ id }: { id: string }) {
   const { job, error, loading } = useJobPolling(id);
   const { user } = useAuth();
   const savedRef = useRef(false);
+  const [saved, setSaved] = useState<SavedAd | null>(null);
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [savedChecked, setSavedChecked] = useState(false);
 
   // Once the ad is rendered, persist it to the signed-in user's library.
   useEffect(() => {
@@ -82,6 +168,22 @@ export function JobReview({ id }: { id: string }) {
       void saveAd(job);
     }
   }, [user, job]);
+
+  // Backend has nothing for this id → fall back to the saved Supabase copy.
+  useEffect(() => {
+    if (job || !error) return;
+    let active = true;
+    setSavedLoading(true);
+    getAd(id).then((ad) => {
+      if (!active) return;
+      setSaved(ad);
+      setSavedLoading(false);
+      setSavedChecked(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [job, error, id]);
 
   if (loading && !job) {
     return (
@@ -92,7 +194,16 @@ export function JobReview({ id }: { id: string }) {
     );
   }
 
-  if (error || !job) {
+  if (!job) {
+    if (savedLoading || (error && !savedChecked)) {
+      return (
+        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+          <div className="h-96 animate-pulse rounded-card bg-sand" />
+          <div className="h-96 animate-pulse rounded-card bg-sand" />
+        </div>
+      );
+    }
+    if (saved) return <SavedAdView ad={saved} />;
     return (
       <div className="mx-auto max-w-md rounded-card bg-sand px-6 py-14 text-center">
         <Alert className="mx-auto text-[28px] text-driftwood" />

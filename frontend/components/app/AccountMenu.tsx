@@ -10,17 +10,12 @@ export function AccountMenu() {
   const router = useRouter();
 
   if (loading) {
-    return <span className="hidden h-8 w-16 animate-pulse rounded-full bg-sand sm:block" />;
+    return <span className="block h-8 w-16 animate-pulse rounded-full bg-sand" />;
   }
 
   if (!user) {
     return (
-      <ButtonLink
-        href="/auth"
-        variant="ghost"
-        size="sm"
-        className="hidden sm:inline-flex"
-      >
+      <ButtonLink href="/auth" variant="ghost" size="sm">
         Log in
       </ButtonLink>
     );

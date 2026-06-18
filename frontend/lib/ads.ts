@@ -7,6 +7,7 @@ import type { Job } from "./types";
 export interface SavedAd {
   id: string;
   product_url: string;
+  target_audience: string | null;
   product_title: string | null;
   product_image: string | null;
   video_url: string | null;
@@ -18,6 +19,32 @@ export interface SavedAd {
   created_at: string;
 }
 
+const VIDEO_BUCKET = "dart-videos";
+
+// Copy the rendered video into Supabase Storage so a saved ad survives backend
+// restarts and plays on any device. Returns a durable public URL — or the
+// original URL if the copy fails, so we never lose the record.
+async function persistVideo(
+  client: NonNullable<typeof supabase>,
+  userId: string,
+  jobId: string,
+  sourceUrl: string,
+): Promise<string> {
+  try {
+    const res = await fetch(sourceUrl);
+    if (!res.ok) return sourceUrl;
+    const blob = await res.blob();
+    const path = `${userId}/${jobId}.mp4`;
+    const { error } = await client.storage
+      .from(VIDEO_BUCKET)
+      .upload(path, blob, { upsert: true, contentType: "video/mp4" });
+    if (error) return sourceUrl;
+    return client.storage.from(VIDEO_BUCKET).getPublicUrl(path).data.publicUrl;
+  } catch {
+    return sourceUrl;
+  }
+}
+
 // Upsert a finished job into the signed-in user's library (idempotent on id).
 export async function saveAd(job: Job): Promise<void> {
   if (!supabase) return;
@@ -26,14 +53,19 @@ export async function saveAd(job: Job): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) return;
 
+  const videoUrl = job.video_url
+    ? await persistVideo(supabase, user.id, job.id, job.video_url)
+    : null;
+
   await supabase.from("dart_ads").upsert(
     {
       id: job.id,
       user_id: user.id,
       product_url: job.product_url,
+      target_audience: job.target_audience,
       product_title: job.product?.title ?? null,
       product_image: job.product?.images?.[0] ?? null,
-      video_url: job.video_url,
+      video_url: videoUrl,
       aspect_ratio: job.aspect_ratio,
       duration_sec: job.duration_sec,
       resolution: job.resolution,
@@ -70,7 +102,7 @@ export function savedAdToJob(ad: SavedAd): Job {
     id: ad.id,
     status: ad.status as Job["status"],
     product_url: ad.product_url,
-    target_audience: "",
+    target_audience: ad.target_audience ?? "",
     aspect_ratio: ad.aspect_ratio as Job["aspect_ratio"],
     duration_sec: ad.duration_sec,
     resolution: ad.resolution as Job["resolution"],
