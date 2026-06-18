@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .api.jobs import router as jobs_router
+from .api.settings import router as settings_router
 from .config import Settings, get_settings, media_root
 from .errors import DartError, dart_error_handler
 from .pipeline import Orchestrator
@@ -40,6 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.add_exception_handler(DartError, dart_error_handler)
     app.include_router(jobs_router)
+    app.include_router(settings_router)
 
     # Serve generated videos (LTX writes mp4s here) at /media/<file>.mp4.
     media = media_root()

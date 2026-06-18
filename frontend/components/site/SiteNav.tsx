@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Logo } from "../ui/Logo";
 import { ButtonLink } from "../ui/Button";
 import { AccountMenu } from "../app/AccountMenu";
+import { LtxKeyMenu } from "../app/LtxKeyMenu";
 
 const LINKS = [
   { href: "/#pipeline", label: "Pipeline" },
@@ -28,6 +29,7 @@ export function SiteNav() {
           ))}
         </ul>
         <div className="ml-auto flex items-center gap-2">
+          <LtxKeyMenu />
           <AccountMenu />
           <ButtonLink href="/dashboard" variant="primary" size="sm">
             Start free

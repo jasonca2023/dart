@@ -8,6 +8,7 @@ import type {
   ExportDestination,
   ExportHandoff,
   Job,
+  VideoSettings,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "";
@@ -107,6 +108,24 @@ export const api = {
     return http<ExportHandoff>(`/jobs/${id}/export`, {
       method: "POST",
       body: JSON.stringify({ destination }),
+    });
+  },
+
+  async getSettings(): Promise<VideoSettings> {
+    if (USING_MOCK) {
+      return {
+        video_provider: "mock",
+        video_generator: "MockVideoGenerator",
+        ltx_key_set: false,
+      };
+    }
+    return http<VideoSettings>("/settings");
+  },
+
+  async setLtxKey(apiKey: string): Promise<VideoSettings & { ok: boolean }> {
+    return http<VideoSettings & { ok: boolean }>("/settings/ltx-key", {
+      method: "POST",
+      body: JSON.stringify({ api_key: apiKey }),
     });
   },
 };

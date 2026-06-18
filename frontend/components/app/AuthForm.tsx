@@ -9,6 +9,20 @@ import { Alert, ArrowRight } from "../icons";
 
 type Mode = "signin" | "signup";
 
+const PASSWORD_REQ =
+  "8+ characters with a capital letter and a special character (or 12+ characters).";
+
+// Policy: a capital letter always; 8+ chars when a special character is present,
+// otherwise 12+ chars. Returns an error string, or null when the password is OK.
+function passwordError(pw: string): string | null {
+  if (!/[A-Z]/.test(pw)) return "Add a capital letter.";
+  const hasSpecial = /[^A-Za-z0-9]/.test(pw);
+  if (hasSpecial && pw.length < 8) return "At least 8 characters.";
+  if (!hasSpecial && pw.length < 12)
+    return "Add a special character, or use 12+ characters.";
+  return null;
+}
+
 // Real Supabase email/password auth. On success the session is persisted and the
 // nav reflects it; from then on, finished ads are saved to the user's library.
 export function AuthForm() {
@@ -20,11 +34,20 @@ export function AuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const pwErr = mode === "signup" ? passwordError(password) : null;
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!supabase) {
       setError("Auth isn’t configured (missing Supabase env).");
       return;
+    }
+    if (mode === "signup") {
+      const pe = passwordError(password);
+      if (pe) {
+        setError(pe);
+        return;
+      }
     }
     setBusy(true);
     setError(null);
@@ -60,7 +83,6 @@ export function AuthForm() {
             id="email"
             type="email"
             required
-            placeholder="you@store.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
@@ -71,12 +93,18 @@ export function AuthForm() {
             id="password"
             type="password"
             required
-            minLength={6}
-            placeholder="At least 6 characters"
+            minLength={mode === "signup" ? 8 : undefined}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
           />
+          {mode === "signup" && (
+            <p
+              className={`text-[12px] ${password && pwErr ? "text-ember" : "text-driftwood"}`}
+            >
+              {password ? (pwErr ?? "Strong password.") : PASSWORD_REQ}
+            </p>
+          )}
         </Field>
 
         {error && (
