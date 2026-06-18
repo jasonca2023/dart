@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, USING_MOCK } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { supabaseEnabled } from "@/lib/supabase";
 import { Input } from "../ui/Field";
 import { Button } from "../ui/Button";
 
 // Top-bar control to paste an LTX API key. The key goes to the local backend
 // (rebuilds the video provider) and is never returned to the browser.
 export function LtxKeyMenu() {
+  const { user, loading: authLoading } = useAuth();
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -56,6 +59,9 @@ export function LtxKeyMenu() {
       setBusy(false);
     }
   }
+
+  // Engine setting — only show it to signed-in users (when real auth is on).
+  if (supabaseEnabled && (authLoading || !user)) return null;
 
   return (
     <div className="relative" ref={ref}>
