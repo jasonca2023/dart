@@ -48,6 +48,8 @@ Then open http://localhost:3000.
 
 > With **zero config** the backend runs an all-mock pipeline, and the frontend can
 > even run with no backend (a local mock drives every screen). Add keys to go real.
+>
+> For auth + the saved-ads library, set the Supabase env (see [Configuration](#configuration)).
 
 ## Configuration
 Copy `.env.example` → `.env` (repo root — the backend reads it) and create
