@@ -18,7 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Logo />
           <nav className="hidden items-center gap-1 sm:flex">
             <Link
-              href="/dashboard"
+              href="/"
               className="rounded-full px-3 py-1.5 text-[14px] text-ink transition-colors duration-150 ease-out hover:text-driftwood"
             >
               Dashboard
@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
             <LtxKeyMenu />
             <AccountMenu />
-            <ButtonLink href="/dashboard" variant="primary" size="sm">
+            <ButtonLink href="/" variant="primary" size="sm">
               New ad
             </ButtonLink>
           </div>

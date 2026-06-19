@@ -7,14 +7,14 @@ const GROUPS = [
     links: [
       { href: "/#pipeline", label: "Pipeline" },
       { href: "/#moods", label: "Ad moods" },
-      { href: "/dashboard", label: "Dashboard" },
+      { href: "/#dashboard", label: "Dashboard" },
     ],
   },
   {
     heading: "Account",
     links: [
       { href: "/auth", label: "Log in" },
-      { href: "/dashboard", label: "Start free" },
+      { href: "/auth", label: "Sign up" },
     ],
   },
 ];

@@ -1,4 +1,4 @@
-import { UrlLaunch } from "./UrlLaunch";
+import { SignInCta } from "./SignInCta";
 import { HeroVisual } from "./HeroVisual";
 
 export function Hero() {
@@ -41,7 +41,7 @@ export function Hero() {
         className="hero-rise -mt-2 flex flex-col items-center gap-4"
         style={{ "--d": "460ms" } as React.CSSProperties}
       >
-        <UrlLaunch size="lg" />
+        <SignInCta />
         <p className="font-mono text-[12px] text-fog">
           4K render · 3–20s · 16:9 / 9:16 · review before you publish
         </p>

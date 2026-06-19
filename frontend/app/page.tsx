@@ -8,9 +8,14 @@ import { FeatureShowcase } from "@/components/site/FeatureShowcase";
 import { FeatureCards } from "@/components/site/FeatureCards";
 import { CtaSection } from "@/components/site/CtaSection";
 import { Reveal } from "@/components/Reveal";
+import { HomeSwitch } from "@/components/app/HomeSwitch";
+import { AppShell } from "@/components/app/AppShell";
+import { LaunchForm } from "@/components/app/LaunchForm";
+import { RecentJobs } from "@/components/app/RecentJobs";
 
 export default function Home() {
-  return (
+  // Signed-out: the marketing landing (generate CTAs → sign-in).
+  const landing = (
     <>
       <SiteNav />
       <main>
@@ -37,4 +42,28 @@ export default function Home() {
       <SiteFooter />
     </>
   );
+
+  // Signed-in: the app — generate, plus the user's saved ads.
+  const app = (
+    <AppShell>
+      <div className="mb-10">
+        <h1 className="t-heading">New ad</h1>
+        <p className="mt-2 text-[16px] text-driftwood">
+          One product link in, one cinematic 4K ad out.
+        </p>
+      </div>
+
+      <LaunchForm initialUrl="" />
+
+      <section className="mt-16">
+        <div className="mb-5 flex items-baseline justify-between">
+          <h2 className="text-[18px] font-medium text-ink">Your ads</h2>
+          <span className="text-[13px] text-fog">Newest first</span>
+        </div>
+        <RecentJobs />
+      </section>
+    </AppShell>
+  );
+
+  return <HomeSwitch landing={landing} app={app} />;
 }

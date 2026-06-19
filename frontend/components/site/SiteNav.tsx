@@ -8,7 +8,6 @@ const LINKS = [
   { href: "/#pipeline", label: "Pipeline" },
   { href: "/#moods", label: "Ad moods" },
   { href: "/#dashboard", label: "Dashboard" },
-  { href: "/dashboard", label: "Generate" },
 ];
 
 export function SiteNav() {
@@ -31,8 +30,8 @@ export function SiteNav() {
         <div className="ml-auto flex items-center gap-2">
           <LtxKeyMenu />
           <AccountMenu />
-          <ButtonLink href="/dashboard" variant="primary" size="sm">
-            Start free
+          <ButtonLink href="/auth" variant="primary" size="sm">
+            Sign in
           </ButtonLink>
         </div>
       </nav>

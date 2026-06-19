@@ -1,4 +1,4 @@
-import { UrlLaunch } from "./UrlLaunch";
+import { SignInCta } from "./SignInCta";
 
 export function CtaSection() {
   return (
@@ -12,7 +12,7 @@ export function CtaSection() {
           render. You review and export.
         </p>
         <div className="mt-8 flex w-full justify-center">
-          <UrlLaunch size="lg" />
+          <SignInCta />
         </div>
         <p className="mt-4 font-mono text-[12px] text-fog">
           No card to start · review every cut before it ships

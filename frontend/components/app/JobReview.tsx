@@ -110,7 +110,7 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
     <div>
       <div className="mb-8">
         <Link
-          href="/dashboard"
+          href="/"
           className="inline-flex items-center gap-1.5 text-[13px] text-driftwood transition-colors duration-150 ease-out hover:text-ink"
         >
           <ArrowRight className="rotate-180 text-[15px]" />
@@ -212,7 +212,7 @@ export function JobReview({ id }: { id: string }) {
           {error ?? "We couldn’t find that job."}
         </p>
         <div className="mt-6 flex justify-center">
-          <Link href="/dashboard">
+          <Link href="/">
             <Button variant="secondary">Back to dashboard</Button>
           </Link>
         </div>
@@ -229,7 +229,7 @@ export function JobReview({ id }: { id: string }) {
       {/* Header */}
       <div className="mb-8">
         <Link
-          href="/dashboard"
+          href="/"
           className="inline-flex items-center gap-1.5 text-[13px] text-driftwood transition-colors duration-150 ease-out hover:text-ink"
         >
           <ArrowRight className="rotate-180 text-[15px]" />
