@@ -7,6 +7,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
+import { createSupabaseServer } from "@/lib/supabase-server";
 
 // Display — a characterful modern grotesque (varied terminals + width) so
 // headlines read made, not defaulted.
@@ -52,18 +53,24 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Read the signed-in user on the server so the first render is already correct.
+  const supabase = await createSupabaseServer();
+  const { data } = supabase
+    ? await supabase.auth.getUser()
+    : { data: { user: null } };
+
   return (
     <html
       lang="en"
       className={`${bricolage.variable} ${hanken.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider initialUser={data.user}>{children}</AuthProvider>
       </body>
     </html>
   );
