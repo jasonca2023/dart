@@ -1,0 +1,25 @@
+{
+  "name": "dart-remotion",
+  "version": "1.0.0",
+  "description": "Dart ad compositions, rendered with Remotion (Lambda).",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render ProductAd out/ad.mp4",
+    "lambda:fn": "remotion lambda functions deploy",
+    "lambda:site": "remotion lambda sites create src/index.ts --site-name=dart-ads"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/lambda": "^4.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "^4.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/web": "^0.0.99",
+    "typescript": "^5.8.0"
+  }
+}
