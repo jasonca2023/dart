@@ -103,6 +103,7 @@ export const ProductAd: React.FC<ProductAdProps> = ({
         >
           <Img
             src={productImage}
+            crossOrigin="anonymous"
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
