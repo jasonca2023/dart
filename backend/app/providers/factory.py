@@ -24,10 +24,7 @@ log = logging.getLogger("dart.providers")
 
 def build_scraper(s: Settings) -> ProductScraper:
     if s.scraper_provider in ("jsonld", "web"):
-        return JsonLdProductScraper(
-            timeout=s.request_timeout_sec,
-            scraper_api_key=s.scraper_api_key,
-        )
+        return JsonLdProductScraper(timeout=s.request_timeout_sec)
     return MockProductScraper(delay=s.mock_stage_delay_sec)
 
 

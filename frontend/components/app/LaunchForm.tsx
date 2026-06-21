@@ -1,14 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { AspectRatio, Duration, Resolution } from "@/lib/types";
+import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
+import { saveRenderedAd, uploadProductImage } from "@/lib/ads";
+import type { AspectRatio, Duration, Job, Resolution } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Segmented } from "../ui/Segmented";
 import { Button } from "../ui/Button";
 import { Orb } from "../ui/Orb";
 import { Alert, ArrowRight } from "../icons";
+
+type Mode = "url" | "upload";
 
 const AUDIENCES = [
   "Gen Z tech enthusiasts",
@@ -24,7 +28,6 @@ const DURATION_PRESETS = [5, 10, 15, 20];
 const clampDuration = (n: number, max = DURATION_MAX) =>
   Math.min(max, Math.max(DURATION_MIN, Math.round(n)));
 
-// Deterministic, decorative-only mapping so the preview orb has personality.
 function toneFor(text: string) {
   const tones = ["cinematic", "energetic", "luxe", "playful", "calm"] as const;
   let h = 0;
@@ -32,9 +35,74 @@ function toneFor(text: string) {
   return tones[h % tones.length];
 }
 
+function formatPrice(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  return /^[\d.,]+$/.test(t) ? `$${t}` : t;
+}
+
+function priceToCents(raw: string): number {
+  const n = parseFloat(raw.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+
+function ImagePicker({
+  file,
+  onChange,
+}: {
+  file: File | null;
+  onChange: (f: File | null) => void;
+}) {
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  useEffect(
+    () => () => {
+      if (preview) URL.revokeObjectURL(preview);
+    },
+    [preview],
+  );
+  return (
+    <label className="flex cursor-pointer items-center gap-4 rounded-[12px] border border-dashed border-ash bg-white p-4 transition-colors duration-150 ease-out hover:border-driftwood">
+      {preview ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={preview}
+          alt=""
+          className="size-16 rounded-[8px] bg-sand object-contain"
+        />
+      ) : (
+        <div className="grid size-16 place-items-center rounded-[8px] bg-sand text-driftwood">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
+            <circle cx="8.5" cy="9.5" r="1.6" fill="currentColor" />
+            <path d="m5 17 4.5-4.5L13 16l3-3 3 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      )}
+      <div className="text-[14px]">
+        <span className="font-medium text-ink">
+          {file ? file.name : "Choose an image"}
+        </span>
+        <span className="block text-[13px] text-driftwood">
+          {file ? "Click to replace" : "PNG or JPG of your product"}
+        </span>
+      </div>
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+      />
+    </label>
+  );
+}
+
 export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
   const router = useRouter();
+  const [mode, setMode] = useState<Mode>("url");
   const [url, setUrl] = useState(initialUrl);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [price, setPrice] = useState("");
   const [audience, setAudience] = useState("");
   const [aspect, setAspect] = useState<AspectRatio>("16:9");
   const [duration, setDuration] = useState<Duration>(10);
@@ -42,12 +110,10 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const estCents = resolution === "2160p" ? 100 : 58;
-  // LTX-2 fast renders 4K at ≤10s; only 1080p goes the full 20s.
+  // Everything renders in the browser now, so it's always free and 1080p.
   const maxDuration = resolution === "2160p" ? 10 : DURATION_MAX;
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function startUrl() {
     if (!url.trim()) {
       setError("Paste a product URL to generate an ad.");
       return;
@@ -69,6 +135,82 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
     }
   }
 
+  async function startUpload() {
+    if (!imageFile) {
+      setError("Add a product image.");
+      return;
+    }
+    if (!title.trim()) {
+      setError("Add a product title.");
+      return;
+    }
+    if (!canRenderInBrowser()) {
+      setError("In-browser rendering needs a recent Chrome or Edge.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    const dur = clampDuration(duration, maxDuration);
+    try {
+      const id = crypto.randomUUID();
+      // Persist the image for the saved record; render from a canvas-safe local
+      // object URL so there's no CORS step.
+      const imageUrl = await uploadProductImage(imageFile, id);
+      const objectUrl = URL.createObjectURL(imageFile);
+      let blob: Blob;
+      try {
+        blob = await renderAdInBrowser({
+          productTitle: title.trim(),
+          productImage: objectUrl,
+          price: formatPrice(price),
+          audience: audience.trim() || "everyone",
+          durationInSeconds: dur,
+          aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
+          accent: "#0447ff",
+        });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+
+      const job: Job = {
+        id,
+        status: "ready",
+        product_url: "",
+        target_audience: audience.trim(),
+        aspect_ratio: aspect,
+        duration_sec: dur,
+        resolution,
+        product: {
+          title: title.trim(),
+          price: priceToCents(price),
+          currency: "USD",
+          images: imageUrl ? [imageUrl] : [],
+          specs: {},
+          source: "upload",
+        },
+        script: null,
+        video_url: null,
+        error: null,
+        cost_cents: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      await saveRenderedAd(job, blob);
+      router.push(`/jobs/${id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not render the ad.");
+      setSubmitting(false);
+    }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (mode === "url") void startUrl();
+    else void startUpload();
+  }
+
+  const busyLabel = mode === "upload" ? "Rendering…" : "Starting…";
+
   return (
     <form
       onSubmit={onSubmit}
@@ -76,26 +218,68 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
     >
       {/* Fields */}
       <div className="flex flex-col gap-6">
-        <Field
-          label="Product URL"
-          htmlFor="product-url"
-          hint="Any product page with a clear hero image — Shopify, Amazon, Etsy and more."
-        >
-          <Input
-            id="product-url"
-            type="url"
-            inputMode="url"
-            placeholder="https://store.example.com/products/aero-runner"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            autoFocus
-          />
-        </Field>
+        <Segmented
+          ariaLabel="Product source"
+          value={mode}
+          onChange={(m) => {
+            setMode(m);
+            setError(null);
+          }}
+          options={[
+            { value: "url", label: "Product URL" },
+            { value: "upload", label: "Upload your own" },
+          ]}
+        />
+
+        {mode === "url" ? (
+          <Field
+            label="Product URL"
+            htmlFor="product-url"
+            hint="A store product page with a clear hero image — Shopify and most DTC sites work. (Amazon/Walmart block scrapers — use Upload for those.)"
+          >
+            <Input
+              id="product-url"
+              type="url"
+              inputMode="url"
+              placeholder="https://store.example.com/products/aero-runner"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              autoFocus
+            />
+          </Field>
+        ) : (
+          <>
+            <Field
+              label="Product image"
+              hint="A clear photo of your product — ideally on a plain background."
+            >
+              <ImagePicker file={imageFile} onChange={setImageFile} />
+            </Field>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <Field label="Product title" htmlFor="title">
+                <Input
+                  id="title"
+                  placeholder="Aero Runner — Lightweight Trainer"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </Field>
+              <Field label="Price" htmlFor="price" hint="Optional.">
+                <Input
+                  id="price"
+                  placeholder="$129"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                />
+              </Field>
+            </div>
+          </>
+        )}
 
         <Field
           label="Target audience"
           htmlFor="audience"
-          hint="Who is this ad for? Steers the script, pacing and tone."
+          hint="Who is this ad for? Steers the tone."
         >
           <Input
             id="audience"
@@ -137,10 +321,7 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
           <Field
             label="Duration"
             htmlFor="duration"
-            hint={
-              `Any length from ${DURATION_MIN} to ${maxDuration} seconds.` +
-              (resolution === "2160p" ? " (4K caps at 10s.)" : "")
-            }
+            hint={`Any length from ${DURATION_MIN} to ${maxDuration} seconds.`}
           >
             <div className="flex items-center gap-2">
               <Input
@@ -180,22 +361,6 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
           </Field>
         </div>
 
-        <Field label="Resolution">
-          <Segmented
-            ariaLabel="Resolution"
-            value={resolution}
-            onChange={(r) => {
-              setResolution(r);
-              // 4K is capped at 10s — pull an over-long duration back in.
-              if (r === "2160p" && duration > 10) setDuration(10);
-            }}
-            options={[
-              { value: "1080p", label: "1080p" },
-              { value: "2160p", label: "2160p · 4K" },
-            ]}
-          />
-        </Field>
-
         {error && (
           <p
             role="alert"
@@ -208,7 +373,7 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
 
         <div>
           <Button type="submit" size="lg" loading={submitting}>
-            {submitting ? "Starting…" : "Generate ad"}
+            {submitting ? busyLabel : "Generate ad"}
             {!submitting && <ArrowRight className="text-[18px]" />}
           </Button>
         </div>
@@ -218,24 +383,27 @@ export function LaunchForm({ initialUrl = "" }: { initialUrl?: string }) {
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <div className="rounded-card bg-sand p-6">
           <div className="flex items-center justify-center rounded-[14px] bg-white py-8 shadow-[var(--shadow-inset-warm)]">
-            <Orb tone={toneFor(audience || url || "cinematic")} className="size-24" />
+            <Orb
+              tone={toneFor(audience || title || url || "cinematic")}
+              className="size-24"
+            />
           </div>
           <dl className="mt-6 flex flex-col gap-3 text-[14px]">
             <div className="flex justify-between">
               <dt className="text-driftwood">Format</dt>
               <dd className="font-mono text-ink">
-                {aspect} · {Number.isFinite(duration) ? duration : "—"}s ·{" "}
-                {resolution}
+                {aspect} · {Number.isFinite(duration) ? duration : "—"}s · 1080p
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-driftwood">Est. cost</dt>
-              <dd className="font-mono text-ink">~${(estCents / 100).toFixed(2)}</dd>
+              <dt className="text-driftwood">Cost</dt>
+              <dd className="font-mono text-ink">Free</dd>
             </div>
           </dl>
           <p className="mt-5 border-t border-ash pt-4 text-[13px] leading-relaxed text-fog">
-            Dart will scrape, script and render, then hold the cut for your
-            review before anything publishes.
+            {mode === "upload"
+              ? "Renders in your browser from your own image — no scraping, nothing leaves your control until you publish."
+              : "Dart reads the page, then renders the ad in your browser. Review the cut before anything publishes."}
           </p>
         </div>
       </aside>

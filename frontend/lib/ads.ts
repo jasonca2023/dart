@@ -117,6 +117,27 @@ export async function saveRenderedAd(job: Job, blob: Blob): Promise<string | nul
   return url;
 }
 
+// Upload a user-provided product image to Storage; returns a durable public URL.
+export async function uploadProductImage(
+  file: File,
+  id: string,
+): Promise<string | null> {
+  if (!supabase) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const ext =
+    file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+  const path = `${user.id}/img-${id}.${ext}`;
+  const { error } = await supabase.storage
+    .from(VIDEO_BUCKET)
+    .upload(path, file, { upsert: true, contentType: file.type || "image/png" });
+  if (error) return null;
+  return supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
 export async function listAds(): Promise<SavedAd[]> {
   if (!supabase) return [];
   const { data, error } = await supabase

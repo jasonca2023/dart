@@ -26,8 +26,6 @@ class Settings(BaseSettings):
     # --- Provider selection ---
     # scraper: "mock" | "jsonld"
     scraper_provider: str = "mock"
-    # Optional ScraperAPI key — retries blocked sites (Amazon, etc.) via proxy.
-    scraper_api_key: str | None = None
     # script:  "auto" (anthropic if key present, else mock) | "mock" | "anthropic"
     script_provider: str = "auto"
     # video:   "mock" | "ltx" | "kling"

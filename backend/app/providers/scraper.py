@@ -217,47 +217,9 @@ def _from_page(html: str, meta: dict[str, str], page_title: Optional[str], url: 
     )
 
 
-def _extract(html: str, url: str) -> Optional[Product]:
-    parser = _MetaParser()
-    parser.feed(html)
-    return _from_ld(parser.ld_blocks, url) or _from_page(
-        html, parser.meta, parser.title, url
-    )
-
-
 class WebProductScraper(ProductScraper):
-    def __init__(self, timeout: float = 20.0, scraper_api_key: Optional[str] = None) -> None:
+    def __init__(self, timeout: float = 20.0) -> None:
         self.timeout = timeout
-        # Optional ScraperAPI key. When set, a blocked/empty direct fetch (e.g.
-        # Amazon) is retried through ScraperAPI's proxies + headless browser.
-        self.scraper_api_key = scraper_api_key
-
-    async def _fetch(self, client, url: str) -> Optional[str]:
-        try:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            return resp.text
-        except Exception:
-            return None
-
-    async def _fetch_via_scraperapi(self, client, url: str) -> Optional[str]:
-        if not self.scraper_api_key:
-            return None
-        try:
-            resp = await client.get(
-                "https://api.scraperapi.com/",
-                params={
-                    "api_key": self.scraper_api_key,
-                    "url": url,
-                    "render": "true",
-                    "country_code": "us",
-                },
-                timeout=70.0,  # rendered proxy fetches are slow
-            )
-            resp.raise_for_status()
-            return resp.text
-        except Exception:
-            return None
 
     async def scrape(self, url: str) -> Product:
         _validate_url(url)
@@ -266,27 +228,25 @@ class WebProductScraper(ProductScraper):
         except ImportError as e:  # pragma: no cover - dependency guard
             raise DartError(SCRAPE_FAILED, "httpx is not installed.", status=500) from e
 
-        async with httpx.AsyncClient(
-            timeout=self.timeout, follow_redirects=True, headers=_BROWSER_HEADERS
-        ) as client:
-            html = await self._fetch(client, url)
-            product = _extract(html, url) if html else None
+        try:
+            async with httpx.AsyncClient(
+                timeout=self.timeout, follow_redirects=True, headers=_BROWSER_HEADERS
+            ) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                html = resp.text
+        except Exception as e:
+            raise DartError(
+                SCRAPE_FAILED,
+                "Could not resolve product data from URL.",
+                status=502,
+                retryable=True,
+            ) from e
 
-            # Fallback for blocked sites (Amazon, Walmart, …) when a key is set.
-            if product is None or not product.images:
-                proxied = await self._fetch_via_scraperapi(client, url)
-                if proxied:
-                    html = proxied
-                    product = _extract(html, url)
-
+        parser = _MetaParser()
+        parser.feed(html)
+        product = _from_ld(parser.ld_blocks, url) or _from_page(html, parser.meta, parser.title, url)
         if product is None or not product.images:
-            if html is None:
-                raise DartError(
-                    SCRAPE_FAILED,
-                    "Could not resolve product data from URL.",
-                    status=502,
-                    retryable=True,
-                )
             raise DartError(
                 NO_PRODUCT_IMAGE,
                 "Could not find product data (title + image) on the page.",
