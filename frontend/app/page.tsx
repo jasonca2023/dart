@@ -49,11 +49,11 @@ export default function Home() {
       <div className="mb-10">
         <h1 className="t-heading">New ad</h1>
         <p className="mt-2 text-[16px] text-driftwood">
-          One product link in, one cinematic 4K ad out.
+          Upload a product photo — get a cinematic ad, rendered in your browser.
         </p>
       </div>
 
-      <LaunchForm initialUrl="" />
+      <LaunchForm />
 
       <section className="mt-16">
         <div className="mb-5 flex items-baseline justify-between">
