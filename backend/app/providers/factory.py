@@ -12,7 +12,12 @@ from ..config import Settings, media_root
 from .base import ProductScraper, ScriptGenerator, VideoGenerator
 from .scraper import JsonLdProductScraper, MockProductScraper
 from .script import AnthropicScriptGenerator, MockScriptGenerator
-from .video import KlingVideoGenerator, LtxVideoGenerator, MockVideoGenerator
+from .video import (
+    ClientRenderVideoGenerator,
+    KlingVideoGenerator,
+    LtxVideoGenerator,
+    MockVideoGenerator,
+)
 
 log = logging.getLogger("dart.providers")
 
@@ -36,6 +41,8 @@ def build_script_generator(s: Settings) -> ScriptGenerator:
 
 
 def build_video_generator(s: Settings) -> VideoGenerator:
+    if s.video_provider == "client":
+        return ClientRenderVideoGenerator()
     if s.video_provider == "ltx":
         if not s.ltx_api_key:
             log.warning("video_provider=ltx but LTX_API_KEY missing; using mock.")

@@ -39,6 +39,23 @@ class MockVideoGenerator(VideoGenerator):
         return VideoResult(video_url=_SAMPLE_VIDEO, cost_cents=0)
 
 
+class ClientRenderVideoGenerator(VideoGenerator):
+    """No-op renderer: the browser renders the ad (Remotion, client-side) and
+    uploads it to storage. The job reaches 'ready' with an empty video_url, which
+    is the signal the frontend uses to render. No keys, no server compute."""
+
+    async def generate(
+        self,
+        *,
+        image_url: str,
+        prompt: str,
+        duration_sec: int,
+        resolution: str,
+        aspect_ratio: str,
+    ) -> VideoResult:
+        return VideoResult(video_url="", cost_cents=0)
+
+
 class KlingVideoGenerator(VideoGenerator):
     def __init__(
         self,

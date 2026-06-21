@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useJobPolling } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
-import { saveAd, getAd, savedAdToJob, type SavedAd } from "@/lib/ads";
+import { saveAd, saveRenderedAd, getAd, savedAdToJob, type SavedAd } from "@/lib/ads";
+import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
+import { api, API_BASE } from "@/lib/api";
 import { cost, relativeTime, isTerminal } from "@/lib/format";
 import type { Job } from "@/lib/types";
 import { StatusPill } from "../ui/StatusPill";
@@ -14,7 +17,7 @@ import { ProductCard } from "./ProductCard";
 import { ScriptView } from "./ScriptView";
 import { JobActions } from "./JobActions";
 import { Button } from "../ui/Button";
-import { ArrowRight, Alert, Download } from "../icons";
+import { ArrowRight, Alert, Download, Refresh, Spinner } from "../icons";
 
 function title(job: Job): string {
   if (job.product?.title) return job.product.title;
@@ -153,6 +156,57 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
   );
 }
 
+// Actions for a browser-rendered ad (video lives in Supabase Storage, not the
+// backend) — direct download + regenerate.
+function ClientActions({ src, jobId }: { src: string; jobId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<null | "dl" | "regen">(null);
+
+  async function download() {
+    setBusy("dl");
+    try {
+      const r = await fetch(src);
+      if (!r.ok) throw new Error();
+      const blob = await r.blob();
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = u;
+      a.download = `dart-ad-${jobId.slice(0, 8)}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(u);
+    } catch {
+      window.open(src, "_blank", "noopener");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function regenerate() {
+    setBusy("regen");
+    try {
+      const job = await api.regenerate(jobId);
+      router.push(`/jobs/${job.id}`);
+    } catch {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2.5">
+      <Button onClick={download} loading={busy === "dl"}>
+        <Download className="text-[18px]" />
+        Download
+      </Button>
+      <Button variant="ghost" onClick={regenerate} loading={busy === "regen"}>
+        <Refresh className="text-[18px]" />
+        Regenerate
+      </Button>
+    </div>
+  );
+}
+
 export function JobReview({ id }: { id: string }) {
   const { job, error, loading } = useJobPolling(id);
   const { user } = useAuth();
@@ -184,6 +238,43 @@ export function JobReview({ id }: { id: string }) {
       active = false;
     };
   }, [job, error, id]);
+
+  // Client-side render: a "ready" job with no video_url means the browser should
+  // render the ad (Remotion) and upload it to the library — no key, no server.
+  const [clientVideo, setClientVideo] = useState<string | null>(null);
+  const [renderState, setRenderState] = useState<"idle" | "rendering" | "error">(
+    "idle",
+  );
+  const renderRef = useRef(false);
+  useEffect(() => {
+    if (!job || job.status !== "ready" || job.video_url || clientVideo) return;
+    if (!job.product?.images?.[0] || renderRef.current) return;
+    renderRef.current = true;
+    if (!canRenderInBrowser()) {
+      setRenderState("error");
+      return;
+    }
+    setRenderState("rendering");
+    const img = job.product.images[0];
+    const proxied = API_BASE
+      ? `${API_BASE}/proxy-image?url=${encodeURIComponent(img)}`
+      : img;
+    renderAdInBrowser({
+      productTitle: job.product.title,
+      productImage: proxied,
+      price: job.product.price ? `$${(job.product.price / 100).toFixed(2)}` : "",
+      audience: job.target_audience || "everyone",
+      durationInSeconds: job.duration_sec,
+      aspectRatio: job.aspect_ratio === "9:16" ? "9:16" : "16:9",
+      accent: "#0447ff",
+    })
+      .then(async (blob) => {
+        const url = await saveRenderedAd(job, blob);
+        setClientVideo(url ?? URL.createObjectURL(blob));
+        setRenderState("idle");
+      })
+      .catch(() => setRenderState("error"));
+  }, [job, clientVideo]);
 
   if (loading && !job) {
     return (
@@ -223,6 +314,7 @@ export function JobReview({ id }: { id: string }) {
   const ready = job.status === "ready";
   const failed = job.status === "failed";
   const inFlight = !isTerminal(job.status);
+  const videoSrc = job.video_url || clientVideo;
 
   return (
     <div>
@@ -247,11 +339,42 @@ export function JobReview({ id }: { id: string }) {
       {/* Main + side */}
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
-          {ready && job.video_url && (
+          {ready && videoSrc && (
             <>
-              <VideoPlayer src={job.video_url} aspect={job.aspect_ratio} />
-              <JobActions jobId={job.id} />
+              <VideoPlayer src={videoSrc} aspect={job.aspect_ratio} />
+              {job.video_url ? (
+                <JobActions jobId={job.id} />
+              ) : (
+                <ClientActions src={videoSrc} jobId={job.id} />
+              )}
             </>
+          )}
+
+          {ready && !videoSrc && renderState === "rendering" && (
+            <div className="flex flex-col items-center gap-3 rounded-card bg-white p-10 text-center shadow-[var(--shadow-elevated)]">
+              <Spinner className="size-6 text-driftwood" />
+              <p className="text-[15px] font-medium text-ink">Rendering your ad…</p>
+              <p className="max-w-sm text-[13px] leading-relaxed text-driftwood">
+                Your browser is rendering the video. Keep this tab open — it
+                takes a few seconds.
+              </p>
+            </div>
+          )}
+
+          {ready && !videoSrc && renderState === "error" && (
+            <div className="rounded-card bg-sand p-8">
+              <Alert className="text-[26px] text-driftwood" />
+              <h2 className="mt-4 text-[18px] font-medium text-ink">
+                Couldn’t render here
+              </h2>
+              <p className="mt-2 max-w-md text-[14px] leading-relaxed text-driftwood">
+                In-browser rendering needs a recent Chrome or Edge. Open this
+                page there, or regenerate to try again.
+              </p>
+              <div className="mt-6">
+                <JobActions jobId={job.id} failed />
+              </div>
+            </div>
           )}
 
           {failed && (

@@ -13,6 +13,7 @@ import type {
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "";
+export const API_BASE = BASE;
 export const USING_MOCK = !BASE;
 
 // A small artificial latency on the mock so loading states are exercised.

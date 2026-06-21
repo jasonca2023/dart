@@ -81,6 +81,42 @@ export async function saveAd(job: Job): Promise<void> {
   }
 }
 
+// Upload a browser-rendered ad (Blob) to Storage and save the library row.
+// Returns the durable public URL, or null on failure.
+export async function saveRenderedAd(job: Job, blob: Blob): Promise<string | null> {
+  if (!supabase) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const path = `${user.id}/${job.id}.mp4`;
+  const { error } = await supabase.storage
+    .from(VIDEO_BUCKET)
+    .upload(path, blob, { upsert: true, contentType: "video/mp4" });
+  if (error) return null;
+
+  const url = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path).data.publicUrl;
+  await supabase.from("dart_ads").upsert(
+    {
+      id: job.id,
+      user_id: user.id,
+      product_url: job.product_url,
+      target_audience: job.target_audience,
+      product_title: job.product?.title ?? null,
+      product_image: job.product?.images?.[0] ?? null,
+      video_url: url,
+      aspect_ratio: job.aspect_ratio,
+      duration_sec: job.duration_sec,
+      resolution: job.resolution,
+      status: "ready",
+      cost_cents: 0,
+    },
+    { onConflict: "id" },
+  );
+  return url;
+}
+
 export async function listAds(): Promise<SavedAd[]> {
   if (!supabase) return [];
   const { data, error } = await supabase

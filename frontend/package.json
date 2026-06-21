@@ -14,11 +14,13 @@
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "@remotion/web-renderer": "^4.0.481",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "next": "^15.5.19",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "remotion": "^4.0.481",
     "three": "^0.171.0"
   },
   "devDependencies": {
