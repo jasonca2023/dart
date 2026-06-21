@@ -90,10 +90,12 @@ export async function saveRenderedAd(job: Job, blob: Blob): Promise<string | nul
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const path = `${user.id}/${job.id}.mp4`;
+  const type = blob.type || "video/mp4";
+  const ext = type.includes("webm") ? "webm" : "mp4";
+  const path = `${user.id}/${job.id}.${ext}`;
   const { error } = await supabase.storage
     .from(VIDEO_BUCKET)
-    .upload(path, blob, { upsert: true, contentType: "video/mp4" });
+    .upload(path, blob, { upsert: true, contentType: type });
   if (error) return null;
 
   const url = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path).data.publicUrl;

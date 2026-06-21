@@ -165,7 +165,12 @@ export function LaunchForm() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      await saveRenderedAd(job, blob);
+      const saved = await saveRenderedAd(job, blob);
+      if (!saved) {
+        setError("Rendered, but saving to your library failed. Please try again.");
+        setSubmitting(false);
+        return;
+      }
       router.push(`/jobs/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not render the ad.");
