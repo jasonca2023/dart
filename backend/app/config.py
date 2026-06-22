@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # Set to the Supabase project URL to require a valid login on write endpoints.
     # Unset (local/dev) → auth is disabled and requests pass through.
     supabase_url: str | None = None
+    # Service-role (admin) key for server-side Storage/DB writes that bypass RLS.
+    # Used by /save-ad to persist browser-rendered ads on the user's behalf.
+    supabase_service_key: str | None = None
 
     # --- LLM (script generation) ---
     anthropic_api_key: str | None = None

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
-import { saveRenderedAd, uploadProductImage } from "@/lib/ads";
+import { saveRenderedAdViaBackend } from "@/lib/ads";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Segmented } from "../ui/Segmented";
@@ -123,9 +123,7 @@ export function LaunchForm() {
     const dur = clampDuration(duration);
     try {
       const id = crypto.randomUUID();
-      // Persist the image for the saved record; render from a canvas-safe local
-      // object URL so there's no CORS step.
-      const imageUrl = await uploadProductImage(imageFile, id);
+      // Render from a canvas-safe local object URL so there's no CORS step.
       const objectUrl = URL.createObjectURL(imageFile);
       let blob: Blob;
       try {
@@ -154,7 +152,7 @@ export function LaunchForm() {
           title: title.trim(),
           price: priceToCents(price),
           currency: "USD",
-          images: imageUrl ? [imageUrl] : [],
+          images: [],
           specs: {},
           source: "upload",
         },
@@ -165,12 +163,9 @@ export function LaunchForm() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      const saved = await saveRenderedAd(job, blob);
-      if (!saved) {
-        setError("Rendered, but saving to your library failed. Please try again.");
-        setSubmitting(false);
-        return;
-      }
+      // Upload + save happens on the backend (service-role key) because the
+      // project's Storage rejects user tokens directly.
+      await saveRenderedAdViaBackend(job, blob, imageFile);
       router.push(`/jobs/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not render the ad.");

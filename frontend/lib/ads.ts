@@ -2,6 +2,7 @@
 // All calls no-op when Supabase isn't configured or no user is signed in.
 
 import { supabase } from "./supabase";
+import { API_BASE } from "./api";
 import type { Job } from "./types";
 
 export interface SavedAd {
@@ -20,6 +21,78 @@ export interface SavedAd {
 }
 
 const VIDEO_BUCKET = "dart-videos";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+// Decode a JWT payload (no verification) so upload errors can report the
+// role/exp the storage API will see.
+function jwtSummary(token: string | undefined): string {
+  if (!token) return "no-token";
+  const decode = (seg: string) =>
+    JSON.parse(atob(seg.replace(/-/g, "+").replace(/_/g, "/")));
+  try {
+    const [h, p] = token.split(".");
+    const head = decode(h) as { alg?: string };
+    const c = decode(p) as { role?: string; exp?: number; sub?: string };
+    const expired =
+      typeof c.exp === "number" ? c.exp * 1000 < Date.now() : "unknown";
+    return `alg=${head.alg} role=${c.role} expired=${expired} sub=${(c.sub ?? "").slice(0, 8)}`;
+  } catch {
+    return "decode-failed";
+  }
+}
+
+const encodePath = (path: string) =>
+  path.split("/").map(encodeURIComponent).join("/");
+
+// Upload to Storage with the user's access token set explicitly on the request,
+// so it can never fall back to anon (which RLS rejects). Returns the public URL.
+async function uploadWithToken(
+  path: string,
+  body: Blob | File,
+  contentType: string,
+  token: string,
+): Promise<string> {
+  const res = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/${VIDEO_BUCKET}/${encodePath(path)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: SUPABASE_ANON,
+        "x-upsert": "true",
+        "content-type": contentType,
+      },
+      body,
+    },
+  );
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 200);
+    throw new Error(`upload ${res.status}: ${detail} [${jwtSummary(token)}]`);
+  }
+  return `${SUPABASE_URL}/storage/v1/object/public/${VIDEO_BUCKET}/${encodePath(path)}`;
+}
+
+// Upsert a library row via PostgREST with the user's token set explicitly.
+async function upsertAdWithToken(
+  row: Record<string, unknown>,
+  token: string,
+): Promise<void> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/dart_ads`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: SUPABASE_ANON,
+      "content-type": "application/json",
+      Prefer: "resolution=merge-duplicates",
+    },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 200);
+    throw new Error(`save row ${res.status}: ${detail}`);
+  }
+}
 
 // Copy the rendered video into Supabase Storage so a saved ad survives backend
 // restarts and plays on any device. Returns a durable public URL — or the
@@ -82,24 +155,29 @@ export async function saveAd(job: Job): Promise<void> {
 }
 
 // Upload a browser-rendered ad (Blob) to Storage and save the library row.
-// Returns the durable public URL, or null on failure.
+// Returns the durable public URL. Throws with a descriptive message on failure
+// so the UI can surface the real cause (e.g. an auth/RLS problem).
 export async function saveRenderedAd(job: Job, blob: Blob): Promise<string | null> {
   if (!supabase) return null;
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  // A live browser session is what authorizes the Storage upload — if it's
+  // missing, the request goes out as anon and RLS rejects it.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!user) return null;
+  if (!session?.access_token) {
+    throw new Error("auth: no active browser session — please sign in again.");
+  }
+  const token = session.access_token;
 
   const type = blob.type || "video/mp4";
   const ext = type.includes("webm") ? "webm" : "mp4";
-  const path = `${user.id}/${job.id}.${ext}`;
-  const { error } = await supabase.storage
-    .from(VIDEO_BUCKET)
-    .upload(path, blob, { upsert: true, contentType: type });
-  if (error) return null;
+  const url = await uploadWithToken(`${user.id}/${job.id}.${ext}`, blob, type, token);
 
-  const url = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path).data.publicUrl;
-  await supabase.from("dart_ads").upsert(
+  await upsertAdWithToken(
     {
       id: job.id,
       user_id: user.id,
@@ -114,12 +192,51 @@ export async function saveRenderedAd(job: Job, blob: Blob): Promise<string | nul
       status: "ready",
       cost_cents: 0,
     },
-    { onConflict: "id" },
+    token,
   );
   return url;
 }
 
+// Send a browser-rendered ad (video + product image + metadata) to the backend,
+// which uploads to Storage and saves the library row with the service-role key.
+// This bypasses the project's broken Storage user-token auth. Returns video URL.
+export async function saveRenderedAdViaBackend(
+  job: Job,
+  blob: Blob,
+  imageFile: File | null,
+): Promise<string> {
+  if (!API_BASE) throw new Error("Backend URL is not configured.");
+  if (!supabase) throw new Error("Auth is not configured.");
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("No active session — please sign in again.");
+  }
+
+  const fd = new FormData();
+  fd.append("token", session.access_token);
+  fd.append("id", job.id);
+  fd.append("product_title", job.product?.title ?? "");
+  fd.append("target_audience", job.target_audience ?? "");
+  fd.append("aspect_ratio", job.aspect_ratio);
+  fd.append("duration_sec", String(job.duration_sec));
+  fd.append("resolution", job.resolution);
+  const vext = (blob.type || "video/mp4").includes("webm") ? "webm" : "mp4";
+  fd.append("video", blob, `${job.id}.${vext}`);
+  if (imageFile) fd.append("image", imageFile, imageFile.name || "image.png");
+
+  const res = await fetch(`${API_BASE}/save-ad`, { method: "POST", body: fd });
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 300);
+    throw new Error(`save ${res.status}: ${detail}`);
+  }
+  const data = (await res.json()) as { video_url: string };
+  return data.video_url;
+}
+
 // Upload a user-provided product image to Storage; returns a durable public URL.
+// Throws with a descriptive message on failure so the UI can surface the cause.
 export async function uploadProductImage(
   file: File,
   id: string,
@@ -128,16 +245,23 @@ export async function uploadProductImage(
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!user) return null;
+  if (!session?.access_token) {
+    throw new Error("auth: no active browser session — please sign in again.");
+  }
 
   const ext =
     file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
-  const path = `${user.id}/img-${id}.${ext}`;
-  const { error } = await supabase.storage
-    .from(VIDEO_BUCKET)
-    .upload(path, file, { upsert: true, contentType: file.type || "image/png" });
-  if (error) return null;
-  return supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path).data.publicUrl;
+  const type = file.type || "image/png";
+  return uploadWithToken(
+    `${user.id}/img-${id}.${ext}`,
+    file,
+    type,
+    session.access_token,
+  );
 }
 
 export async function listAds(): Promise<SavedAd[]> {
