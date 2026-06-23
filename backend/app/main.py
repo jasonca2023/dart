@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from .api.jobs import router as jobs_router
 from .api.settings import router as settings_router
 from .config import Settings, get_settings, media_root
-from .errors import INVALID_URL, RENDER_FAILED, SCRAPE_FAILED, DartError, dart_error_handler
+from .errors import INVALID_URL, SCRAPE_FAILED, DartError, dart_error_handler
 from .pipeline import Orchestrator
 from .providers.factory import build_providers
 from .store import JobStore
@@ -44,29 +44,6 @@ def _jwt_sub(token: str) -> str | None:
 
 
 VIDEO_BUCKET = "dart-videos"
-
-# Image-to-video generation (LTX direct API). Swapping providers later (e.g. fal
-# Kling/Veo) means changing the call in /generate-ad; metadata flow is the same.
-LTX_ENDPOINT = "https://api.ltx.video/v1/image-to-video"
-# (aspect_ratio, resolution) -> LTX "WxH" frame size.
-_LTX_RESOLUTION = {
-    ("16:9", "1080p"): "1920x1080",
-    ("16:9", "2160p"): "3840x2160",
-    ("9:16", "1080p"): "1080x1920",
-    ("9:16", "2160p"): "2160x3840",
-}
-
-
-def _ad_prompt(product_title: str, target_audience: str) -> str:
-    """Build an image-to-video animation prompt from the ad's metadata."""
-    title = (product_title or "the product").strip()
-    audience = (target_audience or "everyone").strip()
-    return (
-        f"Cinematic product commercial for {title}. The product is the hero, shot "
-        f"with slow elegant camera motion, dynamic studio lighting, shallow depth "
-        f"of field and a premium high-end advertising look. Crafted to appeal to "
-        f"{audience}."
-    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -212,143 +189,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         return {"video_url": video_url, "image_url": image_url}
 
-    @app.post("/generate-ad")
-    async def generate_ad(
-        image: UploadFile = File(...),
-        token: str = Form(...),
-        id: str = Form(...),
-        product_title: str = Form(""),
-        target_audience: str = Form(""),
-        aspect_ratio: str = Form("16:9"),
-        duration_sec: int = Form(5),
-        resolution: str = Form("1080p"),
-    ) -> dict:
-        # Animate the uploaded product image into a short ad with LTX image-to-
-        # video, then persist the result to the user's library (service-role key).
-        if not settings.supabase_url or not settings.supabase_service_key:
-            raise DartError(
-                SCRAPE_FAILED, "Server is missing Supabase service config.", status=500
-            )
-        if not settings.ltx_api_key:
-            raise DartError(RENDER_FAILED, "Server is missing the LTX API key.", status=500)
-        user_id = _jwt_sub(token)
-        if not user_id:
-            raise DartError(INVALID_URL, "Invalid or missing session token.", status=401)
-
-        base = settings.supabase_url.rstrip("/")
-        key = settings.supabase_service_key
-        auth = {"Authorization": f"Bearer {key}", "apikey": key}
-
-        import httpx
-
-        def public_url(path: str) -> str:
-            return f"{base}/storage/v1/object/public/{VIDEO_BUCKET}/{path}"
-
-        async with httpx.AsyncClient(timeout=320.0) as client:
-            # 1. Stash the product image in Storage so LTX can fetch it by URL.
-            img_bytes = await image.read()
-            ext = (image.filename or "img.png").rsplit(".", 1)[-1].lower()
-            ext = "".join(c for c in ext if c.isalnum()) or "png"
-            img_path = f"{user_id}/img-{id}.{ext}"
-            r = await client.post(
-                f"{base}/storage/v1/object/{VIDEO_BUCKET}/{img_path}",
-                headers={
-                    **auth,
-                    "x-upsert": "true",
-                    "Content-Type": image.content_type or "image/png",
-                },
-                content=img_bytes,
-            )
-            if r.status_code >= 300:
-                raise DartError(SCRAPE_FAILED, f"Image upload failed: {r.text}", status=502)
-            image_url = public_url(img_path)
-
-            # 2. Animate it with LTX (synchronous; returns the mp4 bytes).
-            max_duration = 10 if resolution == "2160p" else 20
-            ltx_body = {
-                "image_uri": image_url,
-                "prompt": _ad_prompt(product_title, target_audience),
-                "model": settings.ltx_model,
-                "duration": max(2, min(int(duration_sec), max_duration)),
-                "resolution": _LTX_RESOLUTION.get((aspect_ratio, resolution), "1920x1080"),
-                "fps": settings.ltx_fps,
-                "generate_audio": settings.ltx_generate_audio,
-            }
-            try:
-                lr = await client.post(
-                    LTX_ENDPOINT,
-                    json=ltx_body,
-                    headers={"Authorization": f"Bearer {settings.ltx_api_key}"},
-                )
-            except Exception as e:
-                raise DartError(
-                    RENDER_FAILED,
-                    "Could not reach the video provider.",
-                    status=502,
-                    retryable=True,
-                ) from e
-            if lr.status_code == 402:
-                raise DartError(
-                    RENDER_FAILED,
-                    "LTX account is out of credits — top up at https://app.ltx.video.",
-                    status=502,
-                )
-            if lr.status_code != 200:
-                raise DartError(
-                    RENDER_FAILED, f"Video provider error: {lr.text[:200]}", status=502
-                )
-            vid_bytes = lr.content
-
-            # 3. Save the rendered mp4 to Storage.
-            vid_path = f"{user_id}/{id}.mp4"
-            r = await client.post(
-                f"{base}/storage/v1/object/{VIDEO_BUCKET}/{vid_path}",
-                headers={**auth, "x-upsert": "true", "Content-Type": "video/mp4"},
-                content=vid_bytes,
-            )
-            if r.status_code >= 300:
-                raise DartError(SCRAPE_FAILED, f"Video upload failed: {r.text}", status=502)
-            video_url = public_url(vid_path)
-
-            # 4. Upsert the library row.
-            row = {
-                "id": id,
-                "user_id": user_id,
-                "product_url": "",
-                "target_audience": target_audience or None,
-                "product_title": product_title or None,
-                "product_image": image_url,
-                "video_url": video_url,
-                "aspect_ratio": aspect_ratio,
-                "duration_sec": duration_sec,
-                "resolution": resolution,
-                "status": "ready",
-                "cost_cents": 0,
-            }
-            r = await client.post(
-                f"{base}/rest/v1/dart_ads",
-                headers={
-                    **auth,
-                    "Content-Type": "application/json",
-                    "Prefer": "resolution=merge-duplicates",
-                },
-                json=row,
-            )
-            if r.status_code >= 300:
-                raise DartError(SCRAPE_FAILED, f"Saving the ad failed: {r.text}", status=502)
-
-        return {"video_url": video_url, "image_url": image_url}
-
     @app.get("/health")
     async def health() -> dict:
         return {
             "status": "ok",
             "save_ad_ready": bool(settings.supabase_url and settings.supabase_service_key),
-            "generate_ad_ready": bool(
-                settings.supabase_url
-                and settings.supabase_service_key
-                and settings.ltx_api_key
-            ),
             "providers": {
                 "scraper": type(scraper).__name__,
                 "script": type(scripter).__name__,

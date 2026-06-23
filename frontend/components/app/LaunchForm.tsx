@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { generateAdViaBackend } from "@/lib/ads";
+import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
+import { saveRenderedAdViaBackend } from "@/lib/ads";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Segmented } from "../ui/Segmented";
@@ -29,6 +30,12 @@ function toneFor(text: string) {
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
   return tones[h % tones.length];
+}
+
+function formatPrice(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  return /^[\d.,]+$/.test(t) ? `$${t}` : t;
 }
 
 function priceToCents(raw: string): number {
@@ -107,11 +114,32 @@ export function LaunchForm() {
       setError("Add a product title.");
       return;
     }
+    if (!canRenderInBrowser()) {
+      setError("In-browser rendering needs a recent Chrome or Edge.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const dur = clampDuration(duration);
     try {
       const id = crypto.randomUUID();
+      // Render from a canvas-safe local object URL so there's no CORS step.
+      const objectUrl = URL.createObjectURL(imageFile);
+      let blob: Blob;
+      try {
+        blob = await renderAdInBrowser({
+          productTitle: title.trim(),
+          productImage: objectUrl,
+          price: formatPrice(price),
+          audience: audience.trim() || "everyone",
+          durationInSeconds: dur,
+          aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
+          accent: "#0447ff",
+        });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+
       const job: Job = {
         id,
         status: "ready",
@@ -135,13 +163,12 @@ export function LaunchForm() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      // The backend animates the product image into a real video (LTX image-to-
-      // video) and saves it with the service-role key. This is a server render,
-      // so it can take a minute (plus a cold start on the free tier).
-      await generateAdViaBackend(job, imageFile);
+      // Upload + save happens on the backend (service-role key) because the
+      // project's Storage rejects user tokens directly.
+      await saveRenderedAdViaBackend(job, blob, imageFile);
       router.push(`/jobs/${id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not generate the ad.");
+      setError(err instanceof Error ? err.message : "Could not render the ad.");
       setSubmitting(false);
     }
   }
@@ -271,7 +298,7 @@ export function LaunchForm() {
 
         <div>
           <Button type="submit" size="lg" loading={submitting}>
-            {submitting ? "Generating… (~1 min)" : "Generate ad"}
+            {submitting ? "Rendering…" : "Generate ad"}
             {!submitting && <ArrowRight className="text-[18px]" />}
           </Button>
         </div>
@@ -296,8 +323,8 @@ export function LaunchForm() {
             </div>
           </dl>
           <p className="mt-5 border-t border-ash pt-4 text-[13px] leading-relaxed text-fog">
-            AI animates your product image into a short cinematic clip. Generating
-            takes about a minute — keep this tab open.
+            Renders in your browser from your own image — no scraping, nothing
+            leaves your control until you publish.
           </p>
         </div>
       </aside>
