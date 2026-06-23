@@ -80,12 +80,6 @@ export interface ExportHandoff {
   expires_at: string;
 }
 
-export interface VideoSettings {
-  video_provider: string;
-  video_generator: string;
-  ltx_key_set: boolean;
-}
-
 export const STAGES: { key: JobStatus; label: string; verb: string }[] = [
   { key: "scraping", label: "Scrape", verb: "Reading the product page" },
   { key: "scripting", label: "Script", verb: "Directing the scene" },

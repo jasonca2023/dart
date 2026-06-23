@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { Logo } from "../ui/Logo";
 import { ButtonLink } from "../ui/Button";
 import { AccountMenu } from "./AccountMenu";
-import { LtxKeyMenu } from "./LtxKeyMenu";
 import { AuthGate } from "./AuthGate";
 import { USING_MOCK } from "@/lib/api";
 
@@ -34,7 +33,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 Demo data
               </span>
             )}
-            <LtxKeyMenu />
             <AccountMenu />
             <ButtonLink href="/" variant="primary" size="sm">
               New ad

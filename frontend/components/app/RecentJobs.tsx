@@ -86,7 +86,7 @@ export function RecentJobs() {
         </span>
         <p className="mt-5 text-[15px] font-medium text-ink">No ads yet</p>
         <p className="mt-1.5 max-w-xs text-[14px] text-driftwood">
-          Paste a product URL above and your first cut will appear here.
+          Upload a product image above and your first cut will appear here.
         </p>
       </div>
     );

@@ -123,9 +123,11 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
           <h1 className="t-heading">{title(job)}</h1>
           <StatusPill status={job.status} />
         </div>
-        <p className="mt-2 break-all font-mono text-[12px] text-fog">
-          {job.product_url}
-        </p>
+        {job.product_url && (
+          <p className="mt-2 break-all font-mono text-[12px] text-fog">
+            {job.product_url}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -330,9 +332,11 @@ export function JobReview({ id }: { id: string }) {
           <h1 className="t-heading">{title(job)}</h1>
           <StatusPill status={job.status} />
         </div>
-        <p className="mt-2 break-all font-mono text-[12px] text-fog">
-          {job.product_url}
-        </p>
+        {job.product_url && (
+          <p className="mt-2 break-all font-mono text-[12px] text-fog">
+            {job.product_url}
+          </p>
+        )}
       </div>
 
       {/* Main + side */}

@@ -19,7 +19,7 @@ export function ProductCard({ product }: { product: Product }) {
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="t-caption text-fog">Scraped product</p>
+            <p className="t-caption text-fog">Product</p>
             <h3 className="mt-1.5 text-[17px] font-medium text-ink">
               {product.title}
             </h3>
