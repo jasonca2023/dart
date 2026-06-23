@@ -3,18 +3,18 @@ import { Frame, Bolt, Clock } from "../icons";
 const CARDS = [
   {
     icon: Frame,
-    title: "Provider-agnostic by design",
-    body: "Scraper, model and video engine each sit behind an interface. Swap Kling for another renderer, or Opus for Haiku, without touching the dashboard.",
+    title: "From photo to ad",
+    body: "Upload one product image and Dart composes a cinematic ad around it — dynamic motion, clean type and your branding, no editing suite required.",
   },
   {
     icon: Clock,
-    title: "Every job is a tracked job",
-    body: "Status, cost in cents, the script, the scraped product and the final artifact are all persisted — so nothing is a black box and nothing is lost.",
+    title: "Saved to your library",
+    body: "Every ad — the finished video, the product and the settings — is kept in your account, so nothing is lost and you can come back to it anytime.",
   },
   {
     icon: Bolt,
-    title: "Built for volume",
-    body: "Rendering runs async, so concurrent jobs don't block each other. Paste one URL or batch a catalogue — the queue keeps up.",
+    title: "Ready for any channel",
+    body: "Make ads on demand in 16:9 or 9:16, then post straight to your feed, story or reel.",
   },
 ];
 
