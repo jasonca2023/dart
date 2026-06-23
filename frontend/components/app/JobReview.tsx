@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useJobPolling } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
-import { saveAd, saveRenderedAd, getAd, savedAdToJob, type SavedAd } from "@/lib/ads";
+import { saveAd, getAd, savedAdToJob, type SavedAd } from "@/lib/ads";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { api, API_BASE } from "@/lib/api";
 import { cost, relativeTime, isTerminal } from "@/lib/format";
@@ -268,9 +268,8 @@ export function JobReview({ id }: { id: string }) {
       aspectRatio: job.aspect_ratio === "9:16" ? "9:16" : "16:9",
       accent: "#0447ff",
     })
-      .then(async (blob) => {
-        const url = await saveRenderedAd(job, blob);
-        setClientVideo(url ?? URL.createObjectURL(blob));
+      .then((blob) => {
+        setClientVideo(URL.createObjectURL(blob));
         setRenderState("idle");
       })
       .catch(() => setRenderState("error"));
