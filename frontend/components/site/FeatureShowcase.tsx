@@ -1,7 +1,7 @@
 import { Check } from "../icons";
 import { Orb } from "../ui/Orb";
 
-const STAGES = ["Scrape", "Script", "Render", "Ready"];
+const STAGES = ["Upload", "Animate", "Ready"];
 
 export function FeatureShowcase() {
   return (
@@ -37,10 +37,10 @@ export function FeatureShowcase() {
             <div className="mt-5 flex items-center justify-between border-t border-ash pt-4">
               <div>
                 <p className="text-[14px] font-medium text-ink">Aero Runner</p>
-                <p className="font-mono text-[12px] text-fog">$148.00 · shopify</p>
+                <p className="font-mono text-[12px] text-fog">$148.00 · upload</p>
               </div>
               <span className="font-mono text-[12px] text-driftwood">
-                $0.97 · 2160p
+                16:9 · 1080p
               </span>
             </div>
           </div>
@@ -53,15 +53,15 @@ export function FeatureShowcase() {
             You stay in the loop. Always.
           </h2>
           <p className="mt-5 max-w-md text-[16px] leading-relaxed text-driftwood">
-            Watch the job move through scrape, script, render and ready in real
-            time. When the cut lands, you see the video, the exact script, the
-            scraped product, and what it cost — before anything is published.
+            Upload your product photo and watch it become a cinematic ad. When the
+            cut lands, you see the finished video right away — saved to your
+            library, ready to post.
           </p>
           <ul className="mt-6 flex flex-col gap-3">
             {[
-              "Live four-stage status on every job",
-              "Regenerate from the same inputs in one click",
-              "Per-job cost, artifacts and history kept",
+              "Cinematic motion generated from your product photo",
+              "Every ad saved to your library automatically",
+              "Portrait or landscape, ready for any channel",
             ].map((t) => (
               <li key={t} className="flex items-start gap-3 text-[15px] text-ink">
                 <Check className="mt-0.5 shrink-0 text-[18px] text-driftwood" />

@@ -120,6 +120,42 @@ export async function saveRenderedAdViaBackend(
   return data.video_url;
 }
 
+// Generate a real image-to-video ad: the backend uploads the product image,
+// animates it with LTX (image-to-video), stores the result, and saves the
+// library row with the service-role key. Returns the durable video URL. This is
+// a server-side render — expect it to take ~30-120s (plus backend cold start).
+export async function generateAdViaBackend(
+  job: Job,
+  imageFile: File,
+): Promise<string> {
+  if (!API_BASE) throw new Error("Backend URL is not configured.");
+  if (!supabase) throw new Error("Auth is not configured.");
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("No active session — please sign in again.");
+  }
+
+  const fd = new FormData();
+  fd.append("token", session.access_token);
+  fd.append("id", job.id);
+  fd.append("product_title", job.product?.title ?? "");
+  fd.append("target_audience", job.target_audience ?? "");
+  fd.append("aspect_ratio", job.aspect_ratio);
+  fd.append("duration_sec", String(job.duration_sec));
+  fd.append("resolution", job.resolution);
+  fd.append("image", imageFile, imageFile.name || "image.png");
+
+  const res = await fetch(`${API_BASE}/generate-ad`, { method: "POST", body: fd });
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 300);
+    throw new Error(`generate ${res.status}: ${detail}`);
+  }
+  const data = (await res.json()) as { video_url: string };
+  return data.video_url;
+}
+
 export async function listAds(): Promise<SavedAd[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
