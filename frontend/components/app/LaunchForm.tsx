@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { buildAdSpec } from "@/lib/adSpec";
+import { generateAiAd, type Phase } from "@/lib/aiRemotion";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Segmented } from "../ui/Segmented";
@@ -31,6 +32,19 @@ function toneFor(text: string) {
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
   return tones[h % tones.length];
+}
+
+function phaseLabel(p: Phase): string {
+  switch (p.kind) {
+    case "designing":
+      return "AI is designing your ad…";
+    case "revising":
+      return "Refining the design…";
+    case "rendering":
+      return "Rendering the video…";
+    case "reviewing":
+      return "Reviewing the result…";
+  }
 }
 
 function formatPrice(raw: string): string {
@@ -103,6 +117,7 @@ export function LaunchForm() {
   const [aspect, setAspect] = useState<AspectRatio>("16:9");
   const [duration, setDuration] = useState<Duration>(10);
   const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
@@ -121,34 +136,56 @@ export function LaunchForm() {
     }
     setSubmitting(true);
     setError(null);
+    setStatus(phaseLabel({ kind: "designing", attempt: 1 }));
     const dur = clampDuration(duration);
     try {
       const id = crypto.randomUUID();
-      // The "brain": map the inputs to an audience-tailored creative spec, which
-      // drives the look/copy/pacing of the render.
-      const spec = buildAdSpec({
-        title: title.trim(),
-        audience: audience.trim(),
-        price: formatPrice(price),
-        durationSec: dur,
-      });
       // Render from a canvas-safe local object URL so there's no CORS step.
       const objectUrl = URL.createObjectURL(imageFile);
       let blob: Blob;
       try {
-        blob = await renderAdInBrowser({
-          productTitle: title.trim(),
-          productImage: objectUrl,
-          price: formatPrice(price),
-          audience: audience.trim() || "everyone",
-          durationInSeconds: dur,
-          aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
-          accent: spec.palette.accent,
-          spec,
-        });
+        // The AI pipeline: a model writes a bespoke Remotion component for this
+        // product, we render + visually grade it, self-healing until it passes.
+        try {
+          const result = await generateAiAd(
+            {
+              productTitle: title.trim(),
+              productImage: objectUrl,
+              price: formatPrice(price),
+              audience: audience.trim() || "everyone",
+              durationInSeconds: dur,
+              aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
+            },
+            (p) => setStatus(phaseLabel(p)),
+          );
+          blob = result.blob;
+        } catch (aiErr) {
+          // AI path unavailable (no token / model down / all attempts failed) —
+          // fall back to the built-in audience-tuned template so the user always
+          // gets a video.
+          console.warn("AI ad generation failed, using template:", aiErr);
+          setStatus("Finishing with the built-in template…");
+          const spec = buildAdSpec({
+            title: title.trim(),
+            audience: audience.trim(),
+            price: formatPrice(price),
+            durationSec: dur,
+          });
+          blob = await renderAdInBrowser({
+            productTitle: title.trim(),
+            productImage: objectUrl,
+            price: formatPrice(price),
+            audience: audience.trim() || "everyone",
+            durationInSeconds: dur,
+            aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
+            accent: spec.palette.accent,
+            spec,
+          });
+        }
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
+      setStatus("Saving to your library…");
 
       const job: Job = {
         id,
@@ -179,6 +216,7 @@ export function LaunchForm() {
       router.push(`/jobs/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not render the ad.");
+      setStatus(null);
       setSubmitting(false);
     }
   }
@@ -308,7 +346,7 @@ export function LaunchForm() {
 
         <div>
           <Button type="submit" size="lg" loading={submitting}>
-            {submitting ? "Rendering…" : "Generate ad"}
+            {submitting ? status ?? "Rendering…" : "Generate ad"}
             {!submitting && <ArrowRight className="text-[18px]" />}
           </Button>
         </div>
