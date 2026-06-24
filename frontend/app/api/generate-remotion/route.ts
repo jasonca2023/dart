@@ -51,6 +51,13 @@ HARD RULES (a violation means the ad fails to render):
 - Keep ALL text inside a safe margin (>=6% from every edge), high-contrast, legible, and never overlapping the product. Use system fonts only (system-ui, Georgia, "SF Mono").
 - No comments that aren't valid code. The file must compile as-is.
 
+REMOTION API NOTES (getting these wrong makes the render throw):
+- spring() REQUIRES fps: const { fps } = useVideoConfig(); const s = spring({ frame, fps, config: { damping: 200 } }); — never call spring without fps.
+- interpolate() must clamp or it extrapolates past your range: interpolate(frame, [0, 30], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }). Input ranges must be strictly increasing.
+- Use <Sequence from={f} durationInFrames={n}> to schedule scenes; inside a Sequence, useCurrentFrame() restarts at 0.
+- random(seed) takes a seed and returns a deterministic 0..1 number. Math.random/Date are forbidden.
+- Style with inline style objects (numbers are px). No CSS files, no styled-components, no Tailwind.
+
 CREATIVE BRIEF — tailor the design to THIS product and audience (this is the point; do not output a generic template):
 - Product: "${b.title}"
 - Price: ${b.price || "(not provided — do not invent one)"}
