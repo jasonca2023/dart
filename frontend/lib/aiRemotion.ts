@@ -31,6 +31,8 @@ export type Phase =
 const FPS = 30;
 const MAX_ATTEMPTS = 3;
 const PASS_SCORE = 70;
+// Below this, the AI output is junk (e.g. a black frame) — ship the template instead.
+const ACCEPT_FLOOR = 55;
 
 // Bounds so a stuck step can never spin forever — it bails to the template.
 const CODEGEN_MS = 60_000;
@@ -250,6 +252,18 @@ export async function generateAiAd(
       break; // codegen itself is down — stop and let the caller fall back.
     }
 
+    // Cheap guard: Tailwind/className paints nothing here -> black video. Catch it
+    // before wasting a render + judge round-trip; retry with explicit feedback.
+    if (/className\s*=/.test(code)) {
+      tick("rejected: used className");
+      prev = {
+        code,
+        feedback:
+          "You used className/Tailwind, which renders a BLACK empty video here. Rewrite using ONLY inline style={{...}} objects on every element — no className anywhere.",
+      };
+      continue;
+    }
+
     let Component: React.FC<Record<string, unknown>>;
     try {
       Component = await transpileComponent(code);
@@ -298,6 +312,10 @@ export async function generateAiAd(
     };
   }
 
-  if (best) return { ...best, attempts: MAX_ATTEMPTS };
-  throw new Error(lastError || "AI ad generation failed");
+  // Only ship an AI render that's actually decent; otherwise let the caller fall
+  // back to the built-in template rather than save a black/broken clip.
+  if (best && best.score >= ACCEPT_FLOOR) return { ...best, attempts: MAX_ATTEMPTS };
+  throw new Error(
+    lastError || `AI ad did not reach acceptable quality (best ${best?.score ?? 0})`,
+  );
 }

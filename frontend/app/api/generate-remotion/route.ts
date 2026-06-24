@@ -33,9 +33,110 @@ const ALLOWED = [
   "Easing",
 ];
 
+// A correct, known-good component the renderer paints properly: inline styles
+// only, spring with fps, clamped interpolate, product hero, text in margins.
+// The model is told to MATCH this structure and redesign the look for the brief.
+const EXAMPLE = `import React from "react";
+import {
+  AbsoluteFill,
+  Img,
+  Sequence,
+  useCurrentFrame,
+  useVideoConfig,
+  interpolate,
+  spring,
+} from "remotion";
+
+export default function Ad({
+  productImage,
+  productTitle,
+  price,
+  audience,
+}: {
+  productImage: string;
+  productTitle: string;
+  price: string;
+  audience: string;
+}) {
+  const frame = useCurrentFrame();
+  const { fps, width, height } = useVideoConfig();
+  const enter = spring({ frame, fps, config: { damping: 200 } });
+  const imgY = interpolate(enter, [0, 1], [50, 0]);
+  const imgScale = interpolate(frame, [0, 90], [0.94, 1.04], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  return (
+    <AbsoluteFill
+      style={{
+        backgroundColor: "#0b1020",
+        backgroundImage: "linear-gradient(150deg, #182441 0%, #090d18 100%)",
+      }}
+    >
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+        <Img
+          src={productImage}
+          style={{
+            width: width * 0.52,
+            height: height * 0.6,
+            objectFit: "contain",
+            transform: \`translateY(\${imgY}px) scale(\${imgScale})\`,
+            filter: "drop-shadow(0 30px 60px rgba(0,0,0,0.5))",
+          }}
+        />
+      </AbsoluteFill>
+      <Sequence from={14}>
+        <Lower
+          width={width}
+          height={height}
+          title={productTitle}
+          audience={audience}
+          price={price}
+        />
+      </Sequence>
+    </AbsoluteFill>
+  );
+}
+
+function Lower({ width, height, title, audience, price }: {
+  width: number; height: number; title: string; audience: string; price: string;
+}) {
+  const frame = useCurrentFrame();
+  const o = interpolate(frame, [0, 18], [0, 1], { extrapolateRight: "clamp" });
+  const y = interpolate(frame, [0, 18], [26, 0], { extrapolateRight: "clamp" });
+  return (
+    <AbsoluteFill
+      style={{
+        padding: height * 0.08,
+        justifyContent: "flex-end",
+        opacity: o,
+        transform: \`translateY(\${y}px)\`,
+      }}
+    >
+      <div style={{ color: "#76a9ff", fontFamily: "system-ui", fontSize: height * 0.028, fontWeight: 700, letterSpacing: 3 }}>
+        FOR {audience.toUpperCase()}
+      </div>
+      <div style={{ color: "#ffffff", fontFamily: "system-ui", fontSize: height * 0.085, fontWeight: 800, lineHeight: 1.03, marginTop: 14, maxWidth: width * 0.6 }}>
+        {title}
+      </div>
+      {price ? (
+        <div style={{ color: "#cfe0ff", fontFamily: "system-ui", fontSize: height * 0.042, fontWeight: 600, marginTop: 18 }}>
+          {price}
+        </div>
+      ) : null}
+    </AbsoluteFill>
+  );
+}`;
+
 function systemPrompt(b: GenBody): string {
   return `You are a senior motion designer who writes Remotion (React) ad videos.
 You output ONE self-contained TypeScript React component and nothing else.
+
+#1 RULE — READ THIS FIRST. This renders with a custom canvas engine, NOT a web browser. CSS classes do NOTHING here:
+- NEVER write className. NEVER use Tailwind (no "bg-...", "text-...", "flex", "rounded-...", "absolute", "blur-..." class strings). They are silently ignored and produce a BLACK, EMPTY video. This is the #1 cause of failure.
+- Style EVERY element with an inline style={{ ... }} object. That is the only thing that paints.
+- Supported style props: backgroundColor, backgroundImage (linear-gradient/radial-gradient only), color, opacity, transform (translate/scale/rotate), borderRadius, boxShadow, textShadow, filter (blur/brightness/drop-shadow), objectFit, fontFamily, fontSize, fontWeight, fontStyle, letterSpacing, lineHeight, textAlign, padding, margin, width, height, maxWidth, position, top/left/right/bottom, and display:"flex" with flexDirection/alignItems/justifyContent/gap. Numbers are pixels.
+- Do NOT use: fontStretch, textRendering, WebkitFontSmoothing, backdropFilter, mixBlendMode, CSS transitions/animations, or any external font/image.
 
 HARD RULES (a violation means the ad fails to render):
 - Output a single \`\`\`tsx code block. No prose before or after.
@@ -56,14 +157,19 @@ REMOTION API NOTES (getting these wrong makes the render throw):
 - interpolate() must clamp or it extrapolates past your range: interpolate(frame, [0, 30], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }). Input ranges must be strictly increasing.
 - Use <Sequence from={f} durationInFrames={n}> to schedule scenes; inside a Sequence, useCurrentFrame() restarts at 0.
 - random(seed) takes a seed and returns a deterministic 0..1 number. Math.random/Date are forbidden.
-- Style with inline style objects (numbers are px). No CSS files, no styled-components, no Tailwind.
 
 CREATIVE BRIEF — tailor the design to THIS product and audience (this is the point; do not output a generic template):
 - Product: "${b.title}"
 - Price: ${b.price || "(not provided — do not invent one)"}
 - Target audience: "${b.audience}"
 - Aspect ratio: ${b.aspectRatio}
-Think about what look (color, type, pacing, motion, composition) best sells THIS product to THIS audience, then build it. Make confident, specific design choices. Use multiple scenes/sequences with motion (entrances, easing, scale/opacity/position) so it feels like a real ad, not a slideshow.`;
+Think about what look (color, type, pacing, motion, composition) best sells THIS product to THIS audience, then build it. Make confident, specific design choices. Use multiple scenes/sequences with motion (entrances, easing, scale/opacity/position) so it feels like a real ad, not a slideshow.
+
+FOLLOW THIS EXACT STYLING APPROACH — copy the inline-style structure (no className anywhere), then redesign the colors, type, layout, motion and scenes to suit the brief. Do not output this example verbatim; make it specific to the product and audience:
+
+\`\`\`tsx
+${EXAMPLE}
+\`\`\``;
 }
 
 function userPrompt(b: GenBody): string {
