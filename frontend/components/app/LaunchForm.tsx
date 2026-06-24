@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { buildAdSpec } from "@/lib/adSpec";
-import { generateAiAd, type Phase } from "@/lib/aiRemotion";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Segmented } from "../ui/Segmented";
@@ -32,19 +31,6 @@ function toneFor(text: string) {
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
   return tones[h % tones.length];
-}
-
-function phaseLabel(p: Phase): string {
-  switch (p.kind) {
-    case "designing":
-      return "AI is designing your ad…";
-    case "revising":
-      return "Refining the design…";
-    case "rendering":
-      return "Rendering the video…";
-    case "reviewing":
-      return "Reviewing the result…";
-  }
 }
 
 function formatPrice(raw: string): string {
@@ -136,52 +122,34 @@ export function LaunchForm() {
     }
     setSubmitting(true);
     setError(null);
-    setStatus(phaseLabel({ kind: "designing", attempt: 1 }));
+    setStatus("Designing your ad…");
     const dur = clampDuration(duration);
     try {
       const id = crypto.randomUUID();
-      // Render from a canvas-safe local object URL so there's no CORS step.
+      // The "brain": map the inputs to an audience-tailored creative spec
+      // (tone, palette, type, layout, copy, pacing) that drives the render.
+      const spec = buildAdSpec({
+        title: title.trim(),
+        audience: audience.trim(),
+        price: formatPrice(price),
+        durationSec: dur,
+      });
+      // Render in-browser from a canvas-safe local object URL — free, fast, no
+      // CORS step, nothing leaves the browser until the user saves.
       const objectUrl = URL.createObjectURL(imageFile);
       let blob: Blob;
+      setStatus("Rendering the video…");
       try {
-        // The AI pipeline: a model writes a bespoke Remotion component for this
-        // product, we render + visually grade it, self-healing until it passes.
-        try {
-          const result = await generateAiAd(
-            {
-              productTitle: title.trim(),
-              productImage: objectUrl,
-              price: formatPrice(price),
-              audience: audience.trim() || "everyone",
-              durationInSeconds: dur,
-              aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
-            },
-            (p) => setStatus(phaseLabel(p)),
-          );
-          blob = result.blob;
-        } catch (aiErr) {
-          // AI path unavailable (no token / model down / all attempts failed) —
-          // fall back to the built-in audience-tuned template so the user always
-          // gets a video.
-          console.warn("AI ad generation failed, using template:", aiErr);
-          setStatus("Finishing with the built-in template…");
-          const spec = buildAdSpec({
-            title: title.trim(),
-            audience: audience.trim(),
-            price: formatPrice(price),
-            durationSec: dur,
-          });
-          blob = await renderAdInBrowser({
-            productTitle: title.trim(),
-            productImage: objectUrl,
-            price: formatPrice(price),
-            audience: audience.trim() || "everyone",
-            durationInSeconds: dur,
-            aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
-            accent: spec.palette.accent,
-            spec,
-          });
-        }
+        blob = await renderAdInBrowser({
+          productTitle: title.trim(),
+          productImage: objectUrl,
+          price: formatPrice(price),
+          audience: audience.trim() || "everyone",
+          durationInSeconds: dur,
+          aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
+          accent: spec.palette.accent,
+          spec,
+        });
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
