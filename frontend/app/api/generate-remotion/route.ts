@@ -28,6 +28,7 @@ const ALLOWED = [
   "useCurrentFrame",
   "useVideoConfig",
   "interpolate",
+  "interpolateColors",
   "spring",
   "random",
   "Easing",
@@ -154,7 +155,9 @@ HARD RULES (a violation means the ad fails to render):
 
 REMOTION API NOTES (getting these wrong makes the render throw):
 - spring() REQUIRES fps: const { fps } = useVideoConfig(); const s = spring({ frame, fps, config: { damping: 200 } }); — never call spring without fps.
-- interpolate() must clamp or it extrapolates past your range: interpolate(frame, [0, 30], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }). Input ranges must be strictly increasing.
+- interpolate() works with NUMBERS ONLY and THROWS if you pass it colors/strings. interpolate(frame, [0, 30], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }). Input ranges must be strictly increasing.
+- To animate a COLOR, use interpolateColors(frame, [0, 30], ["#000000", "#ffffff"]) — never pass a color to interpolate().
+- This is a render, not an interactive app: do NOT use useState, useEffect, or any React hook except Remotion's. Derive everything from useCurrentFrame().
 - Use <Sequence from={f} durationInFrames={n}> to schedule scenes; inside a Sequence, useCurrentFrame() restarts at 0.
 - random(seed) takes a seed and returns a deterministic 0..1 number. Math.random/Date are forbidden.
 
