@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
+import { buildAdSpec } from "@/lib/adSpec";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Segmented } from "../ui/Segmented";
@@ -123,6 +124,14 @@ export function LaunchForm() {
     const dur = clampDuration(duration);
     try {
       const id = crypto.randomUUID();
+      // The "brain": map the inputs to an audience-tailored creative spec, which
+      // drives the look/copy/pacing of the render.
+      const spec = buildAdSpec({
+        title: title.trim(),
+        audience: audience.trim(),
+        price: formatPrice(price),
+        durationSec: dur,
+      });
       // Render from a canvas-safe local object URL so there's no CORS step.
       const objectUrl = URL.createObjectURL(imageFile);
       let blob: Blob;
@@ -134,7 +143,8 @@ export function LaunchForm() {
           audience: audience.trim() || "everyone",
           durationInSeconds: dur,
           aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
-          accent: "#0447ff",
+          accent: spec.palette.accent,
+          spec,
         });
       } finally {
         URL.revokeObjectURL(objectUrl);
