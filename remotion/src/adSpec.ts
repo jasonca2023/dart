@@ -5,7 +5,7 @@
 
 export type Tone = "luxe" | "energetic" | "playful" | "calm" | "techy" | "bold";
 export type FontKey = "grotesque" | "serif" | "mono";
-export type LayoutVariant = "banded" | "split";
+export type LayoutVariant = "banded" | "split" | "editorial";
 export type SceneType = "hook" | "hero" | "feature" | "price" | "benefit" | "outro";
 export type Motion = "kenburns-in" | "kenburns-out" | "drift" | "rise" | "pop";
 
@@ -103,12 +103,12 @@ const TONE_FONT: Record<Tone, FontKey> = {
 };
 
 const TONE_LAYOUTS: Record<Tone, LayoutVariant[]> = {
-  luxe: ["split", "banded"],
-  energetic: ["banded", "split"],
-  playful: ["banded", "split"],
+  luxe: ["editorial", "split", "banded"],
+  energetic: ["split", "banded", "editorial"],
+  playful: ["editorial", "banded", "split"],
   calm: ["split", "banded"],
-  techy: ["banded", "split"],
-  bold: ["banded", "split"],
+  techy: ["banded", "split", "editorial"],
+  bold: ["editorial", "split", "banded"],
 };
 
 const TONE_MOTION: Record<Tone, Motion> = {

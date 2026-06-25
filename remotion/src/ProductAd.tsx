@@ -52,6 +52,17 @@ const TEMPO: Record<Tone, Tempo> = {
   bold: { dur: 16, damping: 150, stagger: 4, prodTo: 1.08, drift: 7 }, // punchy
 };
 
+// Tone-aware value line for the price moment (the CTA itself lives in the outro,
+// where research says it belongs). Avoids "affordable" for luxe.
+const PRICE_LEAD: Record<Tone, string> = {
+  luxe: "Yours for",
+  energetic: "For an affordable",
+  techy: "Smart value at",
+  calm: "For an affordable",
+  playful: "All this for just",
+  bold: "Get it for",
+};
+
 function useUnit() {
   const { width, height } = useVideoConfig();
   return Math.min(width, height) / 1080;
@@ -336,12 +347,68 @@ const HookScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   );
 };
 
-const HeroScene: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+// Editorial: type-dominant and asymmetric — an oversized headline owns the top,
+// the product sits on a stage strip below. Inverts the banded layout for variety.
+const EditorialHero: React.FC<SceneProps> = ({ spec, scene, productImage }) => {
+  const u = useUnit();
+  const t = TEMPO[spec.tone];
+  const { stage, panel, accent, text, onStage } = spec.palette;
+  const frame = useCurrentFrame();
+  const eb = useReveal(3, t);
+  const hl = useReveal(3 + t.stagger, t);
+  const driftY = interpolate(frame, [0, scene.frames], [t.drift * 0.4, -t.drift * 0.4]);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel }}>
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "52%",
+          backgroundColor: panel,
+          backgroundImage: `radial-gradient(58% 120% at 6% 0%, ${accent}26, transparent 60%)`,
+          padding: `${52 * u}px ${100 * u}px`,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 22 * u, transform: `translateY(${driftY}px)` }}>
+          <Eyebrow text={spec.eyebrow} accent={accent} color={text} u={u} o={eb} />
+          <div
+            style={{
+              opacity: hl,
+              transform: `translateY(${interpolate(hl, [0, 1], [36, 0])}px)`,
+              color: text,
+              fontWeight: 790,
+              fontSize: 98 * u,
+              lineHeight: 0.96,
+              letterSpacing: -3.4 * u,
+              maxWidth: "15ch",
+            }}
+          >
+            {spec.headline}
+          </div>
+        </div>
+      </div>
+      <div style={{ position: "absolute", top: "52%", left: 0, right: 0, bottom: 0 }}>
+        <ProductStage src={productImage} motion={scene.motion} t={t} sceneFrames={scene.frames} stage={stage} onStage={onStage} accent={accent} widthPct="56%" />
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const HeroScene: React.FC<SceneProps> = (props) => {
+  const { spec, scene, productImage, portrait } = props;
   const u = useUnit();
   const t = TEMPO[spec.tone];
   const { stage, panel, accent, text, onStage } = spec.palette;
   const split = spec.layout === "split" && !portrait;
+  const editorial = spec.layout === "editorial" && !portrait;
 
+  if (editorial) return <EditorialHero {...props} />;
   if (split) {
     return (
       <AbsoluteFill style={{ flexDirection: "row", backgroundColor: panel }}>
@@ -441,38 +508,51 @@ const PriceScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const u = useUnit();
   const t = TEMPO[spec.tone];
   const { panel, accent, text } = spec.palette;
+  const lead = useReveal(2, t);
   const pop = spring({
-    frame: useCurrentFrame() - 2,
+    frame: useCurrentFrame() - (2 + t.stagger),
     fps: useVideoConfig().fps,
     durationInFrames: t.dur + 4,
     config: { damping: spec.tone === "playful" ? 9 : 13 },
   });
-  const cta = useReveal(16, t);
+  // The price is the moment (the CTA lives in the outro). Frame it as value, not
+  // a button: a tone-aware lead line over a big, confident number.
   return (
     <AbsoluteFill
       style={{
         backgroundColor: panel,
-        backgroundImage: `radial-gradient(72% 70% at 50% 42%, ${accent}3a, transparent 60%)`,
+        backgroundImage: `radial-gradient(72% 70% at 50% 44%, ${accent}3a, transparent 60%)`,
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "column",
-        gap: 30 * u,
+        gap: 18 * u,
       }}
     >
+      <div
+        style={{
+          opacity: lead,
+          transform: `translateY(${interpolate(lead, [0, 1], [16, 0])}px)`,
+          color: accent,
+          fontWeight: 700,
+          fontSize: (portrait ? 24 : 26) * u,
+          letterSpacing: 3 * u,
+        }}
+      >
+        {up(PRICE_LEAD[spec.tone])}
+      </div>
       <div
         style={{
           transform: `scale(${interpolate(pop, [0, 1], [0.72, 1])})`,
           opacity: pop,
           color: text,
           fontWeight: 800,
-          fontSize: (portrait ? 116 : 140) * u,
+          fontSize: (portrait ? 132 : 162) * u,
           letterSpacing: -3 * u,
           lineHeight: 1,
         }}
       >
         {scene.value}
       </div>
-      <Pill text={`${spec.cta} →`} accent={accent} u={u} o={cta} />
     </AbsoluteFill>
   );
 };
@@ -570,6 +650,23 @@ function fallbackSpec(props: ProductAdProps): AdSpec {
   };
 }
 
+// Subtle entry per scene so each beat lands as a cut-with-motion, not a hard cut.
+// Direction rotates by scene index for variety (slide-in / rise / scale).
+const SceneStage: React.FC<{ index: number; children: React.ReactNode }> = ({ index, children }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const e = spring({ frame, fps, durationInFrames: 14, config: { damping: 200 } });
+  const mode = index % 3;
+  const tr =
+    mode === 0
+      ? `translateX(${interpolate(e, [0, 1], [26, 0])}px)`
+      : mode === 1
+        ? `translateY(${interpolate(e, [0, 1], [22, 0])}px)`
+        : `scale(${interpolate(e, [0, 1], [0.98, 1])})`;
+  const opacity = interpolate(e, [0, 0.45], [0, 1], { extrapolateRight: "clamp" });
+  return <AbsoluteFill style={{ transform: tr, opacity }}>{children}</AbsoluteFill>;
+};
+
 export const ProductAd: React.FC<ProductAdProps> = (props) => {
   const spec = props.spec ?? fallbackSpec(props);
   const { width, height } = useVideoConfig();
@@ -587,7 +684,9 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
         offset += scene.frames;
         return (
           <Sequence key={i} from={from} durationInFrames={scene.frames} layout="none">
-            <SceneView spec={spec} scene={scene} productImage={props.productImage} portrait={portrait} />
+            <SceneStage index={i}>
+              <SceneView spec={spec} scene={scene} productImage={props.productImage} portrait={portrait} />
+            </SceneStage>
           </Sequence>
         );
       })}
