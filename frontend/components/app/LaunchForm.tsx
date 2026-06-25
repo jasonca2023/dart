@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { buildAdSpec } from "@/lib/adSpec";
+import { removeProductBackground } from "@/lib/bgRemove";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Segmented } from "../ui/Segmented";
@@ -134,9 +135,13 @@ export function LaunchForm() {
         price: formatPrice(price),
         durationSec: dur,
       });
+      // Cut the product out of its background (in-browser) so it sits cleanly on
+      // the ad's stage. Falls back to the original photo if it can't.
+      const cleaned = await removeProductBackground(imageFile, setStatus);
+      const renderFile: Blob = cleaned ?? imageFile;
       // Render in-browser from a canvas-safe local object URL — free, fast, no
       // CORS step, nothing leaves the browser until the user saves.
-      const objectUrl = URL.createObjectURL(imageFile);
+      const objectUrl = URL.createObjectURL(renderFile);
       let blob: Blob;
       setStatus("Rendering the video…");
       try {
