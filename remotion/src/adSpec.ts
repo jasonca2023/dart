@@ -62,30 +62,34 @@ const TONE_KEYWORDS: { tone: Tone; words: string[] }[] = [
   { tone: "playful", words: ["kid", "fun", "teen", "creator", "party", "color", "playful", "quirky"] },
 ];
 
+// Stages stay light so a product photo (often white-bg) blends; the tone lives in
+// the dark panel, the accent, the type and the motion. Palettes follow the
+// research: luxe = black+gold "modern heritage", techy = high-contrast electric,
+// energetic = bold athletic, calm = warm/trustworthy.
 const PALETTES: Record<Tone, Palette[]> = {
   luxe: [
-    { stage: "#f6f3ec", panel: "#0c0b09", accent: "#c8a24c", text: "#f7f2e7", onStage: "#0c0b09" },
-    { stage: "#f1eee9", panel: "#13110d", accent: "#b08d57", text: "#f4efe6", onStage: "#13110d" },
+    { stage: "#f3efe5", panel: "#0b0a08", accent: "#c8a24c", text: "#f5efe1", onStage: "#0b0a08" },
+    { stage: "#efe9dc", panel: "#100d09", accent: "#bd9a55", text: "#f3ecdc", onStage: "#100d09" },
   ],
   energetic: [
-    { stage: "#ffffff", panel: "#0b0b14", accent: "#0447ff", text: "#ffffff", onStage: "#070709" },
-    { stage: "#fdfdff", panel: "#0a0d1a", accent: "#ff5a1f", text: "#ffffff", onStage: "#0a0d1a" },
+    { stage: "#ffffff", panel: "#0a0d18", accent: "#ff5a1f", text: "#ffffff", onStage: "#080a12" },
+    { stage: "#fbfdff", panel: "#091024", accent: "#1f6bff", text: "#ffffff", onStage: "#091024" },
   ],
   playful: [
-    { stage: "#fff7f0", panel: "#2a0f3a", accent: "#ff5da2", text: "#ffffff", onStage: "#2a0f3a" },
-    { stage: "#fef6ff", panel: "#15234b", accent: "#ffb020", text: "#ffffff", onStage: "#15234b" },
+    { stage: "#fff6f1", panel: "#2a0f3a", accent: "#ff5da2", text: "#ffffff", onStage: "#2a0f3a" },
+    { stage: "#fdf5ff", panel: "#141f4a", accent: "#ffb020", text: "#ffffff", onStage: "#141f4a" },
   ],
   calm: [
-    { stage: "#f3f5f4", panel: "#243033", accent: "#4f9d8a", text: "#f2f6f4", onStage: "#243033" },
-    { stage: "#f4f3ef", panel: "#2b2f3a", accent: "#7c93c9", text: "#f2f4f8", onStage: "#2b2f3a" },
+    { stage: "#f2f4f3", panel: "#222b2e", accent: "#3f9d86", text: "#eef5f2", onStage: "#222b2e" },
+    { stage: "#f4f2ee", panel: "#2a2f3a", accent: "#6f8fd0", text: "#eef2fa", onStage: "#2a2f3a" },
   ],
   techy: [
-    { stage: "#f4f6f8", panel: "#06070d", accent: "#22d3ee", text: "#eafcff", onStage: "#06070d" },
-    { stage: "#f2f4f7", panel: "#0a0a12", accent: "#7c5cff", text: "#f0ecff", onStage: "#0a0a12" },
+    { stage: "#eef1f6", panel: "#06070d", accent: "#22e3d3", text: "#e9fffb", onStage: "#06070d" },
+    { stage: "#ecedf5", panel: "#08080f", accent: "#8b5cff", text: "#efeaff", onStage: "#08080f" },
   ],
   bold: [
-    { stage: "#fffdf7", panel: "#111111", accent: "#ff3b1d", text: "#ffffff", onStage: "#111111" },
-    { stage: "#fbfbf9", panel: "#0f0f0f", accent: "#ffd400", text: "#111111", onStage: "#0f0f0f" },
+    { stage: "#fffdf7", panel: "#101010", accent: "#ff3b1d", text: "#ffffff", onStage: "#101010" },
+    { stage: "#fbfbf9", panel: "#0f0f0f", accent: "#ffd400", text: "#ffffff", onStage: "#0f0f0f" },
   ],
 };
 

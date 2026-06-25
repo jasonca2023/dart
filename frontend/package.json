@@ -21,7 +21,6 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "remotion": "^4.0.481",
-    "sucrase": "^3.35.1",
     "three": "^0.171.0"
   },
   "devDependencies": {
