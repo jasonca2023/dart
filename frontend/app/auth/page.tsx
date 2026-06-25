@@ -28,9 +28,7 @@ export default function AuthPage() {
             quiet dashboard.
           </p>
         </div>
-        <p className="font-mono text-[12px] text-fog">
-          People in generated ads are synthetic.
-        </p>
+        <span aria-hidden />
       </aside>
 
       {/* Form */}

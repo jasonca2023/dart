@@ -52,7 +52,7 @@ export function SiteFooter() {
           </div>
         </div>
         <div className="mt-12 flex flex-col gap-2 border-t border-ash pt-6 text-[12px] text-fog sm:flex-row sm:items-center sm:justify-between">
-          <span>© {2026} Dart. People in generated ads are synthetic.</span>
+          <span>© {2026} Dart.</span>
           <span className="font-mono">Built for merchants who ship.</span>
         </div>
       </div>

@@ -339,10 +339,26 @@ h3 {
 /* ── Ambient ad-mood orb (the only chromatic element) ─────── */
 /* Color appears only as ad energy made visible — violet↔ember spectrum,
  * blended through pink/peach midtones via color-mix of the two tokens. */
+/* Registering --hot/--cool as typed <color> custom properties makes them
+ * animatable, so the orb fades between moods instead of snapping. --mid reads
+ * them via var() and recomputes each frame. */
+@property --hot {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #ff4704;
+}
+@property --cool {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #0447ff;
+}
 .orb {
   --hot: var(--color-ember);
   --cool: var(--color-violet);
   --mid: color-mix(in oklab, var(--cool) 50%, var(--hot));
+  transition:
+    --hot 0.55s var(--ease-in-out),
+    --cool 0.55s var(--ease-in-out);
   position: relative;
   border-radius: var(--radius-full);
   aspect-ratio: 1;

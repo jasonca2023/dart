@@ -139,8 +139,7 @@ export function AuthForm() {
       </p>
 
       <p className="text-center text-[12px] leading-relaxed text-fog">
-        Sign in to save every ad you generate to your library. People in
-        generated ads are synthetic.
+        Sign in to save every ad you generate to your library.
       </p>
     </div>
   );

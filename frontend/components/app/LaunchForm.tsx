@@ -350,10 +350,6 @@ export function LaunchForm() {
                 {aspect} · {Number.isFinite(duration) ? duration : "—"}s · 1080p
               </dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-driftwood">Cost</dt>
-              <dd className="font-mono text-ink">Free</dd>
-            </div>
           </dl>
           <p className="mt-5 border-t border-ash pt-4 text-[13px] leading-relaxed text-fog">
             Renders in your browser from your own image — no scraping, nothing
