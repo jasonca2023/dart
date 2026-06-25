@@ -27,13 +27,6 @@ const DURATION_PRESETS = [5, 10, 15, 20];
 const clampDuration = (n: number) =>
   Math.min(DURATION_MAX, Math.max(DURATION_MIN, Math.round(n)));
 
-function toneFor(text: string) {
-  const tones = ["cinematic", "energetic", "luxe", "playful", "calm"] as const;
-  let h = 0;
-  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
-  return tones[h % tones.length];
-}
-
 function formatPrice(raw: string): string {
   const t = raw.trim();
   if (!t) return "";
@@ -106,6 +99,19 @@ export function LaunchForm() {
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // The real spec the brain will use for these inputs — drives the preview orb
+  // and mood label so the summary reflects the actual ad, not a random hash.
+  const moodSpec = useMemo(
+    () =>
+      buildAdSpec({
+        title: title.trim(),
+        audience: audience.trim(),
+        price: formatPrice(price),
+        durationSec: clampDuration(duration) || 10,
+      }),
+    [title, audience, price, duration],
+  );
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -329,9 +335,15 @@ export function LaunchForm() {
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <div className="rounded-card bg-sand p-6">
           <div className="flex items-center justify-center rounded-[14px] bg-white py-8 shadow-[var(--shadow-inset-warm)]">
-            <Orb tone={toneFor(audience || title || "cinematic")} className="size-24" />
+            <Orb accent={moodSpec.palette.accent} className="size-24" />
           </div>
           <dl className="mt-6 flex flex-col gap-3 text-[14px]">
+            <div className="flex justify-between">
+              <dt className="text-driftwood">Mood</dt>
+              <dd className="font-mono capitalize text-ink">
+                {moodSpec.tone} · {moodSpec.layout}
+              </dd>
+            </div>
             <div className="flex justify-between">
               <dt className="text-driftwood">Format</dt>
               <dd className="font-mono text-ink">
