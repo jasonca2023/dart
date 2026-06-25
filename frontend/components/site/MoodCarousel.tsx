@@ -1,11 +1,15 @@
 import { Orb } from "../ui/Orb";
+import { TONE_ACCENTS } from "@/lib/adSpec";
 
+// The six real tones the brain picks from, with their actual accent colors and
+// the design personality each one renders with.
 const MOODS = [
-  { tone: "cinematic", name: "Cinematic", note: "Slow, filmic, premium" },
-  { tone: "energetic", name: "Energetic", note: "Fast cuts, high motion" },
-  { tone: "luxe", name: "Luxe", note: "Editorial, restrained" },
-  { tone: "playful", name: "Playful", note: "Bright, friendly, warm" },
-  { tone: "calm", name: "Calm", note: "Soft, airy, considered" },
+  { tone: "luxe", name: "Luxe", note: "Gold & serif, slow, editorial" },
+  { tone: "techy", name: "Techy", note: "Electric, mono, snappy" },
+  { tone: "energetic", name: "Energetic", note: "Bold, fast, athletic" },
+  { tone: "playful", name: "Playful", note: "Bright, bouncy, warm" },
+  { tone: "calm", name: "Calm", note: "Soft, gentle, considered" },
+  { tone: "bold", name: "Bold", note: "High-contrast, punchy" },
 ] as const;
 
 export function MoodCarousel() {
@@ -14,11 +18,11 @@ export function MoodCarousel() {
       <div className="mx-auto mb-10 max-w-[var(--page-max)] px-5 sm:px-8">
         <div className="max-w-2xl">
           <p className="t-caption text-driftwood">Ad moods</p>
-          <h2 className="t-heading mt-3">Color is how Dart shows energy.</h2>
+          <h2 className="t-heading mt-3">A mood, matched to your audience.</h2>
           <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-driftwood">
-            Every cut carries a mood — the pacing, the grade, the way the
-            virtual human moves. Pick one when you launch; it steers the script
-            and the render.
+            Tell Dart who the ad is for and it picks a mood automatically —
+            steering the palette, typography, pacing and motion. Tech buyers get
+            electric and precise; luxury gets gold and restrained.
           </p>
         </div>
       </div>
@@ -32,7 +36,7 @@ export function MoodCarousel() {
                 key={m.name}
                 className="flex w-32 shrink-0 snap-center flex-col items-center text-center sm:w-36"
               >
-                <Orb tone={m.tone} className="size-24 sm:size-28" />
+                <Orb accent={TONE_ACCENTS[m.tone]} className="size-24 sm:size-28" />
                 <span className="mt-5 text-[15px] font-medium text-ink">
                   {m.name}
                 </span>

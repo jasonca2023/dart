@@ -93,6 +93,17 @@ const PALETTES: Record<Tone, Palette[]> = {
   ],
 };
 
+// Representative accent per tone (the first palette variant) — used by previews
+// like the mood carousel so the UI shows the real ad colors.
+export const TONE_ACCENTS: Record<Tone, string> = {
+  luxe: PALETTES.luxe[0].accent,
+  energetic: PALETTES.energetic[0].accent,
+  playful: PALETTES.playful[0].accent,
+  calm: PALETTES.calm[0].accent,
+  techy: PALETTES.techy[0].accent,
+  bold: PALETTES.bold[0].accent,
+};
+
 const TONE_FONT: Record<Tone, FontKey> = {
   luxe: "serif",
   energetic: "grotesque",

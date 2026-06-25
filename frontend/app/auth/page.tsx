@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { Orb } from "@/components/ui/Orb";
 import { AuthForm } from "@/components/app/AuthForm";
+import { TONE_ACCENTS } from "@/lib/adSpec";
 
 export const metadata = {
   title: "Sign in — Dart",
@@ -15,9 +16,9 @@ export default function AuthPage() {
         <Logo />
         <div>
           <div className="mb-10 flex gap-6">
-            <Orb tone="cinematic" className="size-20" />
-            <Orb tone="luxe" className="size-20" />
-            <Orb tone="energetic" className="size-20" />
+            <Orb accent={TONE_ACCENTS.luxe} className="size-20" />
+            <Orb accent={TONE_ACCENTS.techy} className="size-20" />
+            <Orb accent={TONE_ACCENTS.energetic} className="size-20" />
           </div>
           <h2 className="t-heading-lg max-w-[14ch]">
             One product link. One cinematic ad.

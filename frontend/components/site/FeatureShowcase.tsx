@@ -1,5 +1,6 @@
 import { Check } from "../icons";
 import { Orb } from "../ui/Orb";
+import { TONE_ACCENTS } from "@/lib/adSpec";
 
 const STAGES = ["Upload", "Render", "Ready"];
 
@@ -14,7 +15,7 @@ export function FeatureShowcase() {
         <div className="order-2 lg:order-1">
           <div className="mx-auto max-w-md rounded-card bg-white p-5 shadow-[var(--shadow-elevated)]">
             <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-[14px] bg-sand">
-              <Orb tone="luxe" className="size-24" />
+              <Orb accent={TONE_ACCENTS.luxe} className="size-24" />
             </div>
 
             {/* Stage rail — the live pipeline, settled */}

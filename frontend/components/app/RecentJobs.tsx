@@ -9,6 +9,7 @@ import { cost, relativeTime, isTerminal } from "@/lib/format";
 import type { Job } from "@/lib/types";
 import { StatusPill } from "../ui/StatusPill";
 import { Orb } from "../ui/Orb";
+import { TONE_ACCENTS } from "@/lib/adSpec";
 import { ArrowUpRight, Film } from "../icons";
 
 function label(job: Job): string {
@@ -21,7 +22,7 @@ function label(job: Job): string {
   }
 }
 
-const toneCycle = ["cinematic", "energetic", "luxe", "playful", "calm"] as const;
+const accentCycle = Object.values(TONE_ACCENTS);
 
 export function RecentJobs() {
   const { user, loading: authLoading } = useAuth();
@@ -101,7 +102,7 @@ export function RecentJobs() {
             className="group flex items-center gap-4 rounded-card border border-transparent bg-sand p-3 pr-4 transition-[border-color,background-color] duration-150 ease-out hover:border-ash hover:bg-white"
           >
             <span className="flex size-14 shrink-0 items-center justify-center rounded-[14px] bg-white shadow-[var(--shadow-inset-warm)]">
-              <Orb tone={toneCycle[i % toneCycle.length]} className="size-9" float={false} />
+              <Orb accent={accentCycle[i % accentCycle.length]} className="size-9" float={false} />
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-medium text-ink">

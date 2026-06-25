@@ -3,6 +3,7 @@ import { STAGES } from "@/lib/types";
 import { pipelineProgress } from "@/lib/format";
 import { Check } from "../icons";
 import { Orb } from "../ui/Orb";
+import { TONE_ACCENTS } from "@/lib/adSpec";
 
 const ORDER: JobStatus[] = ["scraping", "scripting", "rendering", "ready"];
 
@@ -31,7 +32,7 @@ export function StageProgress({ status }: { status: JobStatus }) {
   return (
     <div className="rounded-card bg-white p-8 shadow-[var(--shadow-elevated)]">
       <div className="flex items-center justify-center rounded-[14px] bg-sand py-10">
-        <Orb tone="cinematic" className="size-28" />
+        <Orb accent={TONE_ACCENTS.energetic} className="size-28" />
       </div>
 
       <div className="mt-8">

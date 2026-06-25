@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Orb } from "../ui/Orb";
+import { TONE_ACCENTS } from "@/lib/adSpec";
 
 interface Stage {
   key: string;
@@ -54,7 +55,7 @@ function ScriptVisual() {
 function RenderVisual() {
   return (
     <div className="flex items-center gap-5">
-      <Orb tone="cinematic" className="size-20 shrink-0" float={false} />
+      <Orb accent={TONE_ACCENTS.techy} className="size-20 shrink-0" float={false} />
       <div className="flex-1">
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-ash">
           <div className="h-full w-full rounded-full bg-ink" />
