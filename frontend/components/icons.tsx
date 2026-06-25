@@ -176,17 +176,6 @@ export function Alert(p: IconProps) {
   );
 }
 
-export function Bar(p: IconProps) {
-  // The wordmark glyph: stacked parallel bars (||)
-  return (
-    <Svg {...p}>
-      <g stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
-        <path d="M9 4.5v15M15 4.5v15" />
-      </g>
-    </Svg>
-  );
-}
-
 export function Spinner({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={`dart-spin ${className ?? ""}`} aria-hidden>

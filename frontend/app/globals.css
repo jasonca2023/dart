@@ -382,26 +382,6 @@ h3 {
   );
   mix-blend-mode: screen;
 }
-.orb[data-tone="cinematic"] {
-  --cool: var(--color-violet);
-  --hot: color-mix(in oklab, var(--color-violet) 60%, var(--color-ember));
-}
-.orb[data-tone="energetic"] {
-  --cool: color-mix(in oklab, var(--color-ember) 70%, var(--color-violet));
-  --hot: var(--color-ember);
-}
-.orb[data-tone="luxe"] {
-  --cool: var(--color-violet);
-  --hot: color-mix(in oklab, var(--color-ember) 55%, #ff00aa);
-}
-.orb[data-tone="playful"] {
-  --cool: color-mix(in oklab, var(--color-ember) 50%, #ff7eb6);
-  --hot: color-mix(in oklab, var(--color-ember) 80%, #ffd0a0);
-}
-.orb[data-tone="calm"] {
-  --cool: color-mix(in oklab, var(--color-violet) 75%, white);
-  --hot: color-mix(in oklab, var(--color-violet) 45%, var(--color-ember));
-}
 @media (prefers-reduced-motion: no-preference) {
   .orb-float {
     animation: orb-float 9s var(--ease-in-out) infinite;

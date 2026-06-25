@@ -1,18 +1,16 @@
 import type { CSSProperties } from "react";
 
-type Tone = "cinematic" | "energetic" | "luxe" | "playful" | "calm";
-
 interface OrbProps {
-  tone?: Tone;
-  /** When set, the orb takes the ad's real accent color (overrides `tone`), so
-   * the preview genuinely reflects the palette the render will use. */
+  /** The ad's real accent color — the orb's gradient is mixed from it, so the
+   * preview genuinely reflects the palette the render will use. Falls back to the
+   * base ember↔violet wash (see `.orb` in globals.css) when omitted. */
   accent?: string;
   className?: string;
   float?: boolean;
 }
 
 // Decorative only — never a surface, never holds text (Hallmark orb rule).
-export function Orb({ tone = "cinematic", accent, className, float = true }: OrbProps) {
+export function Orb({ accent, className, float = true }: OrbProps) {
   const style = accent
     ? ({
         "--hot": accent,
@@ -22,7 +20,6 @@ export function Orb({ tone = "cinematic", accent, className, float = true }: Orb
   return (
     <span
       aria-hidden
-      data-tone={tone}
       style={style}
       className={`orb ${float ? "orb-float" : ""} ${className ?? ""}`}
     />

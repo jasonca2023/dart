@@ -32,6 +32,32 @@ def _jwks(url: str):
     return _jwks_client
 
 
+def verify_token(url: str, token: str) -> str | None:
+    """Verify a Supabase access token's ES256/RS256 signature against the project
+    JWKS and return its `sub` (user id), or None when the token is invalid/expired.
+
+    Shared by `require_user` (Authorization header) and `/save-ad` (which carries
+    the token as a multipart form field) so both trust the same verification —
+    never decode a token's payload without checking its signature first.
+    """
+    try:
+        import jwt
+
+        signing_key = _jwks(url).get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["ES256", "RS256"],
+            audience="authenticated",
+        )
+    except Exception as e:
+        log.warning("Supabase token verification failed: %s", e)
+        return None
+
+    sub = payload.get("sub")
+    return str(sub) if sub else None
+
+
 async def require_user(request: Request) -> str:
     """FastAPI dependency: returns the Supabase user id, or raises 401."""
     settings = request.app.state.settings
@@ -44,20 +70,7 @@ async def require_user(request: Request) -> str:
         raise DartError(UNAUTHORIZED, "Sign in required.", status=401)
     token = header[7:].strip()
 
-    try:
-        import jwt
-
-        signing_key = _jwks(url).get_signing_key_from_jwt(token)
-        payload = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["ES256", "RS256"],
-            audience="authenticated",
-        )
-    except Exception as e:
-        raise DartError(UNAUTHORIZED, "Invalid or expired session.", status=401) from e
-
-    sub = payload.get("sub")
+    sub = verify_token(url, token)
     if not sub:
-        raise DartError(UNAUTHORIZED, "Invalid session.", status=401)
+        raise DartError(UNAUTHORIZED, "Invalid or expired session.", status=401)
     return sub

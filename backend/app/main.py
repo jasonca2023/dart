@@ -5,10 +5,9 @@ Run: uvicorn app.main:app --reload  (from the backend/ directory)
 
 from __future__ import annotations
 
-import base64
-import json
+import ipaddress
 import logging
-import uuid
+import socket
 
 from urllib.parse import urlparse
 
@@ -19,28 +18,46 @@ from fastapi.staticfiles import StaticFiles
 
 from .api.jobs import router as jobs_router
 from .api.settings import router as settings_router
+from .auth import verify_token
 from .config import Settings, get_settings, media_root
-from .errors import INVALID_URL, SCRAPE_FAILED, DartError, dart_error_handler
+from .errors import (
+    INVALID_URL,
+    SCRAPE_FAILED,
+    UNAUTHORIZED,
+    DartError,
+    dart_error_handler,
+)
 from .pipeline import Orchestrator
 from .providers.factory import build_providers
 from .store import JobStore
 
 
-def _jwt_sub(token: str) -> str | None:
-    """Extract the `sub` (user id) from a JWT payload without verifying it.
-
-    The token comes from the caller's own logged-in Supabase session; we only
-    use its `sub` to scope the upload to that user's folder.
+def _is_public_host(host: str | None) -> bool:
+    """True only when every address `host` resolves to is a public IP — blocks
+    SSRF to loopback/link-local/private/reserved ranges (e.g. cloud metadata at
+    169.254.169.254) via the image proxy.
     """
+    if not host:
+        return False
     try:
-        payload = token.split(".")[1]
-        payload += "=" * (-len(payload) % 4)
-        data = json.loads(base64.urlsafe_b64decode(payload))
-        sub = data.get("sub")
-        uuid.UUID(str(sub))  # validate shape
-        return str(sub)
-    except Exception:
-        return None
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    for info in infos:
+        try:
+            addr = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if (
+            addr.is_private
+            or addr.is_loopback
+            or addr.is_link_local
+            or addr.is_reserved
+            or addr.is_multicast
+            or addr.is_unspecified
+        ):
+            return False
+    return True
 
 
 VIDEO_BUCKET = "dart-videos"
@@ -81,6 +98,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             raise DartError(INVALID_URL, "Bad image url.", status=400)
+        if not _is_public_host(parsed.hostname):
+            raise DartError(INVALID_URL, "Image host is not allowed.", status=400)
         try:
             import httpx
 
@@ -115,9 +134,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise DartError(
                 SCRAPE_FAILED, "Server is missing Supabase service config.", status=500
             )
-        user_id = _jwt_sub(token)
+        user_id = verify_token(settings.supabase_url, token)
         if not user_id:
-            raise DartError(INVALID_URL, "Invalid or missing session token.", status=401)
+            raise DartError(
+                UNAUTHORIZED, "Invalid or expired session token.", status=401
+            )
 
         base = settings.supabase_url.rstrip("/")
         key = settings.supabase_service_key

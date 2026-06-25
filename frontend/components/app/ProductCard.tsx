@@ -28,9 +28,11 @@ export function ProductCard({ product }: { product: Product }) {
             {product.source}
           </span>
         </div>
-        <p className="mt-2 font-display text-[22px] font-light text-ink">
-          {money(product.price, product.currency)}
-        </p>
+        {product.price > 0 && (
+          <p className="mt-2 font-display text-[22px] font-light text-ink">
+            {money(product.price, product.currency)}
+          </p>
+        )}
 
         {specs.length > 0 && (
           <dl className="mt-4 flex flex-col gap-2 border-t border-ash pt-4">

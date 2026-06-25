@@ -130,7 +130,9 @@ export function LaunchForm() {
     setSubmitting(true);
     setError(null);
     setStatus("Designing your ad…");
-    const dur = clampDuration(duration);
+    // `duration` can be NaN/0 mid-edit (cleared field); never let that reach the
+    // renderer as durationInFrames — fall back to 10s.
+    const dur = clampDuration(duration) || 10;
     try {
       const id = crypto.randomUUID();
       // The "brain": map the inputs to an audience-tailored creative spec
