@@ -5,7 +5,7 @@
 
 export type Tone = "luxe" | "energetic" | "playful" | "calm" | "techy" | "bold";
 export type FontKey = "grotesque" | "serif" | "mono";
-export type LayoutVariant = "banded" | "split" | "editorial";
+export type LayoutVariant = "banded" | "split" | "editorial" | "statement";
 export type SceneType = "hook" | "hero" | "feature" | "price" | "benefit" | "outro";
 export type Motion = "kenburns-in" | "kenburns-out" | "drift" | "rise" | "pop";
 
@@ -60,6 +60,7 @@ const TONE_KEYWORDS: { tone: Tone; words: string[] }[] = [
   { tone: "calm", words: ["parent", "family", "busy", "mom", "dad", "home", "wellness", "sleep", "calm"] },
   { tone: "energetic", words: ["outdoor", "adventure", "athlete", "fitness", "sport", "runner", "active", "travel"] },
   { tone: "playful", words: ["kid", "fun", "teen", "creator", "party", "color", "playful", "quirky"] },
+  { tone: "bold", words: ["bold", "statement", "streetwear", "fashion", "hype", "trendsetter", "edgy", "influencer", "disruptor", "standout"] },
 ];
 
 // Stages stay light so a product photo (often white-bg) blends; the tone lives in
@@ -113,13 +114,27 @@ const TONE_FONT: Record<Tone, FontKey> = {
   bold: "grotesque",
 };
 
-const TONE_LAYOUTS: Record<Tone, LayoutVariant[]> = {
-  luxe: ["editorial", "split", "banded"],
-  energetic: ["split", "banded", "editorial"],
-  playful: ["editorial", "banded", "split"],
-  calm: ["split", "banded"],
-  techy: ["banded", "split", "editorial"],
-  bold: ["editorial", "split", "banded"],
+// Each mood gets its OWN structure, not just its own colours — a signature hero
+// layout, whether it includes a feature/benefit beat, and per-scene pacing
+// weights. Grounded in how each audience actually responds (see research):
+//  - luxe   : quiet luxury — lean (no spec dump), slow, hero-dominant, editorial.
+//  - calm   : steady & clean — lean, gentle, product-forward banded.
+//  - bold   : loud declarative — lean, oversized statement takeover.
+//  - energetic: kinetic multi-beat — full, fast, dynamic split.
+//  - techy  : spec-forward — full, a prominent feature beat, precise banded.
+//  - playful: bold kinetic type — full, bouncy, type-dominant editorial.
+interface ToneStructure {
+  layout: LayoutVariant;
+  feature: boolean; // include a feature/benefit beat?
+  weights: { hook: number; hero: number; feature: number; price: number; outro: number };
+}
+const TONE_STRUCTURE: Record<Tone, ToneStructure> = {
+  luxe: { layout: "editorial", feature: false, weights: { hook: 1.1, hero: 3.2, feature: 0, price: 1.4, outro: 1.4 } },
+  calm: { layout: "banded", feature: false, weights: { hook: 1.2, hero: 2.8, feature: 0, price: 1.3, outro: 1.2 } },
+  bold: { layout: "statement", feature: false, weights: { hook: 1.5, hero: 2.3, feature: 0, price: 1.5, outro: 1.3 } },
+  energetic: { layout: "split", feature: true, weights: { hook: 1.0, hero: 2.1, feature: 1.4, price: 1.2, outro: 1.0 } },
+  techy: { layout: "banded", feature: true, weights: { hook: 1.0, hero: 2.0, feature: 1.9, price: 1.3, outro: 1.0 } },
+  playful: { layout: "editorial", feature: true, weights: { hook: 1.3, hero: 2.1, feature: 1.3, price: 1.2, outro: 1.1 } },
 };
 
 const TONE_MOTION: Record<Tone, Motion> = {
@@ -229,7 +244,8 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
 
   const palette = pick(PALETTES[tone], seed);
   const font = TONE_FONT[tone];
-  const layout = pick(TONE_LAYOUTS[tone], seed >> 3);
+  const structure = TONE_STRUCTURE[tone];
+  const layout = structure.layout;
   const motion = TONE_MOTION[tone];
 
   const hook = pick(HOOKS[tone], seed >> 5);
@@ -238,24 +254,26 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
   const feature = pick(FEATURES[tone], seed >> 9);
   const eyebrow = pick(KICKERS[tone], seed >> 11);
 
-  // Scene set: hook -> hero -> (feature) -> (price) -> outro. More duration ->
-  // more room for the optional scenes.
+  // Scene set is per-mood (TONE_STRUCTURE): hook -> hero -> (feature) -> (price)
+  // -> outro, with mood-specific pacing weights. The optional feature beat only
+  // appears for moods that want it AND when there's room.
   const totalFrames = Math.max(1, Math.round(input.durationSec * FPS));
   const hasPrice = !!input.price.trim();
   const longEnough = input.durationSec >= 8;
+  const w = structure.weights;
 
   const types: SceneType[] = ["hook", "hero"];
-  const weights: number[] = [1.1, 2.6];
-  if (longEnough) {
+  const weights: number[] = [w.hook, w.hero];
+  if (structure.feature && longEnough) {
     types.push("feature");
-    weights.push(1.5);
+    weights.push(w.feature);
   }
   if (hasPrice) {
     types.push("price");
-    weights.push(1.3);
+    weights.push(w.price);
   }
   types.push("outro");
-  weights.push(1.2);
+  weights.push(w.outro);
 
   const frames = distribute(totalFrames, weights);
   const scenes: Scene[] = types.map((type, i) => {

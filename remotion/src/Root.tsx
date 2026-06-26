@@ -16,6 +16,7 @@ const VARIANTS = [
   { id: "ProductAd-genz", audience: "Gen Z tech enthusiasts" },
   { id: "ProductAd-luxe", audience: "Luxury gift shoppers" },
   { id: "ProductAd-outdoor", audience: "Outdoor adventurers" },
+  { id: "ProductAd-bold", audience: "Bold streetwear statement" },
 ];
 
 export const RemotionRoot: React.FC = () => {

@@ -400,6 +400,68 @@ const EditorialHero: React.FC<SceneProps> = ({ spec, scene, productImage }) => {
   );
 };
 
+// Statement (bold): an oversized headline takeover owns 60% of the frame, the
+// product sits as a small inset card. Type is the hero, product is the accent.
+const StatementHero: React.FC<SceneProps> = ({ spec, scene, productImage }) => {
+  const u = useUnit();
+  const t = TEMPO[spec.tone];
+  const { stage, panel, accent, text, onStage } = spec.palette;
+  const hl = useReveal(2, t);
+  return (
+    <AbsoluteFill style={{ flexDirection: "row", backgroundColor: panel }}>
+      <div
+        style={{
+          width: "60%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: `0 ${64 * u}px 0 ${124 * u}px`,
+        }}
+      >
+        <div
+          style={{
+            width: 92 * u,
+            height: 6 * u,
+            backgroundColor: accent,
+            marginBottom: 34 * u,
+            transform: `scaleX(${hl})`,
+            transformOrigin: "left",
+          }}
+        />
+        <div
+          style={{
+            opacity: hl,
+            transform: `translateY(${interpolate(hl, [0, 1], [44, 0])}px)`,
+            color: text,
+            fontWeight: 800,
+            fontSize: 122 * u,
+            lineHeight: 0.9,
+            letterSpacing: -4.5 * u,
+            maxWidth: "12ch",
+          }}
+        >
+          {spec.headline}
+        </div>
+      </div>
+      <div
+        style={{
+          width: "40%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 56 * u,
+        }}
+      >
+        <div style={{ width: "100%", height: "76%", borderRadius: 10 * u, overflow: "hidden", position: "relative" }}>
+          <ProductStage src={productImage} motion={scene.motion} t={t} sceneFrames={scene.frames} stage={stage} onStage={onStage} accent={accent} widthPct="84%" />
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 const HeroScene: React.FC<SceneProps> = (props) => {
   const { spec, scene, productImage, portrait } = props;
   const u = useUnit();
@@ -407,8 +469,10 @@ const HeroScene: React.FC<SceneProps> = (props) => {
   const { stage, panel, accent, text, onStage } = spec.palette;
   const split = spec.layout === "split" && !portrait;
   const editorial = spec.layout === "editorial" && !portrait;
+  const statement = spec.layout === "statement" && !portrait;
 
   if (editorial) return <EditorialHero {...props} />;
+  if (statement) return <StatementHero {...props} />;
   if (split) {
     return (
       <AbsoluteFill style={{ flexDirection: "row", backgroundColor: panel }}>
