@@ -33,6 +33,17 @@ const FONTS: Record<FontKey, string> = {
 
 const up = (s: string) => (s || "").toUpperCase();
 
+// Pick readable text (ink or white) for a filled accent — so a yellow CTA isn't
+// white-on-yellow.
+function readableOn(hex: string): string {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h.slice(0, 6);
+  const r = parseInt(n.slice(0, 2), 16) || 0;
+  const g = parseInt(n.slice(2, 4), 16) || 0;
+  const b = parseInt(n.slice(4, 6), 16) || 0;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#141414" : "#ffffff";
+}
+
 // Per-tone motion personality — timing + easing is what reads as premium vs
 // amateur (fast = energy, slow = weight). Drives reveal speed, word stagger,
 // product zoom and drift amplitude.
@@ -66,6 +77,12 @@ const PRICE_LEAD: Record<Tone, string> = {
 function useUnit() {
   const { width, height } = useVideoConfig();
   return Math.min(width, height) / 1080;
+}
+
+// Shared left margin so kicker / headline / price / CTA all hang off one column —
+// the consistent baseline reads as "designed", not centered-by-default.
+function margin(u: number, portrait: boolean) {
+  return (portrait ? 76 : 124) * u;
 }
 
 // Scene-relative spring (useCurrentFrame restarts at 0 inside a Sequence).
@@ -131,8 +148,8 @@ const KineticText: React.FC<{
   );
 };
 
-// Product on a softly-lit studio stage: gradient floor, accent spotlight, a
-// grounded contact shadow, and slow life-like motion that spans the whole scene.
+// Product on a softly-lit studio stage: a quiet floor gradient and a grounded
+// contact shadow. No accent spotlight wash (that "bloom" is the AI tell).
 const ProductStage: React.FC<{
   src: string;
   motion: Scene["motion"];
@@ -142,7 +159,7 @@ const ProductStage: React.FC<{
   onStage: string;
   accent: string;
   widthPct: string;
-}> = ({ src, motion, t, sceneFrames, stage, onStage, accent, widthPct }) => {
+}> = ({ src, motion, t, sceneFrames, stage, onStage, widthPct }) => {
   const frame = useCurrentFrame();
   const tt = interpolate(frame, [0, sceneFrames], [0, 1], { extrapolateRight: "clamp" });
   const enter = useReveal(0, t);
@@ -165,13 +182,10 @@ const ProductStage: React.FC<{
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: stage,
-        backgroundImage: `linear-gradient(180deg, ${onStage}0a 0%, ${stage} 46%, ${onStage}12 100%)`,
+        backgroundImage: `linear-gradient(176deg, ${onStage}08 0%, ${stage} 52%, ${onStage}10 100%)`,
         overflow: "hidden",
       }}
     >
-      <AbsoluteFill
-        style={{ backgroundImage: `radial-gradient(44% 40% at 50% 40%, ${accent}22, transparent 70%)` }}
-      />
       <div
         style={{
           position: "relative",
@@ -188,11 +202,11 @@ const ProductStage: React.FC<{
           style={{
             position: "absolute",
             bottom: "1%",
-            width: "62%",
-            height: "8%",
+            width: "60%",
+            height: "7%",
             borderRadius: "50%",
             backgroundImage:
-              "radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,0.34), transparent 72%)",
+              "radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,0.30), transparent 72%)",
             filter: "blur(7px)",
           }}
         />
@@ -203,7 +217,7 @@ const ProductStage: React.FC<{
             maxWidth: "100%",
             maxHeight: "100%",
             objectFit: "contain",
-            filter: "drop-shadow(0 26px 48px rgba(0,0,0,0.18))",
+            filter: "drop-shadow(0 24px 44px rgba(0,0,0,0.16))",
           }}
         />
       </div>
@@ -211,31 +225,34 @@ const ProductStage: React.FC<{
   );
 };
 
-const Eyebrow: React.FC<{ text: string; accent: string; color: string; u: number; o: number }> = ({
+// Refined kicker: a short hairline + small tracked caps in the copy colour
+// (muted) — an editorial label, never the "— FOR AUDIENCE" accent-tick eyebrow.
+const Kicker: React.FC<{ text: string; color: string; u: number; o: number }> = ({
   text,
-  accent,
   color,
   u,
   o,
-}) => (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 12 * u,
-      opacity: o,
-      transform: `translateY(${interpolate(o, [0, 1], [14, 0])}px)`,
-      color,
-      fontSize: 17 * u,
-      fontWeight: 600,
-      letterSpacing: 3 * u,
-    }}
-  >
-    <span style={{ width: 26 * u, height: 3 * u, borderRadius: 99, backgroundColor: accent }} />
-    {up(text)}
-  </div>
-);
+}) => {
+  if (!text) return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 16 * u,
+        opacity: o,
+        transform: `translateY(${interpolate(o, [0, 1], [12, 0])}px)`,
+      }}
+    >
+      <span style={{ width: 46 * u, height: 1.5 * u, backgroundColor: color, opacity: 0.4 }} />
+      <span style={{ color, opacity: 0.72, fontSize: 16 * u, fontWeight: 600, letterSpacing: 3.5 * u }}>
+        {up(text)}
+      </span>
+    </div>
+  );
+};
 
+// Solid CTA — flat accent, contrast-aware text, no gradient, no glow.
 const Pill: React.FC<{ text: string; accent: string; u: number; o: number }> = ({
   text,
   accent,
@@ -245,24 +262,23 @@ const Pill: React.FC<{ text: string; accent: string; u: number; o: number }> = (
   <div
     style={{
       opacity: o,
-      transform: `translateY(${interpolate(o, [0, 1], [14, 0])}px) scale(${interpolate(o, [0, 1], [0.9, 1])})`,
+      transform: `translateY(${interpolate(o, [0, 1], [14, 0])}px)`,
       alignSelf: "flex-start",
-      padding: `${13 * u}px ${28 * u}px`,
-      borderRadius: 999,
-      backgroundImage: `linear-gradient(135deg, ${accent}, ${accent}cc)`,
-      color: "#fff",
+      padding: `${15 * u}px ${32 * u}px`,
+      borderRadius: 10 * u,
+      backgroundColor: accent,
+      color: readableOn(accent),
       fontWeight: 700,
-      fontSize: 23 * u,
-      letterSpacing: 0.4 * u,
-      boxShadow: `0 ${16 * u}px ${36 * u}px ${accent}44`,
+      fontSize: 24 * u,
+      letterSpacing: 0.2 * u,
     }}
   >
     {text}
   </div>
 );
 
-// Eyebrow -> headline -> subhead, staggered at the tone's tempo, with a slow
-// continuous drift so the frame keeps breathing.
+// Kicker -> headline -> subhead, staggered at the tone's tempo, left-aligned,
+// with a slow continuous drift so the frame keeps breathing.
 const Copy: React.FC<{ spec: AdSpec; color: string; u: number; portrait: boolean; sceneFrames: number }> = ({
   spec,
   color,
@@ -275,27 +291,26 @@ const Copy: React.FC<{ spec: AdSpec; color: string; u: number; portrait: boolean
   const eb = useReveal(3, t);
   const tt = useReveal(3 + t.stagger, t);
   const sb = useReveal(3 + t.stagger * 2.4, t);
-  const { accent } = spec.palette;
   const driftY = interpolate(frame, [0, sceneFrames], [t.drift * 0.5, -t.drift * 0.5]);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 * u, transform: `translateY(${driftY}px)` }}>
-      <Eyebrow text={spec.eyebrow} accent={accent} color={color} u={u} o={eb} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 * u, transform: `translateY(${driftY}px)` }}>
+      <Kicker text={spec.eyebrow} color={color} u={u} o={eb} />
       <div
         style={{
           opacity: tt,
           transform: `translateY(${interpolate(tt, [0, 1], [30, 0])}px)`,
           color,
           fontWeight: 760,
-          fontSize: (portrait ? 66 : 76) * u,
+          fontSize: (portrait ? 66 : 78) * u,
           lineHeight: 1.0,
-          letterSpacing: -2 * u,
+          letterSpacing: -2.4 * u,
           maxWidth: portrait ? "15ch" : "16ch",
         }}
       >
         {spec.headline}
       </div>
       {spec.subhead ? (
-        <div style={{ opacity: sb, color, fontSize: 25 * u, lineHeight: 1.32, maxWidth: "30ch" }}>
+        <div style={{ opacity: sb * 0.85, color, fontSize: 25 * u, lineHeight: 1.32, maxWidth: "30ch" }}>
           {spec.subhead}
         </div>
       ) : null}
@@ -313,33 +328,25 @@ const HookScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const hookT: Tempo = { ...t, dur: Math.min(t.dur, 24), stagger: Math.min(t.stagger, 5) };
   const { panel, accent, text } = spec.palette;
   const rule = useReveal(2 + hookT.stagger * 2.5, hookT);
+  const m = margin(u, portrait);
   return (
-    <AbsoluteFill
-      style={{
-        backgroundColor: panel,
-        backgroundImage: `radial-gradient(64% 60% at 50% 36%, ${accent}33, transparent 64%)`,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: (portrait ? 80 : 140) * u,
-      }}
-    >
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", padding: `0 ${m}px` }}>
       <KineticText
         text={scene.text || ""}
         start={2}
         t={hookT}
-        fontSize={(portrait ? 76 : 96) * u}
-        weight={770}
+        fontSize={(portrait ? 76 : 108) * u}
+        weight={760}
         color={text}
-        letterSpacing={-2.4 * u}
-        align="center"
-        maxWidth={`${17}ch`}
+        letterSpacing={-3.2 * u}
+        align="left"
+        maxWidth="13ch"
       />
       <div
         style={{
-          marginTop: 34 * u,
-          width: interpolate(rule, [0, 1], [0, 132 * u]),
-          height: 5 * u,
-          borderRadius: 99,
+          marginTop: 42 * u,
+          width: interpolate(rule, [0, 1], [0, 124 * u]),
+          height: 3 * u,
           backgroundColor: accent,
         }}
       />
@@ -348,7 +355,7 @@ const HookScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
 };
 
 // Editorial: type-dominant and asymmetric — an oversized headline owns the top,
-// the product sits on a stage strip below. Inverts the banded layout for variety.
+// the product sits on a stage strip below, divided by a hairline.
 const EditorialHero: React.FC<SceneProps> = ({ spec, scene, productImage }) => {
   const u = useUnit();
   const t = TEMPO[spec.tone];
@@ -367,25 +374,24 @@ const EditorialHero: React.FC<SceneProps> = ({ spec, scene, productImage }) => {
           right: 0,
           height: "52%",
           backgroundColor: panel,
-          backgroundImage: `radial-gradient(58% 120% at 6% 0%, ${accent}26, transparent 60%)`,
-          padding: `${52 * u}px ${100 * u}px`,
+          padding: `${52 * u}px ${124 * u}px`,
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
           overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 22 * u, transform: `translateY(${driftY}px)` }}>
-          <Eyebrow text={spec.eyebrow} accent={accent} color={text} u={u} o={eb} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 * u, transform: `translateY(${driftY}px)` }}>
+          <Kicker text={spec.eyebrow} color={text} u={u} o={eb} />
           <div
             style={{
               opacity: hl,
               transform: `translateY(${interpolate(hl, [0, 1], [36, 0])}px)`,
               color: text,
               fontWeight: 790,
-              fontSize: 98 * u,
-              lineHeight: 0.96,
-              letterSpacing: -3.4 * u,
+              fontSize: 100 * u,
+              lineHeight: 0.95,
+              letterSpacing: -3.6 * u,
               maxWidth: "15ch",
             }}
           >
@@ -395,6 +401,7 @@ const EditorialHero: React.FC<SceneProps> = ({ spec, scene, productImage }) => {
       </div>
       <div style={{ position: "absolute", top: "52%", left: 0, right: 0, bottom: 0 }}>
         <ProductStage src={productImage} motion={scene.motion} t={t} sceneFrames={scene.frames} stage={stage} onStage={onStage} accent={accent} widthPct="56%" />
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1.5 * u, backgroundColor: accent }} />
       </div>
     </AbsoluteFill>
   );
@@ -414,31 +421,28 @@ const HeroScene: React.FC<SceneProps> = (props) => {
       <AbsoluteFill style={{ flexDirection: "row", backgroundColor: panel }}>
         <div
           style={{
-            width: "43%",
+            width: "44%",
             height: "100%",
             backgroundColor: panel,
-            backgroundImage: `radial-gradient(70% 60% at 8% 18%, ${accent}24, transparent 62%)`,
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            padding: 92 * u,
+            padding: 100 * u,
             position: "relative",
             overflow: "hidden",
           }}
         >
-          <div
-            style={{ position: "absolute", left: 0, top: "18%", width: 5 * u, height: "64%", backgroundColor: accent }}
-          />
           <Copy spec={spec} color={text} u={u} portrait={false} sceneFrames={scene.frames} />
         </div>
-        <div style={{ width: "57%", height: "100%", position: "relative", overflow: "hidden" }}>
+        <div style={{ width: "56%", height: "100%", position: "relative", overflow: "hidden" }}>
           <ProductStage src={productImage} motion={scene.motion} t={t} sceneFrames={scene.frames} stage={stage} onStage={onStage} accent={accent} widthPct="78%" />
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 1 * u, backgroundColor: `${text}1f` }} />
         </div>
       </AbsoluteFill>
     );
   }
 
-  // Banded: product on a lit stage up top, copy on a panel below.
+  // Banded: product on a lit stage up top, copy on a flat panel below.
   const stageH = portrait ? "56%" : "60%";
   return (
     <AbsoluteFill style={{ backgroundColor: panel }}>
@@ -453,14 +457,14 @@ const HeroScene: React.FC<SceneProps> = (props) => {
           bottom: 0,
           top: stageH,
           backgroundColor: panel,
-          backgroundImage: `radial-gradient(54% 130% at 96% 0%, ${accent}26, transparent 58%)`,
-          padding: `0 ${(portrait ? 74 : 100) * u}px`,
+          padding: `0 ${margin(u, portrait)}px`,
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
           overflow: "hidden",
         }}
       >
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1.5 * u, backgroundColor: accent }} />
         <Copy spec={spec} color={text} u={u} portrait={portrait} sceneFrames={scene.frames} />
       </div>
     </AbsoluteFill>
@@ -478,25 +482,27 @@ const FeatureScene: React.FC<SceneProps> = ({ spec, scene, productImage, portrai
       <div
         style={{
           position: "absolute",
-          left: (portrait ? 60 : 96) * u,
+          left: (portrait ? 60 : 100) * u,
           bottom: (portrait ? 110 : 104) * u,
           opacity: r,
           transform: `translateY(${interpolate(r, [0, 1], [24, 0])}px)`,
           backgroundColor: panel,
           color: text,
-          padding: `${22 * u}px ${28 * u}px`,
-          borderRadius: 18 * u,
-          boxShadow: "0 26px 60px rgba(0,0,0,0.28)",
-          maxWidth: "64%",
+          padding: `${24 * u}px ${30 * u}px`,
+          borderRadius: 4 * u,
+          maxWidth: "62%",
           display: "flex",
           flexDirection: "column",
-          gap: 8 * u,
+          gap: 10 * u,
         }}
       >
-        <div style={{ fontSize: 15 * u, letterSpacing: 2.4 * u, color: accent, fontWeight: 700 }}>
-          {up(scene.label || "")}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 * u }}>
+          <span style={{ width: 24 * u, height: 1.5 * u, backgroundColor: accent }} />
+          <span style={{ fontSize: 15 * u, letterSpacing: 2.4 * u, color: accent, fontWeight: 700 }}>
+            {up(scene.label || "")}
+          </span>
         </div>
-        <div style={{ fontSize: (portrait ? 34 : 38) * u, fontWeight: 740, lineHeight: 1.04, letterSpacing: -0.6 * u }}>
+        <div style={{ fontSize: (portrait ? 34 : 40) * u, fontWeight: 740, lineHeight: 1.04, letterSpacing: -0.8 * u }}>
           {scene.value}
         </div>
       </div>
@@ -509,50 +515,46 @@ const PriceScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const t = TEMPO[spec.tone];
   const { panel, accent, text } = spec.palette;
   const lead = useReveal(2, t);
-  const pop = spring({
-    frame: useCurrentFrame() - (2 + t.stagger),
-    fps: useVideoConfig().fps,
-    durationInFrames: t.dur + 4,
-    config: { damping: spec.tone === "playful" ? 9 : 13 },
-  });
+  const pop = useReveal(2 + t.stagger, t);
+  const m = margin(u, portrait);
   // The price is the moment (the CTA lives in the outro). Frame it as value, not
-  // a button: a tone-aware lead line over a big, confident number.
+  // a button: a tone-aware lead line over a big, confident number — left-hung.
   return (
-    <AbsoluteFill
-      style={{
-        backgroundColor: panel,
-        backgroundImage: `radial-gradient(72% 70% at 50% 44%, ${accent}3a, transparent 60%)`,
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "column",
-        gap: 18 * u,
-      }}
-    >
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", padding: `0 ${m}px` }}>
       <div
         style={{
           opacity: lead,
           transform: `translateY(${interpolate(lead, [0, 1], [16, 0])}px)`,
           color: accent,
           fontWeight: 700,
-          fontSize: (portrait ? 24 : 26) * u,
+          fontSize: (portrait ? 22 : 26) * u,
           letterSpacing: 3 * u,
+          marginBottom: 18 * u,
         }}
       >
         {up(PRICE_LEAD[spec.tone])}
       </div>
       <div
         style={{
-          transform: `scale(${interpolate(pop, [0, 1], [0.72, 1])})`,
           opacity: pop,
+          transform: `translateY(${interpolate(pop, [0, 1], [26, 0])}px)`,
           color: text,
           fontWeight: 800,
-          fontSize: (portrait ? 132 : 162) * u,
-          letterSpacing: -3 * u,
-          lineHeight: 1,
+          fontSize: (portrait ? 138 : 196) * u,
+          letterSpacing: -5 * u,
+          lineHeight: 0.9,
         }}
       >
         {scene.value}
       </div>
+      <div
+        style={{
+          marginTop: 38 * u,
+          width: interpolate(pop, [0, 1], [0, 168 * u]),
+          height: 3 * u,
+          backgroundColor: accent,
+        }}
+      />
     </AbsoluteFill>
   );
 };
@@ -563,37 +565,33 @@ const OutroScene: React.FC<SceneProps> = ({ spec, portrait }) => {
   const { panel, accent, text } = spec.palette;
   const r = useReveal(2, t);
   const c = useReveal(14, t);
+  const m = margin(u, portrait);
   return (
     <AbsoluteFill
       style={{
         backgroundColor: panel,
-        backgroundImage: `radial-gradient(60% 60% at 50% 40%, ${accent}33, transparent 62%)`,
-        alignItems: "center",
         justifyContent: "center",
-        flexDirection: "column",
-        gap: 28 * u,
-        padding: 100 * u,
+        alignItems: "flex-start",
+        padding: `0 ${m}px`,
       }}
     >
-      {/* Block reveal — the headline is the product title, which can be long. */}
+      {/* The headline is the product title, which can be long. */}
       <div
         style={{
           opacity: r,
           transform: `translateY(${interpolate(r, [0, 1], [24, 0])}px)`,
-          textAlign: "center",
           color: text,
           fontWeight: 770,
-          fontSize: (portrait ? 60 : 72) * u,
-          lineHeight: 1.04,
-          letterSpacing: -1.8 * u,
-          maxWidth: "18ch",
+          fontSize: (portrait ? 60 : 86) * u,
+          lineHeight: 0.98,
+          letterSpacing: -2.6 * u,
+          maxWidth: "15ch",
+          marginBottom: 46 * u,
         }}
       >
         {spec.headline}
       </div>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <Pill text={`${spec.cta} →`} accent={accent} u={u} o={c} />
-      </div>
+      <Pill text={`${spec.cta} →`} accent={accent} u={u} o={c} />
     </AbsoluteFill>
   );
 };
@@ -641,7 +639,7 @@ function fallbackSpec(props: ProductAdProps): AdSpec {
     headline: props.productTitle,
     subhead: "",
     cta: "Shop now",
-    eyebrow: `For ${props.audience || "everyone"}`,
+    eyebrow: "New",
     scenes: [
       { type: "hook", frames: hook, text: "Your upgrade is here.", motion: "rise" },
       { type: "hero", frames: total - hook - outro, text: props.productTitle, motion: "rise" },
@@ -691,9 +689,9 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
         );
       })}
 
-      {/* slim progress bar */}
+      {/* slim progress hairline */}
       <AbsoluteFill style={{ justifyContent: "flex-end" }}>
-        <div style={{ height: 4 * u, backgroundColor: "#ffffff1a" }}>
+        <div style={{ height: 3 * u, backgroundColor: "#ffffff14" }}>
           <div
             style={{
               height: "100%",

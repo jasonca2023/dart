@@ -133,21 +133,32 @@ const TONE_MOTION: Record<Tone, Motion> = {
 
 // Copy templates keyed on tone (the LLM brain replaces these in v2).
 const HOOKS: Record<Tone, string[]> = {
-  luxe: ["Made to be gifted.", "Quietly exceptional.", "The detail you'll notice."],
+  luxe: ["Made to be gifted.", "Quietly exceptional.", "The detail you’ll notice."],
   energetic: ["Built to move.", "Less waiting. More doing.", "Your upgrade is here."],
-  playful: ["Say hello to your new favorite.", "Yep, it's that good.", "Big mood, small price."],
+  playful: ["Say hello to your new favorite.", "Yep, it’s that good.", "Big mood, small price."],
   calm: ["One less thing to worry about.", "Simple. Sorted.", "Made for real life."],
-  techy: ["Spec'd to impress.", "Plug in. Power up.", "Smarter by design."],
-  bold: ["Don't blink.", "This changes things.", "Go big."],
+  techy: ["Spec’d to impress.", "Plug in. Power up.", "Smarter by design."],
+  bold: ["Don’t blink.", "This changes things.", "Go big."],
 };
 
 const SUBHEADS: Record<Tone, string[]> = {
   luxe: ["Crafted for those who notice.", "An effortless upgrade."],
-  energetic: ["Everything you need, nothing you don't.", "Ready when you are."],
+  energetic: ["Everything you need, nothing you don’t.", "Ready when you are."],
   playful: ["Designed to make you smile.", "Seriously fun, fairly priced."],
   calm: ["Thoughtful, dependable, easy.", "Made to just work."],
   techy: ["Engineered for performance.", "The details that matter."],
   bold: ["No compromises.", "Made to stand out."],
+};
+
+// Short editorial kicker per tone (replaces the templated "For {audience}" eyebrow,
+// which read as an AI tell). The LLM brain overrides this with a bespoke kicker.
+const KICKERS: Record<Tone, string[]> = {
+  luxe: ["Considered", "The detail"],
+  energetic: ["Go time", "Built different"],
+  playful: ["Say hi", "New favorite"],
+  calm: ["Effortless", "Sorted"],
+  techy: ["Engineered", "By design"],
+  bold: ["New", "Big news"],
 };
 
 const CTAS: Record<Tone, string> = {
@@ -225,7 +236,7 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
   const subhead = pick(SUBHEADS[tone], seed >> 7);
   const cta = CTAS[tone];
   const feature = pick(FEATURES[tone], seed >> 9);
-  const eyebrow = `For ${audience}`;
+  const eyebrow = pick(KICKERS[tone], seed >> 11);
 
   // Scene set: hook -> hero -> (feature) -> (price) -> outro. More duration ->
   // more room for the optional scenes.
