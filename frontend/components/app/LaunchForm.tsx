@@ -167,7 +167,7 @@ export function LaunchForm() {
     }),
     [dq, previewSpec.tone],
   );
-  const aiCopy = useAiCopy(copyInput, !!previewUrl);
+  const { copy: aiCopy, loading: aiLoading } = useAiCopy(copyInput, !!previewUrl);
   const previewSpecWithCopy = useMemo(
     () => applyCopy(previewSpec, aiCopy),
     [previewSpec, aiCopy],
@@ -425,9 +425,16 @@ export function LaunchForm() {
                   spec={previewSpecWithCopy}
                 />
               </div>
-              {aiCopy && (
-                <p className="mt-2 text-center text-[12px] text-fog">
-                  ✨ Copy written by AI for this product
+              {(aiLoading || aiCopy) && (
+                <p
+                  className={
+                    "mt-2 text-center text-[12px] text-fog " +
+                    (aiLoading ? "animate-pulse" : "")
+                  }
+                >
+                  {aiLoading
+                    ? "✨ Writing copy with AI…"
+                    : "✨ AI-written copy for this product"}
                 </p>
               )}
             </>

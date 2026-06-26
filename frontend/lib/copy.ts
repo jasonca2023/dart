@@ -74,22 +74,30 @@ export function applyCopy(spec: AdSpec, copy: AdCopy | null): AdSpec {
   return { ...spec, eyebrow, subhead, cta, scenes };
 }
 
-// Debounced fetch for the live preview. Returns the latest copy for `input`
-// (null while loading / on failure), ignoring stale responses. `input` must be a
-// stable (memoized) object so the debounce can settle.
-export function useAiCopy(input: CopyInput, enabled: boolean): AdCopy | null {
+// Debounced fetch for the live preview. Returns the latest copy for `input` plus
+// a `loading` flag (so the UI can show the AI working), ignoring stale responses.
+// `input` must be a stable (memoized) object so the debounce can settle.
+export function useAiCopy(
+  input: CopyInput,
+  enabled: boolean,
+): { copy: AdCopy | null; loading: boolean } {
   const debounced = useDebounced(input, 700);
   const [copy, setCopy] = useState<AdCopy | null>(null);
+  const [loading, setLoading] = useState(false);
   const reqId = useRef(0);
   useEffect(() => {
     if (!enabled || !debounced.title.trim()) {
       setCopy(null);
+      setLoading(false);
       return;
     }
     const id = ++reqId.current;
+    setLoading(true);
     generateCopy(debounced).then((c) => {
-      if (id === reqId.current) setCopy(c);
+      if (id !== reqId.current) return;
+      setCopy(c);
+      setLoading(false);
     });
   }, [enabled, debounced]);
-  return copy;
+  return { copy, loading };
 }
