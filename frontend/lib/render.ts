@@ -34,7 +34,16 @@ export async function renderComponentInBrowser(
 // heavy Remotion code is dynamically imported so it only loads when a render
 // actually runs. Requires Chrome 94+ / Edge / Firefox 130+ / Safari 26+.
 export async function renderAdInBrowser(props: ProductAdProps): Promise<Blob> {
-  const { ProductAd } = await import("./remotion/ProductAd");
+  const [{ ProductAd }, { fontsReady }] = await Promise.all([
+    import("./remotion/ProductAd"),
+    import("./remotion/fonts"),
+  ]);
+  // Wait for the real webfonts before rasterizing (cap at 5s so a slow/blocked
+  // font never stalls a render — the fallback stack renders either way).
+  await Promise.race([
+    fontsReady,
+    new Promise((resolve) => setTimeout(resolve, 5000)),
+  ]);
   return renderComponentInBrowser(
     ProductAd as unknown as React.FC<Record<string, unknown>>,
     props as unknown as Record<string, unknown>,

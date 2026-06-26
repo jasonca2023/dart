@@ -28,15 +28,24 @@ export interface AdCopy {
 const SYSTEM = `You are an expert advertising copywriter for short, silent product video ads.
 Write punchy, concrete copy that could ONLY describe THIS product — never generic filler that would fit any product.
 Match the requested tone. Do not invent specs, numbers, prices, or claims that aren't given.
-Keep each line within its character budget: eyebrow <= 28, hook <= 40, subhead <= 58, cta <= 22.
-"hook" is the opening line; "cta" is the closing button text (e.g. "Shop now").
+Keep every line SHORT and COMPLETE — never cut a line off mid-word, and never end with "…". Hard word caps:
+- eyebrow: 1-3 words
+- hook: 2-5 words
+- subhead: one short phrase, 9 words max
+- cta: 2-3 words (button text, e.g. "Shop now")
+"hook" is the opening line; "cta" is the closing button text.
 Output a SINGLE JSON object with exactly the keys "eyebrow", "hook", "subhead", "cta" and NOTHING else — no markdown, no preamble, no explanation, no second attempt. Stop after the closing brace.`;
 
 function clip(s: unknown, max: number): string | undefined {
   if (typeof s !== "string") return undefined;
   const t = s.trim().replace(/^["']|["']$/g, "");
   if (!t) return undefined;
-  return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + "…";
+  if (t.length <= max) return t;
+  // Truncate on a word boundary so we never leave a mid-word stub ("…player, j…").
+  let cut = t.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  if (lastSpace > max * 0.5) cut = cut.slice(0, lastSpace);
+  return cut.replace(/[\s.,;:!?-]+$/, "") + "…";
 }
 
 // Return the FIRST balanced {...} block that parses as an object. The model can

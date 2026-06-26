@@ -7,7 +7,8 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import type { AdSpec, FontKey, Scene, Tone } from "../adSpec";
+import type { AdSpec, Scene, Tone } from "../adSpec";
+import { FONT_FAMILY } from "./fonts";
 
 export interface ProductAdProps {
   productTitle: string;
@@ -20,14 +21,6 @@ export interface ProductAdProps {
   /** Creative direction. When absent, a default banded spec is derived. */
   spec?: AdSpec;
 }
-
-const FONTS: Record<FontKey, string> = {
-  grotesque:
-    'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  serif:
-    '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", ui-serif, serif',
-  mono: '"SF Mono", ui-monospace, "Cascadia Code", "Roboto Mono", Menlo, monospace',
-};
 
 const up = (s: string) => (s || "").toUpperCase();
 
@@ -541,6 +534,7 @@ const PriceScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
           fontSize: (portrait ? 138 : 196) * u,
           letterSpacing: -5 * u,
           lineHeight: 0.9,
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {scene.value}
@@ -674,7 +668,7 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
   const total = spec.scenes.reduce((a, s) => a + s.frames, 0);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: spec.palette.panel, fontFamily: FONTS[spec.font] }}>
+    <AbsoluteFill style={{ backgroundColor: spec.palette.panel, fontFamily: FONT_FAMILY[spec.font] }}>
       {spec.scenes.map((scene, i) => {
         const from = offset;
         offset += scene.frames;

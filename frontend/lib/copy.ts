@@ -54,7 +54,11 @@ function clip(s: string | undefined, max: number): string | undefined {
   if (!s) return undefined;
   const t = s.trim();
   if (!t) return undefined;
-  return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + "…";
+  if (t.length <= max) return t;
+  let cut = t.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  if (lastSpace > max * 0.5) cut = cut.slice(0, lastSpace);
+  return cut.replace(/[\s.,;:!?-]+$/, "") + "…";
 }
 
 // Overlay LLM copy onto a template-built spec. Pure; only replaces the fields the
