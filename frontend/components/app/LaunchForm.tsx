@@ -7,6 +7,7 @@ import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { buildAdSpec } from "@/lib/adSpec";
 import { removeProductBackground } from "@/lib/bgRemove";
+import { generateCopy, applyCopy, useAiCopy } from "@/lib/copy";
 import { useDebounced } from "@/lib/hooks";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
@@ -154,6 +155,24 @@ export function LaunchForm() {
     [dq],
   );
 
+  // Bespoke copy from the Workers AI brain, fetched (debounced + cached) only
+  // while the preview is on screen. Overlaid on the template spec; null until it
+  // arrives, so the preview shows template copy first, then upgrades in place.
+  const copyInput = useMemo(
+    () => ({
+      title: dq.title.trim(),
+      audience: dq.audience.trim(),
+      price: formatPrice(dq.price),
+      tone: previewSpec.tone,
+    }),
+    [dq, previewSpec.tone],
+  );
+  const aiCopy = useAiCopy(copyInput, !!previewUrl);
+  const previewSpecWithCopy = useMemo(
+    () => applyCopy(previewSpec, aiCopy),
+    [previewSpec, aiCopy],
+  );
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!imageFile) {
@@ -178,12 +197,22 @@ export function LaunchForm() {
       const id = crypto.randomUUID();
       // The "brain": map the inputs to an audience-tailored creative spec
       // (tone, palette, type, layout, copy, pacing) that drives the render.
-      const spec = buildAdSpec({
+      const baseSpec = buildAdSpec({
         title: title.trim(),
         audience: audience.trim(),
         price: formatPrice(price),
         durationSec: dur,
       });
+      // Upgrade the template copy with bespoke LLM lines (Workers AI). Cache hit
+      // if the preview already fetched it; null on failure → keep the templates.
+      setStatus("Writing the copy…");
+      const copy = await generateCopy({
+        title: title.trim(),
+        audience: audience.trim(),
+        price: formatPrice(price),
+        tone: baseSpec.tone,
+      });
+      const spec = applyCopy(baseSpec, copy);
       // Cut the product out of its background (in-browser) so it sits cleanly on
       // the ad's stage. Falls back to the original photo if it can't.
       const cleaned = await removeProductBackground(imageFile, setStatus);
@@ -378,23 +407,30 @@ export function LaunchForm() {
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <div className="rounded-card bg-sand p-6">
           {previewUrl ? (
-            <div
-              className={
-                "overflow-hidden rounded-[14px] bg-ink " +
-                (dq.aspect === "9:16" ? "flex justify-center py-2" : "")
-              }
-            >
-              <AdPreview
-                productTitle={dq.title.trim() || "Your product"}
-                productImage={previewUrl}
-                price={formatPrice(dq.price)}
-                audience={dq.audience.trim() || "everyone"}
-                durationInSeconds={clampDuration(dq.duration) || 10}
-                aspectRatio={dq.aspect}
-                accent={previewSpec.palette.accent}
-                spec={previewSpec}
-              />
-            </div>
+            <>
+              <div
+                className={
+                  "overflow-hidden rounded-[14px] bg-ink " +
+                  (dq.aspect === "9:16" ? "flex justify-center py-2" : "")
+                }
+              >
+                <AdPreview
+                  productTitle={dq.title.trim() || "Your product"}
+                  productImage={previewUrl}
+                  price={formatPrice(dq.price)}
+                  audience={dq.audience.trim() || "everyone"}
+                  durationInSeconds={clampDuration(dq.duration) || 10}
+                  aspectRatio={dq.aspect}
+                  accent={previewSpecWithCopy.palette.accent}
+                  spec={previewSpecWithCopy}
+                />
+              </div>
+              {aiCopy && (
+                <p className="mt-2 text-center text-[12px] text-fog">
+                  ✨ Copy written by AI for this product
+                </p>
+              )}
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 rounded-[14px] bg-white py-10 shadow-[var(--shadow-inset-warm)]">
               <Orb accent={moodSpec.palette.accent} className="size-24" />

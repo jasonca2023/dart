@@ -7,6 +7,12 @@
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
+  },
+  // Cloudflare Workers AI — free-tier LLM inference for the ad-copy brain
+  // (/api/copy). No external key; the app falls back to rule-based copy if it's
+  // unavailable or over the daily allowance.
+  "ai": {
+    "binding": "AI"
   }
   // Build-time public env (NEXT_PUBLIC_API_BASE_URL, NEXT_PUBLIC_SUPABASE_*) are
   // inlined by `next build` — set them in the deploy environment, not here.
