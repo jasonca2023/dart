@@ -30,6 +30,9 @@ export async function removeProductBackground(
     const { removeBackground } = await import("@imgly/background-removal");
     const blob = await withTimeout(
       removeBackground(file as Blob, {
+        // Full-precision model (vs the default isnet_fp16) — the best cutout this
+        // free in-browser library offers. Larger one-time download, $0.
+        model: "isnet",
         output: { format: "image/png" },
         progress: (key: string, current: number, total: number) => {
           if (!onStatus) return;
