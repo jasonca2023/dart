@@ -2,16 +2,27 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { buildAdSpec } from "@/lib/adSpec";
 import { removeProductBackground } from "@/lib/bgRemove";
+import { useDebounced } from "@/lib/hooks";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Segmented } from "../ui/Segmented";
 import { Button } from "../ui/Button";
 import { Orb } from "../ui/Orb";
 import { Alert, ArrowRight } from "../icons";
+
+// The live preview pulls in Remotion's player — load it only in the browser, and
+// only once it's actually shown, so it stays out of the server + initial bundle.
+const AdPreview = dynamic(() => import("./AdPreview"), {
+  ssr: false,
+  loading: () => (
+    <div className="aspect-video w-full animate-pulse rounded-[14px] bg-white" />
+  ),
+});
 
 const AUDIENCES = [
   "Gen Z tech enthusiasts",
@@ -111,6 +122,36 @@ export function LaunchForm() {
         durationSec: clampDuration(duration) || 10,
       }),
     [title, audience, price, duration],
+  );
+
+  // A stable object URL for the uploaded image, fed to the live preview.
+  const previewUrl = useMemo(
+    () => (imageFile ? URL.createObjectURL(imageFile) : null),
+    [imageFile],
+  );
+  useEffect(
+    () => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    },
+    [previewUrl],
+  );
+
+  // Debounced inputs so the player re-renders only after typing settles, not on
+  // every keystroke. (Image changes are discrete, so the URL passes through live.)
+  const liveInput = useMemo(
+    () => ({ title, audience, price, duration, aspect }),
+    [title, audience, price, duration, aspect],
+  );
+  const dq = useDebounced(liveInput, 350);
+  const previewSpec = useMemo(
+    () =>
+      buildAdSpec({
+        title: dq.title.trim(),
+        audience: dq.audience.trim(),
+        price: formatPrice(dq.price),
+        durationSec: clampDuration(dq.duration) || 10,
+      }),
+    [dq],
   );
 
   async function onSubmit(e: React.FormEvent) {
@@ -336,9 +377,32 @@ export function LaunchForm() {
       {/* Summary — sticky preview, decorative orb */}
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <div className="rounded-card bg-sand p-6">
-          <div className="flex items-center justify-center rounded-[14px] bg-white py-8 shadow-[var(--shadow-inset-warm)]">
-            <Orb accent={moodSpec.palette.accent} className="size-24" />
-          </div>
+          {previewUrl ? (
+            <div
+              className={
+                "overflow-hidden rounded-[14px] bg-ink " +
+                (dq.aspect === "9:16" ? "flex justify-center py-2" : "")
+              }
+            >
+              <AdPreview
+                productTitle={dq.title.trim() || "Your product"}
+                productImage={previewUrl}
+                price={formatPrice(dq.price)}
+                audience={dq.audience.trim() || "everyone"}
+                durationInSeconds={clampDuration(dq.duration) || 10}
+                aspectRatio={dq.aspect}
+                accent={previewSpec.palette.accent}
+                spec={previewSpec}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-[14px] bg-white py-10 shadow-[var(--shadow-inset-warm)]">
+              <Orb accent={moodSpec.palette.accent} className="size-24" />
+              <p className="text-[13px] text-fog">
+                Add a product image to preview
+              </p>
+            </div>
+          )}
           <dl className="mt-6 flex flex-col gap-3 text-[14px]">
             <div className="flex justify-between">
               <dt className="text-driftwood">Mood</dt>
@@ -354,8 +418,9 @@ export function LaunchForm() {
             </div>
           </dl>
           <p className="mt-5 border-t border-ash pt-4 text-[13px] leading-relaxed text-fog">
-            Renders in your browser from your own image — no scraping, nothing
-            leaves your control until you publish.
+            A live preview from your photo. Generating removes the background and
+            renders the final video in your browser — nothing leaves your control
+            until you publish.
           </p>
         </div>
       </aside>

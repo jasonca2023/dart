@@ -77,6 +77,17 @@ export function useJobPolling(id: string | null, intervalMs = 2000) {
   return { job, error, loading, setJob };
 }
 
+// Returns `value` delayed by `ms` after it last changed — so rapidly-changing
+// inputs (typing) settle before driving an expensive consumer (the live preview).
+export function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return debounced;
+}
+
 // Tracks prefers-reduced-motion for JS-driven flourishes.
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
