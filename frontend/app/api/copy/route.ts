@@ -5,14 +5,17 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 // 200 with `{ copy }` — `copy: null` when the model is unavailable/over quota or
 // the output can't be parsed, so the client cleanly falls back to rule-based copy.
 
-// Swap this one line to change models (e.g. @cf/mistralai/mistral-small-3.1-24b-instruct).
+// Swap this one line to change models (e.g. @cf/mistralai/mistral-small-3.1-24b-instruct,
+// @cf/qwen/qwen3-30b-a3b-fp8, @cf/deepseek-ai/deepseek-r1-distill-qwen-32b).
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+
+// NB: do NOT pass `temperature` to the binding — it throws inside Workers AI here.
 
 interface WorkersAI {
   run: (
     model: string,
     options: Record<string, unknown>,
-  ) => Promise<{ response?: string } | string>;
+  ) => Promise<{ response?: unknown } | string>;
 }
 
 export interface AdCopy {
@@ -25,9 +28,9 @@ export interface AdCopy {
 const SYSTEM = `You are an expert advertising copywriter for short, silent product video ads.
 Write punchy, concrete copy that could ONLY describe THIS product — never generic filler that would fit any product.
 Match the requested tone. Do not invent specs, numbers, prices, or claims that aren't given.
-Reply with ONLY a JSON object (no markdown, no commentary) with exactly these keys: "eyebrow", "hook", "subhead", "cta".
-Character limits: eyebrow <= 28, hook <= 40, subhead <= 58, cta <= 22.
-"hook" is the opening line; "cta" is the closing button text (e.g. "Shop now").`;
+Keep each line within its character budget: eyebrow <= 28, hook <= 40, subhead <= 58, cta <= 22.
+"hook" is the opening line; "cta" is the closing button text (e.g. "Shop now").
+Output a SINGLE JSON object with exactly the keys "eyebrow", "hook", "subhead", "cta" and NOTHING else — no markdown, no preamble, no explanation, no second attempt. Stop after the closing brace.`;
 
 function clip(s: unknown, max: number): string | undefined {
   if (typeof s !== "string") return undefined;
@@ -36,24 +39,42 @@ function clip(s: unknown, max: number): string | undefined {
   return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + "…";
 }
 
-// Pull a JSON object out of the model's reply (tolerates code fences / stray text).
-function parseCopy(raw: string): AdCopy | null {
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end <= start) return null;
-  let obj: Record<string, unknown>;
-  try {
-    obj = JSON.parse(raw.slice(start, end + 1));
-  } catch {
-    return null;
+// Return the FIRST balanced {...} block that parses as an object. The model can
+// be chatty (prose, self-critique, a second attempt) — a naive first-{ to last-}
+// slice would span multiple objects and fail, so walk brace depth instead.
+function firstJsonObject(raw: string): Record<string, unknown> | null {
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === "}" && depth > 0) {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        try {
+          const obj = JSON.parse(raw.slice(start, i + 1));
+          if (obj && typeof obj === "object") return obj as Record<string, unknown>;
+        } catch {
+          /* not valid JSON — keep scanning for the next block */
+        }
+        start = -1;
+      }
+    }
   }
+  return null;
+}
+
+function parseCopy(raw: string): AdCopy | null {
+  const obj = firstJsonObject(raw);
+  if (!obj) return null;
   const copy: AdCopy = {
     eyebrow: clip(obj.eyebrow, 28),
     hook: clip(obj.hook, 40),
     subhead: clip(obj.subhead, 58),
     cta: clip(obj.cta, 22),
   };
-  // Only worth using if the model produced the lines that actually matter.
   return copy.hook || copy.subhead ? copy : null;
 }
 
@@ -82,18 +103,28 @@ export async function POST(req: Request): Promise<Response> {
     `Tone: ${(body.tone || "energetic").trim()}\n\n` +
     `Write the ad copy as JSON.`;
 
-  try {
-    const result = await ai.run(MODEL, {
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: user },
-      ],
-      max_tokens: 256,
-      temperature: 0.7,
-    });
-    const text = typeof result === "string" ? result : result.response ?? "";
-    return Response.json({ copy: parseCopy(text) });
-  } catch {
-    return Response.json({ copy: null });
+  // Try the chat (messages) shape first; fall back to a plain prompt so swapping
+  // MODEL to one that only accepts `prompt` keeps working.
+  const run = async (inputs: Record<string, unknown>): Promise<string | null> => {
+    try {
+      const result = await ai!.run(MODEL, inputs);
+      if (typeof result === "string") return result;
+      return typeof result.response === "string" ? result.response : null;
+    } catch {
+      return null;
+    }
+  };
+
+  let text = await run({
+    messages: [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: user },
+    ],
+    max_tokens: 256,
+  });
+  if (text === null) {
+    text = await run({ prompt: `${SYSTEM}\n\n${user}`, max_tokens: 256 });
   }
+
+  return Response.json({ copy: text ? parseCopy(text) : null });
 }
