@@ -134,7 +134,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise DartError(
                 SCRAPE_FAILED, "Server is missing Supabase service config.", status=500
             )
-        user_id = verify_token(settings.supabase_url, token)
+        user_id = await verify_token(
+            settings.supabase_url, settings.supabase_service_key, token
+        )
         if not user_id:
             raise DartError(
                 UNAUTHORIZED, "Invalid or expired session token.", status=401

@@ -1,8 +1,9 @@
-"""Supabase JWT verification.
+"""Supabase access-token verification.
 
-Protects write endpoints so only logged-in users can call them. The frontend
-sends the Supabase access token as `Authorization: Bearer <token>`; we verify its
-ES256 signature against the project's public JWKS (no shared secret needed).
+Protects write endpoints so only logged-in users can call them. We validate the
+token by asking Supabase's own auth endpoint (`GET /auth/v1/user`) over httpx,
+which is signing-algorithm agnostic and uses bundled CA certs — local JWKS
+verification via urllib's PyJWKClient failed cert verification on the deploy host.
 
 Disabled — requests pass through — when SUPABASE_URL is unset, so local/mock dev
 keeps working without auth.
@@ -12,50 +13,37 @@ from __future__ import annotations
 
 import logging
 
+import httpx
 from fastapi import Request
 
 from .errors import UNAUTHORIZED, DartError
 
 log = logging.getLogger("dart.auth")
 
-_jwks_client = None  # lazily built, caches keys after first fetch
 
+async def verify_token(url: str, api_key: str, token: str) -> str | None:
+    """Validate a Supabase access token and return its user id (`sub`), or None.
 
-def _jwks(url: str):
-    global _jwks_client
-    if _jwks_client is None:
-        import jwt
-
-        _jwks_client = jwt.PyJWKClient(
-            f"{url.rstrip('/')}/auth/v1/.well-known/jwks.json"
-        )
-    return _jwks_client
-
-
-def verify_token(url: str, token: str) -> str | None:
-    """Verify a Supabase access token's ES256/RS256 signature against the project
-    JWKS and return its `sub` (user id), or None when the token is invalid/expired.
-
+    Asks Supabase to validate the token (it owns the signing keys), so this works
+    regardless of the token's algorithm and never trusts an unverified payload.
     Shared by `require_user` (Authorization header) and `/save-ad` (which carries
-    the token as a multipart form field) so both trust the same verification —
-    never decode a token's payload without checking its signature first.
+    the token as a multipart form field).
     """
-    try:
-        import jwt
-
-        signing_key = _jwks(url).get_signing_key_from_jwt(token)
-        payload = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["ES256", "RS256"],
-            audience="authenticated",
-        )
-    except Exception as e:
-        log.warning("Supabase token verification failed: %s", e)
+    if not token or not api_key:
         return None
-
-    sub = payload.get("sub")
-    return str(sub) if sub else None
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(
+                f"{url.rstrip('/')}/auth/v1/user",
+                headers={"Authorization": f"Bearer {token}", "apikey": api_key},
+            )
+    except Exception as e:
+        log.warning("Supabase token check failed: %s", e)
+        return None
+    if r.status_code != 200:
+        return None
+    user_id = r.json().get("id")
+    return str(user_id) if user_id else None
 
 
 async def require_user(request: Request) -> str:
@@ -70,7 +58,7 @@ async def require_user(request: Request) -> str:
         raise DartError(UNAUTHORIZED, "Sign in required.", status=401)
     token = header[7:].strip()
 
-    sub = verify_token(url, token)
+    sub = await verify_token(url, settings.supabase_service_key or "", token)
     if not sub:
         raise DartError(UNAUTHORIZED, "Invalid or expired session.", status=401)
     return sub
