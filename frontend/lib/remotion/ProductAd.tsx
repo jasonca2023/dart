@@ -16,8 +16,10 @@ export interface ProductAdProps {
   price: string;
   audience: string;
   durationInSeconds: number;
-  aspectRatio: "16:9" | "9:16";
+  aspectRatio: "16:9" | "1:1" | "4:5" | "9:16";
   accent: string;
+  /** Optional brand logo (image URL/data-URL) — overlaid small in a corner. */
+  brandLogo?: string;
   /** Creative direction. When absent, a default banded spec is derived. */
   spec?: AdSpec;
 }
@@ -461,13 +463,13 @@ const StatementHero: React.FC<SceneProps> = ({ spec, scene, productImage }) => {
 };
 
 const HeroScene: React.FC<SceneProps> = (props) => {
-  const { spec, scene, productImage, portrait } = props;
+  const { spec, scene, productImage, portrait, wide } = props;
   const u = useUnit();
   const t = TEMPO[spec.tone];
   const { stage, panel, accent, text, onStage } = spec.palette;
-  const split = spec.layout === "split" && !portrait;
-  const editorial = spec.layout === "editorial" && !portrait;
-  const statement = spec.layout === "statement" && !portrait;
+  const split = spec.layout === "split" && wide;
+  const editorial = spec.layout === "editorial" && wide;
+  const statement = spec.layout === "statement" && wide;
 
   if (editorial) return <EditorialHero {...props} />;
   if (statement) return <StatementHero {...props} />;
@@ -657,6 +659,8 @@ interface SceneProps {
   scene: Scene;
   productImage: string;
   portrait: boolean;
+  /** Wide (16:9) gets the horizontal hero layouts; square/vertical stack. */
+  wide: boolean;
 }
 
 const SceneView: React.FC<SceneProps> = (props) => {
@@ -726,6 +730,7 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
   const { width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const portrait = height > width;
+  const wide = width > height * 1.2; // only 16:9 — square/vertical stack
   const u = Math.min(width, height) / 1080;
 
   let offset = 0;
@@ -739,11 +744,31 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
         return (
           <Sequence key={i} from={from} durationInFrames={scene.frames} layout="none">
             <SceneStage index={i}>
-              <SceneView spec={spec} scene={scene} productImage={props.productImage} portrait={portrait} />
+              <SceneView spec={spec} scene={scene} productImage={props.productImage} portrait={portrait} wide={wide} />
             </SceneStage>
           </Sequence>
         );
       })}
+
+      {/* brand logo — small, top-right, all scenes */}
+      {props.brandLogo ? (
+        <AbsoluteFill>
+          <Img
+            src={props.brandLogo}
+            crossOrigin="anonymous"
+            style={{
+              position: "absolute",
+              top: 46 * u,
+              right: 56 * u,
+              height: 42 * u,
+              width: "auto",
+              maxWidth: 200 * u,
+              objectFit: "contain",
+              opacity: 0.92,
+            }}
+          />
+        </AbsoluteFill>
+      ) : null}
 
       {/* slim progress hairline */}
       <AbsoluteFill style={{ justifyContent: "flex-end" }}>

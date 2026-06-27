@@ -53,7 +53,11 @@ export const RemotionRoot: React.FC = () => {
               const dims =
                 props.aspectRatio === "9:16"
                   ? { width: 1080, height: 1920 }
-                  : { width: 1920, height: 1080 };
+                  : props.aspectRatio === "4:5"
+                    ? { width: 1080, height: 1350 }
+                    : props.aspectRatio === "1:1"
+                      ? { width: 1080, height: 1080 }
+                      : { width: 1920, height: 1080 };
               return {
                 ...dims,
                 fps: FPS,

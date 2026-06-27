@@ -1,11 +1,19 @@
 import type { ProductAdProps } from "./remotion/ProductAd";
+import type { AspectRatio } from "./types";
 
 const FPS = 30;
 
-export function dimsFor(aspectRatio: "16:9" | "9:16") {
-  return aspectRatio === "9:16"
-    ? { width: 1080, height: 1920 }
-    : { width: 1920, height: 1080 };
+export function dimsFor(aspectRatio: AspectRatio) {
+  switch (aspectRatio) {
+    case "9:16":
+      return { width: 1080, height: 1920 };
+    case "4:5":
+      return { width: 1080, height: 1350 };
+    case "1:1":
+      return { width: 1080, height: 1080 };
+    default:
+      return { width: 1920, height: 1080 };
+  }
 }
 
 // Render an arbitrary Remotion component to an MP4 Blob in the browser
@@ -13,7 +21,7 @@ export function dimsFor(aspectRatio: "16:9" | "9:16") {
 export async function renderComponentInBrowser(
   component: React.FC<Record<string, unknown>>,
   inputProps: Record<string, unknown>,
-  opts: { aspectRatio: "16:9" | "9:16"; durationInSeconds: number; id?: string },
+  opts: { aspectRatio: AspectRatio; durationInSeconds: number; id?: string },
 ): Promise<Blob> {
   const { renderMediaOnWeb } = await import("@remotion/web-renderer");
   const { getBlob } = await renderMediaOnWeb({
@@ -48,7 +56,7 @@ export async function renderAdInBrowser(props: ProductAdProps): Promise<Blob> {
     ProductAd as unknown as React.FC<Record<string, unknown>>,
     props as unknown as Record<string, unknown>,
     {
-      aspectRatio: props.aspectRatio === "9:16" ? "9:16" : "16:9",
+      aspectRatio: props.aspectRatio,
       durationInSeconds: props.durationInSeconds,
       id: "ProductAd",
     },

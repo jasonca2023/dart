@@ -48,6 +48,8 @@ export interface AdSpecInput {
   /** Formatted price like "$129", or "" when none. */
   price: string;
   durationSec: number;
+  /** Bump to get a different take (palette variant, copy picks) — same mood. */
+  variant?: number;
 }
 
 const FPS = 30;
@@ -71,26 +73,32 @@ const PALETTES: Record<Tone, Palette[]> = {
   luxe: [
     { stage: "#f3efe5", panel: "#0b0a08", accent: "#c8a24c", text: "#f5efe1", onStage: "#0b0a08" },
     { stage: "#efe9dc", panel: "#100d09", accent: "#bd9a55", text: "#f3ecdc", onStage: "#100d09" },
+    { stage: "#f1ece2", panel: "#0c0a09", accent: "#9c6b52", text: "#f2ead9", onStage: "#0c0a09" },
   ],
   energetic: [
     { stage: "#ffffff", panel: "#0a0d18", accent: "#ff5a1f", text: "#ffffff", onStage: "#080a12" },
     { stage: "#fbfdff", panel: "#091024", accent: "#1f6bff", text: "#ffffff", onStage: "#091024" },
+    { stage: "#f7fffb", panel: "#08160f", accent: "#15c06a", text: "#ffffff", onStage: "#08160f" },
   ],
   playful: [
     { stage: "#fff6f1", panel: "#2a0f3a", accent: "#ff5da2", text: "#ffffff", onStage: "#2a0f3a" },
     { stage: "#fdf5ff", panel: "#141f4a", accent: "#ffb020", text: "#ffffff", onStage: "#141f4a" },
+    { stage: "#f1fffb", panel: "#10243a", accent: "#00c2b8", text: "#ffffff", onStage: "#10243a" },
   ],
   calm: [
     { stage: "#f2f4f3", panel: "#222b2e", accent: "#3f9d86", text: "#eef5f2", onStage: "#222b2e" },
     { stage: "#f4f2ee", panel: "#2a2f3a", accent: "#6f8fd0", text: "#eef2fa", onStage: "#2a2f3a" },
+    { stage: "#f5f1ec", panel: "#2b2724", accent: "#c08457", text: "#f3ece4", onStage: "#2b2724" },
   ],
   techy: [
     { stage: "#eef1f6", panel: "#06070d", accent: "#22e3d3", text: "#e9fffb", onStage: "#06070d" },
     { stage: "#ecedf5", panel: "#08080f", accent: "#8b5cff", text: "#efeaff", onStage: "#08080f" },
+    { stage: "#eef3ef", panel: "#06080a", accent: "#2bd96b", text: "#eafff0", onStage: "#06080a" },
   ],
   bold: [
     { stage: "#fffdf7", panel: "#101010", accent: "#ff3b1d", text: "#ffffff", onStage: "#101010" },
     { stage: "#fbfbf9", panel: "#0f0f0f", accent: "#ffd400", text: "#ffffff", onStage: "#0f0f0f" },
+    { stage: "#fafbff", panel: "#0d0d0f", accent: "#2b59ff", text: "#ffffff", onStage: "#0d0d0f" },
   ],
 };
 
@@ -240,7 +248,7 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
   const title = input.title.trim() || "Your product";
   const audience = input.audience.trim() || "everyone";
   const tone = toneFor(audience, title);
-  const seed = hash(`${title}|${audience}`);
+  const seed = hash(`${title}|${audience}|${input.variant ?? 0}`);
 
   const palette = pick(PALETTES[tone], seed);
   const font = TONE_FONT[tone];

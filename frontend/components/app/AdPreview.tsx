@@ -15,7 +15,8 @@ const FPS = 30;
 export default function AdPreview(props: ProductAdProps) {
   const { width, height } = dimsFor(props.aspectRatio);
   const durationInFrames = Math.max(1, Math.round(props.durationInSeconds * FPS));
-  const portrait = props.aspectRatio === "9:16";
+  // Tall formats (9:16, 4:5) are height-constrained; wide/square fill the width.
+  const tall = props.aspectRatio === "9:16" || props.aspectRatio === "4:5";
 
   return (
     <Player
@@ -29,7 +30,7 @@ export default function AdPreview(props: ProductAdProps) {
       autoPlay
       controls
       acknowledgeRemotionLicense
-      style={portrait ? { height: 360 } : { width: "100%" }}
+      style={tall ? { height: 380 } : { width: "100%" }}
     />
   );
 }

@@ -8,13 +8,19 @@ import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { buildAdSpec } from "@/lib/adSpec";
 import { removeProductBackground } from "@/lib/bgRemove";
 import { generateCopy, applyCopy, useAiCopy } from "@/lib/copy";
+import {
+  applyBrand,
+  loadBrandKit,
+  saveBrandKit,
+  readLogo,
+  type BrandKit,
+} from "@/lib/brand";
 import { useDebounced } from "@/lib/hooks";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
-import { Segmented } from "../ui/Segmented";
 import { Button } from "../ui/Button";
 import { Orb } from "../ui/Orb";
-import { Alert, ArrowRight } from "../icons";
+import { Alert, ArrowRight, Refresh } from "../icons";
 
 // The live preview pulls in Remotion's player — load it only in the browser, and
 // only once it's actually shown, so it stays out of the server + initial bundle.
@@ -30,6 +36,13 @@ const AUDIENCES = [
   "Busy parents",
   "Outdoor adventurers",
   "Luxury gift shoppers",
+];
+
+const FORMATS: { value: AspectRatio; label: string }[] = [
+  { value: "16:9", label: "16:9" },
+  { value: "1:1", label: "1:1" },
+  { value: "4:5", label: "4:5" },
+  { value: "9:16", label: "9:16" },
 ];
 
 const DURATION_MIN = 3;
@@ -106,23 +119,48 @@ export function LaunchForm() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [audience, setAudience] = useState("");
-  const [aspect, setAspect] = useState<AspectRatio>("16:9");
+  const [formats, setFormats] = useState<AspectRatio[]>(["16:9"]);
   const [duration, setDuration] = useState<Duration>(10);
+  const [variant, setVariant] = useState(0);
+  const [brand, setBrand] = useState<BrandKit>({});
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // The real spec the brain will use for these inputs — drives the preview orb
-  // and mood label so the summary reflects the actual ad, not a random hash.
+  // Restore the saved brand kit on mount (sticky across sessions).
+  useEffect(() => {
+    setBrand(loadBrandKit());
+  }, []);
+
+  function updateBrand(patch: Partial<BrandKit>) {
+    setBrand((prev) => {
+      const next = { ...prev, ...patch };
+      saveBrandKit(next);
+      return next;
+    });
+  }
+
+  function toggleFormat(f: AspectRatio) {
+    setFormats((prev) =>
+      prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f],
+    );
+  }
+
+  // The mood the brain picks for these inputs (with brand colour applied) — drives
+  // the empty-state orb and the mood label.
   const moodSpec = useMemo(
     () =>
-      buildAdSpec({
-        title: title.trim(),
-        audience: audience.trim(),
-        price: formatPrice(price),
-        durationSec: clampDuration(duration) || 10,
-      }),
-    [title, audience, price, duration],
+      applyBrand(
+        buildAdSpec({
+          title: title.trim(),
+          audience: audience.trim(),
+          price: formatPrice(price),
+          durationSec: clampDuration(duration) || 10,
+          variant,
+        }),
+        brand,
+      ),
+    [title, audience, price, duration, variant, brand],
   );
 
   // A stable object URL for the uploaded image, fed to the live preview.
@@ -137,13 +175,14 @@ export function LaunchForm() {
     [previewUrl],
   );
 
-  // Debounced inputs so the player re-renders only after typing settles, not on
-  // every keystroke. (Image changes are discrete, so the URL passes through live.)
+  // Debounced text inputs so the player re-renders only after typing settles.
+  // (Format/variant/brand are discrete, so they pass through live.)
   const liveInput = useMemo(
-    () => ({ title, audience, price, duration, aspect }),
-    [title, audience, price, duration, aspect],
+    () => ({ title, audience, price, duration }),
+    [title, audience, price, duration],
   );
   const dq = useDebounced(liveInput, 350);
+  const previewFmt = formats[0] ?? "16:9";
   const previewSpec = useMemo(
     () =>
       buildAdSpec({
@@ -151,13 +190,13 @@ export function LaunchForm() {
         audience: dq.audience.trim(),
         price: formatPrice(dq.price),
         durationSec: clampDuration(dq.duration) || 10,
+        variant,
       }),
-    [dq],
+    [dq, variant],
   );
 
-  // Bespoke copy from the Workers AI brain, fetched (debounced + cached) only
-  // while the preview is on screen. Overlaid on the template spec; null until it
-  // arrives, so the preview shows template copy first, then upgrades in place.
+  // Bespoke copy from the Workers AI brain (debounced + cached), overlaid on the
+  // template spec along with the brand colour.
   const copyInput = useMemo(
     () => ({
       title: dq.title.trim(),
@@ -168,24 +207,29 @@ export function LaunchForm() {
     [dq, previewSpec.tone],
   );
   const { copy: aiCopy, loading: aiLoading } = useAiCopy(copyInput, !!previewUrl);
-  const previewSpecWithCopy = useMemo(
-    () => applyCopy(previewSpec, aiCopy),
-    [previewSpec, aiCopy],
+  const previewSpecFinal = useMemo(
+    () => applyBrand(applyCopy(previewSpec, aiCopy), brand),
+    [previewSpec, aiCopy, brand],
   );
+
+  async function onLogo(file: File | null) {
+    if (!file) return;
+    const logo = await readLogo(file);
+    if (!logo) {
+      setError("Logo is too large — use an image under 600 KB.");
+      return;
+    }
+    setError(null);
+    updateBrand({ logo });
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!imageFile) {
-      setError("Add a product image.");
-      return;
-    }
-    if (!title.trim()) {
-      setError("Add a product title.");
-      return;
-    }
+    if (!imageFile) return setError("Add a product image.");
+    if (!title.trim()) return setError("Add a product title.");
+    if (formats.length === 0) return setError("Pick at least one format.");
     if (!canRenderInBrowser()) {
-      setError("In-browser rendering needs a recent Chrome or Edge.");
-      return;
+      return setError("In-browser rendering needs a recent Chrome or Edge.");
     }
     setSubmitting(true);
     setError(null);
@@ -194,17 +238,14 @@ export function LaunchForm() {
     // renderer as durationInFrames — fall back to 10s.
     const dur = clampDuration(duration) || 10;
     try {
-      const id = crypto.randomUUID();
-      // The "brain": map the inputs to an audience-tailored creative spec
-      // (tone, palette, type, layout, copy, pacing) that drives the render.
+      // The "brain": inputs -> creative spec, then bespoke LLM copy + brand colour.
       const baseSpec = buildAdSpec({
         title: title.trim(),
         audience: audience.trim(),
         price: formatPrice(price),
         durationSec: dur,
+        variant,
       });
-      // Upgrade the template copy with bespoke LLM lines (Workers AI). Cache hit
-      // if the preview already fetched it; null on failure → keep the templates.
       setStatus("Writing the copy…");
       const copy = await generateCopy({
         title: title.trim(),
@@ -212,65 +253,76 @@ export function LaunchForm() {
         price: formatPrice(price),
         tone: baseSpec.tone,
       });
-      const spec = applyCopy(baseSpec, copy);
-      // Cut the product out of its background (in-browser) so it sits cleanly on
-      // the ad's stage. Falls back to the original photo if it can't.
+      const spec = applyBrand(applyCopy(baseSpec, copy), brand);
+
+      // Background removal runs once; the cutout is reused across every format.
       const cleaned = await removeProductBackground(imageFile, setStatus);
       const renderFile: Blob = cleaned ?? imageFile;
-      // Render in-browser from a canvas-safe local object URL — free, fast, no
-      // CORS step, nothing leaves the browser until the user saves.
       const objectUrl = URL.createObjectURL(renderFile);
-      let blob: Blob;
-      setStatus("Rendering the video…");
+
+      let firstId: string | null = null;
       try {
-        blob = await renderAdInBrowser({
-          productTitle: title.trim(),
-          productImage: objectUrl,
-          price: formatPrice(price),
-          audience: audience.trim() || "everyone",
-          durationInSeconds: dur,
-          aspectRatio: aspect === "9:16" ? "9:16" : "16:9",
-          accent: spec.palette.accent,
-          spec,
-        });
+        for (let i = 0; i < formats.length; i++) {
+          const fmt = formats[i];
+          const id = crypto.randomUUID();
+          if (!firstId) firstId = id;
+          setStatus(
+            formats.length > 1
+              ? `Rendering ${fmt} (${i + 1}/${formats.length})…`
+              : "Rendering the video…",
+          );
+          const blob = await renderAdInBrowser({
+            productTitle: title.trim(),
+            productImage: objectUrl,
+            price: formatPrice(price),
+            audience: audience.trim() || "everyone",
+            durationInSeconds: dur,
+            aspectRatio: fmt,
+            accent: spec.palette.accent,
+            brandLogo: brand.logo,
+            spec,
+          });
+          setStatus(`Saving ${fmt}…`);
+          const job: Job = {
+            id,
+            status: "ready",
+            product_url: "",
+            target_audience: audience.trim(),
+            aspect_ratio: fmt,
+            duration_sec: dur,
+            resolution: "1080p",
+            product: {
+              title: title.trim(),
+              price: priceToCents(price),
+              currency: "USD",
+              images: [],
+              specs: {},
+              source: "upload",
+            },
+            script: null,
+            video_url: null,
+            error: null,
+            cost_cents: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          await saveRenderedAdViaBackend(job, blob, imageFile);
+        }
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
-      setStatus("Saving to your library…");
-
-      const job: Job = {
-        id,
-        status: "ready",
-        product_url: "",
-        target_audience: audience.trim(),
-        aspect_ratio: aspect,
-        duration_sec: dur,
-        resolution: "1080p",
-        product: {
-          title: title.trim(),
-          price: priceToCents(price),
-          currency: "USD",
-          images: [],
-          specs: {},
-          source: "upload",
-        },
-        script: null,
-        video_url: null,
-        error: null,
-        cost_cents: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      // Upload + save happens on the backend (service-role key) because the
-      // project's Storage rejects user tokens directly.
-      await saveRenderedAdViaBackend(job, blob, imageFile);
-      router.push(`/jobs/${id}`);
+      router.push(`/jobs/${firstId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not render the ad.");
       setStatus(null);
       setSubmitting(false);
     }
   }
+
+  const pillBase =
+    "rounded-full border px-2.5 py-1 text-[12px] transition-colors duration-150 ease-out ";
+  const pillOn = "border-ink bg-ink text-parchment";
+  const pillOff = "border-ash bg-white text-driftwood hover:text-ink";
 
   return (
     <form
@@ -322,12 +374,7 @@ export function LaunchForm() {
                 key={a}
                 type="button"
                 onClick={() => setAudience(a)}
-                className={
-                  "rounded-full border px-2.5 py-1 text-[12px] transition-colors duration-150 ease-out " +
-                  (audience === a
-                    ? "border-ink bg-ink text-parchment"
-                    : "border-ash bg-white text-driftwood hover:text-ink")
-                }
+                className={pillBase + (audience === a ? pillOn : pillOff)}
               >
                 {a}
               </button>
@@ -335,58 +382,105 @@ export function LaunchForm() {
           </div>
         </Field>
 
-        <div className="grid gap-6 sm:grid-cols-2">
-          <Field label="Aspect ratio">
-            <Segmented
-              ariaLabel="Aspect ratio"
-              value={aspect}
-              onChange={setAspect}
-              options={[
-                { value: "16:9", label: "16:9" },
-                { value: "9:16", label: "9:16" },
-              ]}
+        <Field label="Formats" hint="Pick any — each is rendered and saved.">
+          <div className="flex flex-wrap gap-1.5">
+            {FORMATS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                aria-pressed={formats.includes(f.value)}
+                onClick={() => toggleFormat(f.value)}
+                className={
+                  pillBase + (formats.includes(f.value) ? pillOn : pillOff)
+                }
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field
+          label="Duration"
+          htmlFor="duration"
+          hint={`Any length from ${DURATION_MIN} to ${DURATION_MAX} seconds.`}
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              id="duration"
+              type="number"
+              inputMode="numeric"
+              min={DURATION_MIN}
+              max={DURATION_MAX}
+              step={1}
+              value={Number.isFinite(duration) ? duration : ""}
+              onChange={(e) => setDuration(Number(e.target.value))}
+              onBlur={(e) => setDuration(clampDuration(Number(e.target.value) || 10))}
+              className="w-24"
+              aria-label="Duration in seconds"
             />
-          </Field>
-          <Field
-            label="Duration"
-            htmlFor="duration"
-            hint={`Any length from ${DURATION_MIN} to ${DURATION_MAX} seconds.`}
-          >
-            <div className="flex items-center gap-2">
-              <Input
-                id="duration"
-                type="number"
-                inputMode="numeric"
-                min={DURATION_MIN}
-                max={DURATION_MAX}
-                step={1}
-                value={Number.isFinite(duration) ? duration : ""}
-                onChange={(e) => setDuration(Number(e.target.value))}
-                onBlur={(e) => setDuration(clampDuration(Number(e.target.value) || 10))}
-                className="w-24"
-                aria-label="Duration in seconds"
+            <span className="text-[14px] text-driftwood">seconds</span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {DURATION_PRESETS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDuration(d)}
+                className={pillBase + (duration === d ? pillOn : pillOff)}
+              >
+                {d}s
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="Brand kit" hint="Optional — saved on this device for next time.">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-2 rounded-full border border-ash bg-white py-1 pl-1 pr-3 text-[13px] text-ink">
+              <input
+                type="color"
+                aria-label="Brand color"
+                value={brand.accent ?? moodSpec.palette.accent}
+                onChange={(e) => updateBrand({ accent: e.target.value })}
+                className="size-7 cursor-pointer rounded-full border-0 bg-transparent p-0"
               />
-              <span className="text-[14px] text-driftwood">seconds</span>
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {DURATION_PRESETS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDuration(d)}
-                  className={
-                    "rounded-full border px-2.5 py-1 text-[12px] transition-colors duration-150 ease-out " +
-                    (duration === d
-                      ? "border-ink bg-ink text-parchment"
-                      : "border-ash bg-white text-driftwood hover:text-ink")
-                  }
-                >
-                  {d}s
-                </button>
-              ))}
-            </div>
-          </Field>
-        </div>
+              {brand.accent ? "Brand color" : "Use brand color"}
+            </label>
+            {brand.accent && (
+              <button
+                type="button"
+                onClick={() => updateBrand({ accent: undefined })}
+                className="text-[12px] text-driftwood underline-offset-2 hover:text-ink hover:underline"
+              >
+                reset color
+              </button>
+            )}
+
+            <label className="flex cursor-pointer items-center gap-2 rounded-full border border-ash bg-white px-3 py-1.5 text-[13px] text-ink hover:border-driftwood">
+              {brand.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={brand.logo} alt="" className="h-5 w-auto max-w-[64px] object-contain" />
+              ) : null}
+              {brand.logo ? "Replace logo" : "Add logo"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => onLogo(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            {brand.logo && (
+              <button
+                type="button"
+                onClick={() => updateBrand({ logo: undefined })}
+                className="text-[12px] text-driftwood underline-offset-2 hover:text-ink hover:underline"
+              >
+                remove logo
+              </button>
+            )}
+          </div>
+        </Field>
 
         {error && (
           <p role="alert" className="flex items-center gap-2 text-[14px] text-ink">
@@ -397,13 +491,17 @@ export function LaunchForm() {
 
         <div>
           <Button type="submit" size="lg" loading={submitting}>
-            {submitting ? status ?? "Rendering…" : "Generate ad"}
+            {submitting
+              ? status ?? "Rendering…"
+              : formats.length > 1
+                ? `Generate ${formats.length} ads`
+                : "Generate ad"}
             {!submitting && <ArrowRight className="text-[18px]" />}
           </Button>
         </div>
       </div>
 
-      {/* Summary — sticky preview, decorative orb */}
+      {/* Summary — sticky preview */}
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <div className="rounded-card bg-sand p-6">
           {previewUrl ? (
@@ -411,7 +509,9 @@ export function LaunchForm() {
               <div
                 className={
                   "overflow-hidden rounded-[14px] bg-ink " +
-                  (dq.aspect === "9:16" ? "flex justify-center py-2" : "")
+                  (previewFmt === "9:16" || previewFmt === "4:5"
+                    ? "flex justify-center py-2"
+                    : "")
                 }
               >
                 <AdPreview
@@ -420,30 +520,38 @@ export function LaunchForm() {
                   price={formatPrice(dq.price)}
                   audience={dq.audience.trim() || "everyone"}
                   durationInSeconds={clampDuration(dq.duration) || 10}
-                  aspectRatio={dq.aspect}
-                  accent={previewSpecWithCopy.palette.accent}
-                  spec={previewSpecWithCopy}
+                  aspectRatio={previewFmt}
+                  accent={previewSpecFinal.palette.accent}
+                  brandLogo={brand.logo}
+                  spec={previewSpecFinal}
                 />
               </div>
-              {(aiLoading || aiCopy) && (
-                <p
+              <div className="mt-2 flex items-center justify-between">
+                <span
                   className={
-                    "mt-2 text-center text-[12px] text-fog " +
-                    (aiLoading ? "animate-pulse" : "")
+                    "text-[12px] text-fog " + (aiLoading ? "animate-pulse" : "")
                   }
                 >
                   {aiLoading
                     ? "✨ Writing copy with AI…"
-                    : "✨ AI-written copy for this product"}
-                </p>
-              )}
+                    : aiCopy
+                      ? "✨ AI-written copy"
+                      : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setVariant((v) => v + 1)}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium text-driftwood transition-colors duration-150 ease-out hover:text-ink"
+                >
+                  <Refresh className="text-[14px]" />
+                  Shuffle look
+                </button>
+              </div>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 rounded-[14px] bg-white py-10 shadow-[var(--shadow-inset-warm)]">
               <Orb accent={moodSpec.palette.accent} className="size-24" />
-              <p className="text-[13px] text-fog">
-                Add a product image to preview
-              </p>
+              <p className="text-[13px] text-fog">Add a product image to preview</p>
             </div>
           )}
           <dl className="mt-6 flex flex-col gap-3 text-[14px]">
@@ -453,17 +561,18 @@ export function LaunchForm() {
                 {moodSpec.tone} · {moodSpec.layout}
               </dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-driftwood">Format</dt>
-              <dd className="font-mono text-ink">
-                {aspect} · {Number.isFinite(duration) ? duration : "—"}s · 1080p
+            <div className="flex justify-between gap-3">
+              <dt className="shrink-0 text-driftwood">Formats</dt>
+              <dd className="text-right font-mono text-ink">
+                {formats.join(", ") || "—"} ·{" "}
+                {Number.isFinite(duration) ? duration : "—"}s · 1080p
               </dd>
             </div>
           </dl>
           <p className="mt-5 border-t border-ash pt-4 text-[13px] leading-relaxed text-fog">
             A live preview from your photo. Generating removes the background and
-            renders the final video in your browser — nothing leaves your control
-            until you publish.
+            renders the final video(s) in your browser — nothing leaves your
+            control until you publish.
           </p>
         </div>
       </aside>

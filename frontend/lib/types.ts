@@ -8,7 +8,7 @@ export type JobStatus =
   | "ready"
   | "failed";
 
-export type AspectRatio = "16:9" | "9:16";
+export type AspectRatio = "16:9" | "1:1" | "4:5" | "9:16";
 export type Resolution = "1080p" | "2160p";
 // Custom ad length in seconds (backend accepts 3–20).
 export type Duration = number;
