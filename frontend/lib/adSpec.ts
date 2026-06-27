@@ -4,7 +4,7 @@
 // an LLM can later produce the same shape behind this contract for bespoke copy.
 
 export type Tone = "luxe" | "energetic" | "playful" | "calm" | "techy" | "bold";
-export type FontKey = "grotesque" | "serif" | "mono";
+export type FontKey = "grotesque" | "serif" | "softserif" | "condensed" | "mono";
 export type LayoutVariant = "banded" | "split" | "editorial" | "statement";
 export type SceneType = "hook" | "hero" | "feature" | "price" | "benefit" | "outro";
 export type Motion = "kenburns-in" | "kenburns-out" | "drift" | "rise" | "pop";
@@ -106,12 +106,12 @@ export const TONE_ACCENTS: Record<Tone, string> = {
 };
 
 const TONE_FONT: Record<Tone, FontKey> = {
-  luxe: "serif",
-  energetic: "grotesque",
-  playful: "grotesque",
-  calm: "serif",
-  techy: "mono",
-  bold: "grotesque",
+  luxe: "serif", // Fraunces — editorial luxury
+  energetic: "condensed", // Big Shoulders — athletic/outdoor
+  playful: "grotesque", // Bricolage Grotesque
+  calm: "softserif", // Newsreader — gentle, distinct from luxe
+  techy: "mono", // JetBrains Mono
+  bold: "grotesque", // Bricolage Grotesque
 };
 
 // Each mood gets its OWN structure, not just its own colours — a signature hero
