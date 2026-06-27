@@ -42,7 +42,10 @@ async def verify_token(url: str, api_key: str, token: str) -> str | None:
         return None
     if r.status_code != 200:
         return None
-    user_id = r.json().get("id")
+    try:
+        user_id = r.json().get("id")
+    except Exception:
+        return None
     return str(user_id) if user_id else None
 
 

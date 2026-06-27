@@ -329,7 +329,7 @@ export const DEFAULT_SPEC: AdSpec = {
   palette: PALETTES.energetic[0],
   font: "grotesque",
   headline: "Your product",
-  subhead: "Everything you need, nothing you don't.",
+  subhead: "Everything you need, nothing you don’t.",
   cta: "Shop now",
   eyebrow: "For everyone",
   scenes: [
