@@ -1,26 +1,44 @@
 // Brand kit — an optional brand colour + logo the user sets once and reuses.
 // Persisted in localStorage so it sticks across sessions (the "on-brand" value
-// prop). Applied to the ad's accent; the logo is overlaid by the renderer.
+// prop). Applied to the ad's accent; the logo (with smart background handling,
+// see logo.ts) is overlaid by the renderer.
 
 import type { AdSpec } from "./adSpec";
 
 export interface BrandKit {
   accent?: string; // hex
-  logo?: string; // data URL
+  logo?: string; // data URL actually used in the ad
+  logoChip?: string; // backing chip colour behind the logo (when it's a dark cutout)
+  // Stored so the "remove background" toggle can flip without re-processing:
+  logoOriginal?: string;
+  logoCutout?: string;
+  logoCutoutChip?: string;
+  logoRemoved?: boolean; // a removable backdrop was detected
+  logoUseCutout?: boolean; // is the cutout (vs the original) currently applied?
 }
 
 const KEY = "dart.brandkit.v1";
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+const dataUrl = (v: unknown) =>
+  typeof v === "string" && v.startsWith("data:") ? v : undefined;
 
 export function loadBrandKit(): BrandKit {
   if (typeof window === "undefined") return {};
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return {};
-    const b = JSON.parse(raw) as BrandKit;
+    const b = JSON.parse(raw) as Record<string, unknown>;
     return {
       accent: typeof b.accent === "string" && HEX.test(b.accent) ? b.accent : undefined,
-      logo: typeof b.logo === "string" && b.logo.startsWith("data:") ? b.logo : undefined,
+      logo: dataUrl(b.logo),
+      logoChip: str(b.logoChip),
+      logoOriginal: dataUrl(b.logoOriginal),
+      logoCutout: dataUrl(b.logoCutout),
+      logoCutoutChip: str(b.logoCutoutChip),
+      logoRemoved: b.logoRemoved === true,
+      logoUseCutout: b.logoUseCutout === true,
     };
   } catch {
     return {};
@@ -40,19 +58,4 @@ export function saveBrandKit(b: BrandKit): void {
 export function applyBrand(spec: AdSpec, brand: BrandKit): AdSpec {
   if (!brand.accent || !HEX.test(brand.accent)) return spec;
   return { ...spec, palette: { ...spec.palette, accent: brand.accent } };
-}
-
-// Read a logo File into a data URL (canvas-safe for the renderer). Rejects files
-// that are too large to persist comfortably.
-export function readLogo(file: File): Promise<string | null> {
-  return new Promise((resolve) => {
-    if (file.size > 600_000) {
-      resolve(null); // ~600KB cap — keeps localStorage happy
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
-    reader.onerror = () => resolve(null);
-    reader.readAsDataURL(file);
-  });
 }

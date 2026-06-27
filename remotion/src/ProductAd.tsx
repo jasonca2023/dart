@@ -20,6 +20,7 @@ export const productAdSchema = z.object({
   aspectRatio: z.enum(["16:9", "1:1", "4:5", "9:16"]),
   accent: z.string(),
   brandLogo: z.string().optional(),
+  brandLogoChip: z.string().optional(),
   spec: z.any().optional(),
 });
 
@@ -751,23 +752,37 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
         );
       })}
 
-      {/* brand logo — small, top-right, all scenes */}
+      {/* brand logo — small, top-right, all scenes; on an adaptive chip when the
+          cutout logo would be too dark to read on the panel. */}
       {props.brandLogo ? (
         <AbsoluteFill>
-          <Img
-            src={props.brandLogo}
-            crossOrigin="anonymous"
+          <div
             style={{
               position: "absolute",
               top: 46 * u,
               right: 56 * u,
-              height: 42 * u,
-              width: "auto",
-              maxWidth: 200 * u,
-              objectFit: "contain",
-              opacity: 0.92,
+              display: "flex",
+              ...(props.brandLogoChip
+                ? {
+                    backgroundColor: props.brandLogoChip,
+                    borderRadius: 9 * u,
+                    padding: `${9 * u}px ${13 * u}px`,
+                  }
+                : {}),
             }}
-          />
+          >
+            <Img
+              src={props.brandLogo}
+              crossOrigin="anonymous"
+              style={{
+                height: 38 * u,
+                width: "auto",
+                maxWidth: 200 * u,
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+          </div>
         </AbsoluteFill>
       ) : null}
 

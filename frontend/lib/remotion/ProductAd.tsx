@@ -20,6 +20,8 @@ export interface ProductAdProps {
   accent: string;
   /** Optional brand logo (image URL/data-URL) — overlaid small in a corner. */
   brandLogo?: string;
+  /** Backing chip colour behind the logo (set when it's a dark cutout). */
+  brandLogoChip?: string;
   /** Creative direction. When absent, a default banded spec is derived. */
   spec?: AdSpec;
 }
@@ -750,23 +752,37 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
         );
       })}
 
-      {/* brand logo — small, top-right, all scenes */}
+      {/* brand logo — small, top-right, all scenes; on an adaptive chip when the
+          cutout logo would be too dark to read on the panel. */}
       {props.brandLogo ? (
         <AbsoluteFill>
-          <Img
-            src={props.brandLogo}
-            crossOrigin="anonymous"
+          <div
             style={{
               position: "absolute",
               top: 46 * u,
               right: 56 * u,
-              height: 42 * u,
-              width: "auto",
-              maxWidth: 200 * u,
-              objectFit: "contain",
-              opacity: 0.92,
+              display: "flex",
+              ...(props.brandLogoChip
+                ? {
+                    backgroundColor: props.brandLogoChip,
+                    borderRadius: 9 * u,
+                    padding: `${9 * u}px ${13 * u}px`,
+                  }
+                : {}),
             }}
-          />
+          >
+            <Img
+              src={props.brandLogo}
+              crossOrigin="anonymous"
+              style={{
+                height: 38 * u,
+                width: "auto",
+                maxWidth: 200 * u,
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+          </div>
         </AbsoluteFill>
       ) : null}
 

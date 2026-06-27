@@ -8,13 +8,8 @@ import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { buildAdSpec } from "@/lib/adSpec";
 import { removeProductBackground } from "@/lib/bgRemove";
 import { generateCopy, applyCopy, useAiCopy } from "@/lib/copy";
-import {
-  applyBrand,
-  loadBrandKit,
-  saveBrandKit,
-  readLogo,
-  type BrandKit,
-} from "@/lib/brand";
+import { applyBrand, loadBrandKit, saveBrandKit, type BrandKit } from "@/lib/brand";
+import { prepareLogo } from "@/lib/logo";
 import { useDebounced } from "@/lib/hooks";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
@@ -214,13 +209,30 @@ export function LaunchForm() {
 
   async function onLogo(file: File | null) {
     if (!file) return;
-    const logo = await readLogo(file);
-    if (!logo) {
-      setError("Logo is too large — use an image under 600 KB.");
+    const p = await prepareLogo(file);
+    if (!p) {
+      setError("Couldn’t read that logo — try a PNG or JPG under 3 MB.");
       return;
     }
     setError(null);
-    updateBrand({ logo });
+    const useCutout = p.removed; // auto-apply when a useless backdrop was stripped
+    updateBrand({
+      logoOriginal: p.original,
+      logoCutout: p.cutout,
+      logoCutoutChip: p.cutoutChip ?? undefined,
+      logoRemoved: p.removed,
+      logoUseCutout: useCutout,
+      logo: useCutout ? p.cutout : p.original,
+      logoChip: useCutout ? p.cutoutChip ?? undefined : undefined,
+    });
+  }
+
+  function setRemoveBg(on: boolean) {
+    updateBrand({
+      logoUseCutout: on,
+      logo: on ? brand.logoCutout : brand.logoOriginal,
+      logoChip: on ? brand.logoCutoutChip : undefined,
+    });
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -280,6 +292,7 @@ export function LaunchForm() {
             aspectRatio: fmt,
             accent: spec.palette.accent,
             brandLogo: brand.logo,
+            brandLogoChip: brand.logoChip,
             spec,
           });
           setStatus(`Saving ${fmt}…`);
@@ -473,13 +486,33 @@ export function LaunchForm() {
             {brand.logo && (
               <button
                 type="button"
-                onClick={() => updateBrand({ logo: undefined })}
+                onClick={() =>
+                  updateBrand({
+                    logo: undefined,
+                    logoChip: undefined,
+                    logoOriginal: undefined,
+                    logoCutout: undefined,
+                    logoCutoutChip: undefined,
+                    logoRemoved: undefined,
+                    logoUseCutout: undefined,
+                  })
+                }
                 className="text-[12px] text-driftwood underline-offset-2 hover:text-ink hover:underline"
               >
                 remove logo
               </button>
             )}
           </div>
+          {brand.logo && brand.logoRemoved && (
+            <label className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-[12px] text-driftwood">
+              <input
+                type="checkbox"
+                checked={!!brand.logoUseCutout}
+                onChange={(e) => setRemoveBg(e.target.checked)}
+              />
+              Remove logo background
+            </label>
+          )}
         </Field>
 
         {error && (
@@ -523,6 +556,7 @@ export function LaunchForm() {
                   aspectRatio={previewFmt}
                   accent={previewSpecFinal.palette.accent}
                   brandLogo={brand.logo}
+                  brandLogoChip={brand.logoChip}
                   spec={previewSpecFinal}
                 />
               </div>
