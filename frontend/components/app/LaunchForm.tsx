@@ -567,9 +567,9 @@ export function LaunchForm() {
                   }
                 >
                   {aiLoading
-                    ? "✨ Writing copy with AI…"
+                    ? "Writing copy with AI…"
                     : aiCopy
-                      ? "✨ AI-written copy"
+                      ? "AI-written copy"
                       : ""}
                 </span>
                 <button
