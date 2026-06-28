@@ -8,11 +8,9 @@ import type { AdSpec } from "./adSpec";
 export interface BrandKit {
   accent?: string; // hex
   logo?: string; // data URL actually used in the ad
-  logoChip?: string; // backing chip colour behind the logo (when it's a dark cutout)
   // Stored so the "remove background" toggle can flip without re-processing:
   logoOriginal?: string;
   logoCutout?: string;
-  logoCutoutChip?: string;
   logoRemoved?: boolean; // a removable backdrop was detected
   logoUseCutout?: boolean; // is the cutout (vs the original) currently applied?
   logoTransparent?: boolean; // is the *active* logo transparent (safe to knock out)?
@@ -21,7 +19,6 @@ export interface BrandKit {
 const KEY = "dart.brandkit.v1";
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
-const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 const dataUrl = (v: unknown) =>
   typeof v === "string" && v.startsWith("data:") ? v : undefined;
 
@@ -34,10 +31,8 @@ export function loadBrandKit(): BrandKit {
     return {
       accent: typeof b.accent === "string" && HEX.test(b.accent) ? b.accent : undefined,
       logo: dataUrl(b.logo),
-      logoChip: str(b.logoChip),
       logoOriginal: dataUrl(b.logoOriginal),
       logoCutout: dataUrl(b.logoCutout),
-      logoCutoutChip: str(b.logoCutoutChip),
       logoRemoved: b.logoRemoved === true,
       logoUseCutout: b.logoUseCutout === true,
       // Older kits predate this flag; leave it undefined so the renderer's

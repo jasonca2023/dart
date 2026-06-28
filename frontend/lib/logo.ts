@@ -1,14 +1,13 @@
 // Smart logo prep — runs in the browser on a <canvas>. Removes a *useless*
 // backdrop (a uniform near-white or near-black border, the classic "exported on
-// a white card" case) by flood-keying from the edges, while leaving a logo whose
+// a white card" case) by colour-keying it out, while leaving a logo whose
 // background is part of the design (colourful, non-uniform, or already
-// transparent) untouched. Because dark logos vanish on the ad's dark panel, it
-// also returns a backing-chip colour so a dark cutout still reads.
+// transparent) untouched. The renderer knocks a transparent cutout out to a flat
+// colour, so the mark stays legible on any scene.
 
 export interface PreparedLogo {
   original: string; // downscaled data URL, as uploaded
   cutout: string; // background-removed + cropped (or === original if nothing removed)
-  cutoutChip: string | null; // chip colour behind the cutout when it's dark, else null
   removed: boolean; // did we actually strip a backdrop?
   transparent: boolean; // is the result transparent (a real cutout) vs an opaque image?
 }
@@ -35,7 +34,7 @@ const lum = (r: number, g: number, b: number) => (0.299 * r + 0.587 * g + 0.114 
 
 export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
   if (typeof document === "undefined") return null;
-  if (file.size > 3_000_000) return null; // 3MB pre-downscale cap
+  if (file.size > 10_000_000) return null; // 10MB pre-downscale cap (decode bound)
   const img = await loadImage(file);
   if (!img || !img.width || !img.height) return null;
 
@@ -117,32 +116,23 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
     }
   }
 
-  // Crop the (transparent) logo to its content box + small padding, and measure
-  // its luminance so a dark mark can sit on a light chip.
+  // Crop the (transparent) logo to its content box + small padding.
   const transparentNow = hasAlpha || removed;
   let cutout = original;
-  let cutoutChip: string | null = null;
   if (transparentNow) {
     let minX = w,
       minY = h,
       maxX = -1,
       maxY = -1;
-    let lr = 0,
-      lg = 0,
-      lb = 0,
-      ln = 0;
+    let ln = 0;
     const cur = ctx.getImageData(0, 0, w, h).data;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const a = cur[(y * w + x) * 4 + 3];
-        if (a > 24) {
+        if (cur[(y * w + x) * 4 + 3] > 24) {
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
           if (y < minY) minY = y;
           if (y > maxY) maxY = y;
-          lr += cur[(y * w + x) * 4];
-          lg += cur[(y * w + x) * 4 + 1];
-          lb += cur[(y * w + x) * 4 + 2];
           ln++;
         }
       }
@@ -161,11 +151,8 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
         cctx.drawImage(canvas, cx, cy, cw, chh, 0, 0, cw, chh);
         cutout = crop.toDataURL("image/png");
       }
-      const logoLum = lum(lr / ln, lg / ln, lb / ln);
-      // Dark mark on the dark ad panel → give it a light bone chip to read on.
-      if (logoLum < 0.5) cutoutChip = "#f4f1ea";
     }
   }
 
-  return { original, cutout, cutoutChip, removed, transparent: transparentNow };
+  return { original, cutout, removed, transparent: transparentNow };
 }

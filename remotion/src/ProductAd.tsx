@@ -20,7 +20,6 @@ export const productAdSchema = z.object({
   aspectRatio: z.enum(["16:9", "1:1", "4:5", "9:16"]),
   accent: z.string(),
   brandLogo: z.string().optional(),
-  brandLogoChip: z.string().optional(),
   brandLogoKnockout: z.boolean().optional(),
   spec: z.any().optional(),
 });

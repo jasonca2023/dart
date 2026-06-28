@@ -20,8 +20,6 @@ export interface ProductAdProps {
   accent: string;
   /** Optional brand logo (image URL/data-URL) — overlaid small in a corner. */
   brandLogo?: string;
-  /** Backing chip colour behind the logo (set when it's a dark cutout). */
-  brandLogoChip?: string;
   /** Whether the logo is a transparent cutout that can be safely knocked out to a
    * flat colour. Undefined keeps the legacy behaviour (knock out); only an
    * explicit `false` (an opaque logo) renders it as-is to avoid a solid block. */

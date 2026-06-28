@@ -211,7 +211,7 @@ export function LaunchForm() {
     if (!file) return;
     const p = await prepareLogo(file);
     if (!p) {
-      setError("Couldn’t read that logo — try a PNG or JPG under 3 MB.");
+      setError("Couldn’t read that logo — try a PNG or JPG under 10 MB.");
       return;
     }
     setError(null);
@@ -219,11 +219,9 @@ export function LaunchForm() {
     updateBrand({
       logoOriginal: p.original,
       logoCutout: p.cutout,
-      logoCutoutChip: p.cutoutChip ?? undefined,
       logoRemoved: p.removed,
       logoUseCutout: useCutout,
       logo: useCutout ? p.cutout : p.original,
-      logoChip: useCutout ? p.cutoutChip ?? undefined : undefined,
       // `p.transparent` reflects the active logo: cutout (when removed) is always
       // transparent; otherwise the original is transparent only if it already had
       // alpha. An opaque logo must NOT be knocked out (it'd become a solid block).
@@ -237,7 +235,6 @@ export function LaunchForm() {
     updateBrand({
       logoUseCutout: on,
       logo: on ? brand.logoCutout : brand.logoOriginal,
-      logoChip: on ? brand.logoCutoutChip : undefined,
       logoTransparent: on,
     });
   }
@@ -299,7 +296,6 @@ export function LaunchForm() {
             aspectRatio: fmt,
             accent: spec.palette.accent,
             brandLogo: brand.logo,
-            brandLogoChip: brand.logoChip,
             brandLogoKnockout: brand.logoTransparent,
             spec,
           });
@@ -497,12 +493,11 @@ export function LaunchForm() {
                 onClick={() =>
                   updateBrand({
                     logo: undefined,
-                    logoChip: undefined,
                     logoOriginal: undefined,
                     logoCutout: undefined,
-                    logoCutoutChip: undefined,
                     logoRemoved: undefined,
                     logoUseCutout: undefined,
+                    logoTransparent: undefined,
                   })
                 }
                 className="text-[12px] text-driftwood underline-offset-2 hover:text-ink hover:underline"
@@ -564,7 +559,6 @@ export function LaunchForm() {
                   aspectRatio={previewFmt}
                   accent={previewSpecFinal.palette.accent}
                   brandLogo={brand.logo}
-                  brandLogoChip={brand.logoChip}
                   brandLogoKnockout={brand.logoTransparent}
                   spec={previewSpecFinal}
                 />
