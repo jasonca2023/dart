@@ -15,6 +15,7 @@ export interface BrandKit {
   logoCutoutChip?: string;
   logoRemoved?: boolean; // a removable backdrop was detected
   logoUseCutout?: boolean; // is the cutout (vs the original) currently applied?
+  logoTransparent?: boolean; // is the *active* logo transparent (safe to knock out)?
 }
 
 const KEY = "dart.brandkit.v1";
@@ -39,6 +40,9 @@ export function loadBrandKit(): BrandKit {
       logoCutoutChip: str(b.logoCutoutChip),
       logoRemoved: b.logoRemoved === true,
       logoUseCutout: b.logoUseCutout === true,
+      // Older kits predate this flag; leave it undefined so the renderer's
+      // default (knock out an existing cutout) still applies to them.
+      logoTransparent: typeof b.logoTransparent === "boolean" ? b.logoTransparent : undefined,
     };
   } catch {
     return {};

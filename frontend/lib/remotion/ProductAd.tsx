@@ -22,6 +22,10 @@ export interface ProductAdProps {
   brandLogo?: string;
   /** Backing chip colour behind the logo (set when it's a dark cutout). */
   brandLogoChip?: string;
+  /** Whether the logo is a transparent cutout that can be safely knocked out to a
+   * flat colour. Undefined keeps the legacy behaviour (knock out); only an
+   * explicit `false` (an opaque logo) renders it as-is to avoid a solid block. */
+  brandLogoKnockout?: boolean;
   /** Creative direction. When absent, a default banded spec is derived. */
   spec?: AdSpec;
 }
@@ -802,7 +806,11 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
                 maxWidth: 200 * u,
                 objectFit: "contain",
                 display: "block",
-                filter: logoOnStage ? "brightness(0)" : "brightness(0) invert(1)",
+                // Only knock out a transparent cutout — an opaque logo would
+                // flatten to a solid block. Undefined = legacy cutouts, still knock.
+                ...(props.brandLogoKnockout !== false
+                  ? { filter: logoOnStage ? "brightness(0)" : "brightness(0) invert(1)" }
+                  : {}),
               }}
             />
           </div>

@@ -21,6 +21,7 @@ export const productAdSchema = z.object({
   accent: z.string(),
   brandLogo: z.string().optional(),
   brandLogoChip: z.string().optional(),
+  brandLogoKnockout: z.boolean().optional(),
   spec: z.any().optional(),
 });
 
@@ -742,7 +743,9 @@ function logoOverStage(scene: Scene, spec: AdSpec, wide: boolean): boolean {
 }
 
 export const ProductAd: React.FC<ProductAdProps> = (props) => {
-  const spec = props.spec ?? fallbackSpec(props);
+  // `spec` is z.any() in the schema; treat it as the real type so this mirror
+  // type-checks like the frontend source it mirrors.
+  const spec: AdSpec = (props.spec as AdSpec | undefined) ?? fallbackSpec(props);
   const { width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const portrait = height > width;
@@ -802,7 +805,11 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
                 maxWidth: 200 * u,
                 objectFit: "contain",
                 display: "block",
-                filter: logoOnStage ? "brightness(0)" : "brightness(0) invert(1)",
+                // Only knock out a transparent cutout — an opaque logo would
+                // flatten to a solid block. Undefined = legacy cutouts, still knock.
+                ...(props.brandLogoKnockout !== false
+                  ? { filter: logoOnStage ? "brightness(0)" : "brightness(0) invert(1)" }
+                  : {}),
               }}
             />
           </div>

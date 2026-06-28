@@ -10,6 +10,7 @@ export interface PreparedLogo {
   cutout: string; // background-removed + cropped (or === original if nothing removed)
   cutoutChip: string | null; // chip colour behind the cutout when it's dark, else null
   removed: boolean; // did we actually strip a backdrop?
+  transparent: boolean; // is the result transparent (a real cutout) vs an opaque image?
 }
 
 const MAX = 440;
@@ -107,8 +108,10 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
       }
     }
     const frac = count / N;
-    // Removed a sensible amount (not nothing, not basically-everything).
-    if (frac > 0.04 && frac < 0.92) {
+    // Removed a sensible amount (not nothing, not basically-everything). The
+    // ceiling is generous because keying the whole backdrop — a logo with lots of
+    // white padding is legitimately mostly background — should still be accepted.
+    if (frac > 0.04 && frac < 0.97) {
       ctx.putImageData(image, 0, 0);
       removed = true;
     }
@@ -164,5 +167,5 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
     }
   }
 
-  return { original, cutout, cutoutChip, removed };
+  return { original, cutout, cutoutChip, removed, transparent: transparentNow };
 }

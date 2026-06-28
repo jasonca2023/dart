@@ -224,14 +224,21 @@ export function LaunchForm() {
       logoUseCutout: useCutout,
       logo: useCutout ? p.cutout : p.original,
       logoChip: useCutout ? p.cutoutChip ?? undefined : undefined,
+      // `p.transparent` reflects the active logo: cutout (when removed) is always
+      // transparent; otherwise the original is transparent only if it already had
+      // alpha. An opaque logo must NOT be knocked out (it'd become a solid block).
+      logoTransparent: p.transparent,
     });
   }
 
   function setRemoveBg(on: boolean) {
+    // The toggle only appears once a backdrop was removed, so the original is the
+    // opaque source and the cutout is transparent.
     updateBrand({
       logoUseCutout: on,
       logo: on ? brand.logoCutout : brand.logoOriginal,
       logoChip: on ? brand.logoCutoutChip : undefined,
+      logoTransparent: on,
     });
   }
 
@@ -293,6 +300,7 @@ export function LaunchForm() {
             accent: spec.palette.accent,
             brandLogo: brand.logo,
             brandLogoChip: brand.logoChip,
+            brandLogoKnockout: brand.logoTransparent,
             spec,
           });
           setStatus(`Saving ${fmt}…`);
@@ -557,6 +565,7 @@ export function LaunchForm() {
                   accent={previewSpecFinal.palette.accent}
                   brandLogo={brand.logo}
                   brandLogoChip={brand.logoChip}
+                  brandLogoKnockout={brand.logoTransparent}
                   spec={previewSpecFinal}
                 />
               </div>
