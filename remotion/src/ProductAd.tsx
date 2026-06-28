@@ -752,8 +752,11 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
         );
       })}
 
-      {/* brand logo — small, top-right, all scenes; on an adaptive chip when the
-          cutout logo would be too dark to read on the panel. */}
+      {/* brand logo — small, top-right, all scenes. A dark cutout would vanish on
+          the dark text scenes, so it gets a soft adaptive halo (feathered glow in
+          a bone tone) instead of a hard chip: it lifts the mark on dark panels and
+          stays invisible over the light hero, so it never reads as a stuck-on
+          sticker. */}
       {props.brandLogo ? (
         <AbsoluteFill>
           <div
@@ -762,13 +765,6 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
               top: 46 * u,
               right: 56 * u,
               display: "flex",
-              ...(props.brandLogoChip
-                ? {
-                    backgroundColor: props.brandLogoChip,
-                    borderRadius: 9 * u,
-                    padding: `${9 * u}px ${13 * u}px`,
-                  }
-                : {}),
             }}
           >
             <Img
@@ -780,6 +776,11 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
                 maxWidth: 200 * u,
                 objectFit: "contain",
                 display: "block",
+                ...(props.brandLogoChip
+                  ? {
+                      filter: `drop-shadow(0 0 ${3 * u}px ${props.brandLogoChip}e6) drop-shadow(0 0 ${8 * u}px ${props.brandLogoChip}b3)`,
+                    }
+                  : {}),
               }}
             />
           </div>
