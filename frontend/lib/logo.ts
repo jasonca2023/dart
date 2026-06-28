@@ -89,41 +89,22 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
 
   let removed = false;
   if (!hasAlpha && useless) {
-    // Flood-key the backdrop colour, seeded from every border pixel that matches.
+    // Colour-key the backdrop *everywhere*, not just the edge-connected exterior.
+    // A letter's counter (the hole in A, O, R, e…) is an island of backdrop colour
+    // that no edge flood can reach, so an edge-only flood leaves it filled — which
+    // then shows as a solid blob once the mark is knocked out to a flat colour.
+    // Keying by colour clears those counters too. Safe here because `useless`
+    // already established the backdrop is a uniform neutral, i.e. pure background.
     const tol2 = 52 * 52;
-    const match = (i: number) => {
+    let count = 0;
+    for (let i = 0; i < N; i++) {
       const dr = px[i * 4] - mean[0];
       const dg = px[i * 4 + 1] - mean[1];
       const db = px[i * 4 + 2] - mean[2];
-      return dr * dr + dg * dg + db * db <= tol2;
-    };
-    const visited = new Uint8Array(N);
-    const stack: number[] = [];
-    const seed = (i: number) => {
-      if (!visited[i] && match(i)) {
-        visited[i] = 1;
-        stack.push(i);
+      if (dr * dr + dg * dg + db * db <= tol2) {
+        px[i * 4 + 3] = 0;
+        count++;
       }
-    };
-    for (let x = 0; x < w; x++) {
-      seed(x);
-      seed((h - 1) * w + x);
-    }
-    for (let y = 0; y < h; y++) {
-      seed(y * w);
-      seed(y * w + w - 1);
-    }
-    let count = 0;
-    while (stack.length) {
-      const i = stack.pop() as number;
-      px[i * 4 + 3] = 0;
-      count++;
-      const x = i % w;
-      const y = (i / w) | 0;
-      if (x > 0) seed(i - 1);
-      if (x < w - 1) seed(i + 1);
-      if (y > 0) seed(i - w);
-      if (y < h - 1) seed(i + w);
     }
     const frac = count / N;
     // Removed a sensible amount (not nothing, not basically-everything).
