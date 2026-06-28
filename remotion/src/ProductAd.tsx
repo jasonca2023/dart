@@ -727,6 +727,20 @@ const SceneStage: React.FC<{ index: number; children: React.ReactNode }> = ({ in
   return <AbsoluteFill style={{ transform: tr, opacity }}>{children}</AbsoluteFill>;
 };
 
+// Is the top-right corner — where the brand logo sits — over the light product
+// "stage" rather than the dark panel? Drives the logo knockout colour so it reads
+// as ink on light scenes and white on dark ones, no stuck-on chip.
+function logoOverStage(scene: Scene, spec: AdSpec, wide: boolean): boolean {
+  if (scene.type === "feature") return true; // full stage backdrop
+  if (scene.type === "hero") {
+    // Editorial/Statement keep the corner over the dark headline panel; split,
+    // banded and the stacked portrait hero all put the lit stage up there.
+    if (wide && (spec.layout === "editorial" || spec.layout === "statement")) return false;
+    return true;
+  }
+  return false; // hook / price / benefit / outro → solid dark panel
+}
+
 export const ProductAd: React.FC<ProductAdProps> = (props) => {
   const spec = props.spec ?? fallbackSpec(props);
   const { width, height } = useVideoConfig();
@@ -734,6 +748,18 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
   const portrait = height > width;
   const wide = width > height * 1.2; // only 16:9 — square/vertical stack
   const u = Math.min(width, height) / 1080;
+
+  // Which scene is on screen now → whether the logo sits on a light or dark
+  // background, so it can knock out to the contrasting colour.
+  const activeScene = (() => {
+    let a = 0;
+    for (const s of spec.scenes) {
+      a += s.frames;
+      if (frame < a) return s;
+    }
+    return spec.scenes[spec.scenes.length - 1];
+  })();
+  const logoOnStage = activeScene ? logoOverStage(activeScene, spec, wide) : false;
 
   let offset = 0;
   const total = spec.scenes.reduce((a, s) => a + s.frames, 0);
@@ -752,11 +778,11 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
         );
       })}
 
-      {/* brand logo — small, top-right, all scenes. A dark cutout would vanish on
-          the dark text scenes, so it gets a soft adaptive halo (feathered glow in
-          a bone tone) instead of a hard chip: it lifts the mark on dark panels and
-          stays invisible over the light hero, so it never reads as a stuck-on
-          sticker. */}
+      {/* brand logo — small, top-right, all scenes. Knocked out to a flat
+          silhouette that flips with the background: ink-black over the light
+          product stage, white over the dark text panels. `brightness(0)`
+          flattens the mark to black (keeping its alpha + sizing); `invert(1)`
+          turns that white. No chip, no sticker — it reads like a clean monogram. */}
       {props.brandLogo ? (
         <AbsoluteFill>
           <div
@@ -776,11 +802,7 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
                 maxWidth: 200 * u,
                 objectFit: "contain",
                 display: "block",
-                ...(props.brandLogoChip
-                  ? {
-                      filter: `drop-shadow(0 0 ${3 * u}px ${props.brandLogoChip}e6) drop-shadow(0 0 ${8 * u}px ${props.brandLogoChip}b3)`,
-                    }
-                  : {}),
+                filter: logoOnStage ? "brightness(0)" : "brightness(0) invert(1)",
               }}
             />
           </div>
