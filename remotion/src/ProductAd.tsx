@@ -54,7 +54,7 @@ const TEMPO: Record<Tone, Tempo> = {
   techy: { dur: 18, damping: 200, stagger: 4, prodTo: 1.05, drift: 6 }, // snappy, precise
   energetic: { dur: 16, damping: 170, stagger: 4, prodTo: 1.08, drift: 7 }, // fast, athletic
   calm: { dur: 26, damping: 200, stagger: 6, prodTo: 1.05, drift: 6 }, // gentle, steady
-  playful: { dur: 20, damping: 95, stagger: 5, prodTo: 1.07, drift: 9 }, // bouncy
+  playful: { dur: 20, damping: 150, stagger: 5, prodTo: 1.07, drift: 9 }, // lively, no overshoot
   bold: { dur: 16, damping: 150, stagger: 4, prodTo: 1.08, drift: 7 }, // punchy
 };
 
@@ -619,13 +619,68 @@ const PriceScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   );
 };
 
-const OutroScene: React.FC<SceneProps> = ({ spec, portrait }) => {
+const OutroScene: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnockout }) => {
   const u = useUnit();
   const t = TEMPO[spec.tone];
   const { panel, accent, text } = spec.palette;
+  const m = margin(u, portrait);
+
+  // Brand end-card: when a logo is set, the outro becomes a clean, centered
+  // sign-off — the logo *reveals* as the final beat (one orchestrated moment),
+  // CTA staggered just after. A crisp ease-out (high damping, no overshoot) so
+  // the brand moment never reads bouncy/templated. White knockout on the dark
+  // panel; an opaque logo (knockout === false) renders as-is.
+  if (brandLogo) {
+    const clean: Tempo = { ...t, dur: Math.min(t.dur, 26), damping: Math.max(t.damping, 190) };
+    const logoIn = useReveal(4, clean);
+    const ctaIn = useReveal(4 + clean.stagger * 2, clean);
+    const knockout = brandLogoKnockout !== false;
+    return (
+      <AbsoluteFill
+        style={{
+          backgroundColor: panel,
+          justifyContent: "center",
+          alignItems: "center",
+          flexDirection: "column",
+          gap: 42 * u,
+          padding: `0 ${m}px`,
+        }}
+      >
+        <Img
+          src={brandLogo}
+          crossOrigin="anonymous"
+          style={{
+            height: (portrait ? 60 : 84) * u,
+            width: "auto",
+            maxWidth: "66%",
+            objectFit: "contain",
+            opacity: logoIn,
+            transform: `translateY(${interpolate(logoIn, [0, 1], [24, 0])}px)`,
+            ...(knockout ? { filter: "brightness(0) invert(1)" } : {}),
+          }}
+        />
+        <div
+          style={{
+            opacity: ctaIn,
+            transform: `translateY(${interpolate(ctaIn, [0, 1], [14, 0])}px)`,
+            padding: `${15 * u}px ${32 * u}px`,
+            borderRadius: 10 * u,
+            backgroundColor: accent,
+            color: readableOn(accent),
+            fontWeight: 700,
+            fontSize: 24 * u,
+            letterSpacing: 0.2 * u,
+          }}
+        >
+          {`${spec.cta} →`}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  // No brand logo → the product title is the sign-off, left-hung as before.
   const r = useReveal(2, t);
   const c = useReveal(14, t);
-  const m = margin(u, portrait);
   return (
     <AbsoluteFill
       style={{
@@ -663,6 +718,9 @@ interface SceneProps {
   portrait: boolean;
   /** Wide (16:9) gets the horizontal hero layouts; square/vertical stack. */
   wide: boolean;
+  /** Brand logo — only the outro renders it, as the end-card sign-off. */
+  brandLogo?: string;
+  brandLogoKnockout?: boolean;
 }
 
 const SceneView: React.FC<SceneProps> = (props) => {
@@ -727,20 +785,6 @@ const SceneStage: React.FC<{ index: number; children: React.ReactNode }> = ({ in
   return <AbsoluteFill style={{ transform: tr, opacity }}>{children}</AbsoluteFill>;
 };
 
-// Is the top-right corner — where the brand logo sits — over the light product
-// "stage" rather than the dark panel? Drives the logo knockout colour so it reads
-// as ink on light scenes and white on dark ones, no stuck-on chip.
-function logoOverStage(scene: Scene, spec: AdSpec, wide: boolean): boolean {
-  if (scene.type === "feature") return true; // full stage backdrop
-  if (scene.type === "hero") {
-    // Editorial/Statement keep the corner over the dark headline panel; split,
-    // banded and the stacked portrait hero all put the lit stage up there.
-    if (wide && (spec.layout === "editorial" || spec.layout === "statement")) return false;
-    return true;
-  }
-  return false; // hook / price / benefit / outro → solid dark panel
-}
-
 export const ProductAd: React.FC<ProductAdProps> = (props) => {
   // `spec` is z.any() in the schema; treat it as the real type so this mirror
   // type-checks like the frontend source it mirrors.
@@ -750,18 +794,6 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
   const portrait = height > width;
   const wide = width > height * 1.2; // only 16:9 — square/vertical stack
   const u = Math.min(width, height) / 1080;
-
-  // Which scene is on screen now → whether the logo sits on a light or dark
-  // background, so it can knock out to the contrasting colour.
-  const activeScene = (() => {
-    let a = 0;
-    for (const s of spec.scenes) {
-      a += s.frames;
-      if (frame < a) return s;
-    }
-    return spec.scenes[spec.scenes.length - 1];
-  })();
-  const logoOnStage = activeScene ? logoOverStage(activeScene, spec, wide) : false;
 
   let offset = 0;
   const total = spec.scenes.reduce((a, s) => a + s.frames, 0);
@@ -774,46 +806,19 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
         return (
           <Sequence key={i} from={from} durationInFrames={scene.frames} layout="none">
             <SceneStage index={i}>
-              <SceneView spec={spec} scene={scene} productImage={props.productImage} portrait={portrait} wide={wide} />
+              <SceneView
+                spec={spec}
+                scene={scene}
+                productImage={props.productImage}
+                portrait={portrait}
+                wide={wide}
+                brandLogo={props.brandLogo}
+                brandLogoKnockout={props.brandLogoKnockout}
+              />
             </SceneStage>
           </Sequence>
         );
       })}
-
-      {/* brand logo — small, top-right, all scenes. Knocked out to a flat
-          silhouette that flips with the background: ink-black over the light
-          product stage, white over the dark text panels. `brightness(0)`
-          flattens the mark to black (keeping its alpha + sizing); `invert(1)`
-          turns that white. No chip, no sticker — it reads like a clean monogram. */}
-      {props.brandLogo ? (
-        <AbsoluteFill>
-          <div
-            style={{
-              position: "absolute",
-              top: 46 * u,
-              right: 56 * u,
-              display: "flex",
-            }}
-          >
-            <Img
-              src={props.brandLogo}
-              crossOrigin="anonymous"
-              style={{
-                height: 38 * u,
-                width: "auto",
-                maxWidth: 200 * u,
-                objectFit: "contain",
-                display: "block",
-                // Only knock out a transparent cutout — an opaque logo would
-                // flatten to a solid block. Undefined = legacy cutouts, still knock.
-                ...(props.brandLogoKnockout !== false
-                  ? { filter: logoOnStage ? "brightness(0)" : "brightness(0) invert(1)" }
-                  : {}),
-              }}
-            />
-          </div>
-        </AbsoluteFill>
-      ) : null}
 
       {/* slim progress hairline */}
       <AbsoluteFill style={{ justifyContent: "flex-end" }}>
