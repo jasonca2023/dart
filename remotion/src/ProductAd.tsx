@@ -318,11 +318,12 @@ const Copy: React.FC<{ spec: AdSpec; color: string; u: number; portrait: boolean
 const HookScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const u = useUnit();
   const t = TEMPO[spec.tone];
-  // The hook scene is short and must settle+hold — cap the kinetic timing so even
-  // slow tones land the words with time to spare.
-  const hookT: Tempo = { ...t, dur: Math.min(t.dur, 24), stagger: Math.min(t.stagger, 5) };
+  // The hook owns the first ~3s — the single highest-leverage beat for retention.
+  // Snap it in fast (low dur/stagger so the words land in well under a second),
+  // big and bold, then hold. A thick accent rule swipes under it as the anchor.
+  const hookT: Tempo = { ...t, dur: Math.min(t.dur, 16), stagger: Math.min(t.stagger, 4) };
   const { panel, accent, text } = spec.palette;
-  const rule = useReveal(2 + hookT.stagger * 2.5, hookT);
+  const rule = useReveal(2 + hookT.stagger * 2, hookT);
   const m = margin(u, portrait);
   return (
     <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", padding: `0 ${m}px` }}>
@@ -330,18 +331,18 @@ const HookScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
         text={scene.text || ""}
         start={2}
         t={hookT}
-        fontSize={(portrait ? 76 : 108) * u}
-        weight={760}
+        fontSize={(portrait ? 84 : 122) * u}
+        weight={780}
         color={text}
-        letterSpacing={-3.2 * u}
+        letterSpacing={-3.6 * u}
         align="left"
         maxWidth="13ch"
       />
       <div
         style={{
-          marginTop: 42 * u,
-          width: interpolate(rule, [0, 1], [0, 124 * u]),
-          height: 3 * u,
+          marginTop: 44 * u,
+          width: interpolate(rule, [0, 1], [0, 132 * u]),
+          height: 4 * u,
           backgroundColor: accent,
         }}
       />
@@ -770,19 +771,33 @@ function fallbackSpec(props: ProductAdProps): AdSpec {
 
 // Subtle entry per scene so each beat lands as a cut-with-motion, not a hard cut.
 // Direction rotates by scene index for variety (slide-in / rise / scale).
-const SceneStage: React.FC<{ index: number; children: React.ReactNode }> = ({ index, children }) => {
+const SceneStage: React.FC<{
+  index: number;
+  frames: number;
+  exit: boolean;
+  children: React.ReactNode;
+}> = ({ index, frames, exit, children }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const e = spring({ frame, fps, durationInFrames: 14, config: { damping: 200 } });
   const mode = index % 3;
-  const tr =
-    mode === 0
-      ? `translateX(${interpolate(e, [0, 1], [26, 0])}px)`
-      : mode === 1
-        ? `translateY(${interpolate(e, [0, 1], [22, 0])}px)`
-        : `scale(${interpolate(e, [0, 1], [0.98, 1])})`;
+  // Cut-with-motion: in its last frames each beat eases out along its entry axis,
+  // accelerating away (transform only — no opacity dip), so a cut reads as a
+  // deliberate transition. The final scene (`exit` false) holds its frame.
+  const exitWindow = 7;
+  const er = exit && frames > exitWindow ? Math.max(0, (frame - (frames - exitWindow)) / exitWindow) : 0;
+  const ex = er * er; // ease-in → accelerate out
+  const tx = mode === 0 ? interpolate(e, [0, 1], [26, 0]) : 0;
+  const ty = mode === 1 ? interpolate(e, [0, 1], [22, 0]) : 0;
+  // Exit is a uniform, subtle push-out (scale) — not a translate, so a leaving
+  // beat never reveals a sliver of the dark panel behind a light stage scene.
+  const sc = (mode === 2 ? interpolate(e, [0, 1], [0.98, 1]) : 1) + ex * 0.02;
   const opacity = interpolate(e, [0, 0.45], [0, 1], { extrapolateRight: "clamp" });
-  return <AbsoluteFill style={{ transform: tr, opacity }}>{children}</AbsoluteFill>;
+  return (
+    <AbsoluteFill style={{ transform: `translateX(${tx}px) translateY(${ty}px) scale(${sc})`, opacity }}>
+      {children}
+    </AbsoluteFill>
+  );
 };
 
 export const ProductAd: React.FC<ProductAdProps> = (props) => {
@@ -805,7 +820,7 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
         offset += scene.frames;
         return (
           <Sequence key={i} from={from} durationInFrames={scene.frames} layout="none">
-            <SceneStage index={i}>
+            <SceneStage index={i} frames={scene.frames} exit={i < spec.scenes.length - 1}>
               <SceneView
                 spec={spec}
                 scene={scene}

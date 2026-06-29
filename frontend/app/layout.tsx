@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import {
   Bricolage_Grotesque,
   Hanken_Grotesk,
@@ -41,16 +41,29 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dart — One product link. One cinematic ad.",
+  title: "Dart — Product photo to finished ad, in your browser",
   description:
-    "Dart is an autonomous ad factory. Paste a product URL and get a 4K cinematic commercial featuring a virtual human with your real product. No actors, no editing, no delays.",
-  metadataBase: new URL("https://dart.example"),
+    "Dart turns a product photo into a short, on-brand animated ad — AI-written copy, your colours and logo, rendered free in your browser. No editing suite, no render farm.",
+  metadataBase: new URL("https://dart-frontend.blink-cursor.workers.dev"),
+  applicationName: "Dart",
   openGraph: {
-    title: "Dart — One product link. One cinematic ad.",
+    title: "Dart — Product photo to finished ad",
     description:
-      "Paste a product URL. Dart scrapes it, writes the script, and renders a 4K ad. Review and export.",
+      "Upload a product photo. Dart writes the copy, designs an on-brand look, and renders a short animated ad in your browser — then saves it to your library.",
     type: "website",
+    siteName: "Dart",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Dart — Product photo to finished ad",
+    description:
+      "A short, on-brand animated ad from one product photo. Rendered free, in your browser.",
+  },
+  // Favicon is auto-detected from app/icon.svg (file-convention metadata).
+};
+
+export const viewport: Viewport = {
+  themeColor: "#fdfcfc",
 };
 
 export default async function RootLayout({

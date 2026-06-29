@@ -49,7 +49,8 @@ export default function Home() {
       <div className="mb-10">
         <h1 className="t-heading">New ad</h1>
         <p className="mt-2 text-[16px] text-driftwood">
-          Upload a product photo — get a cinematic ad, rendered in your browser.
+          Upload a product photo — get a short, on-brand animated ad, rendered in
+          your browser.
         </p>
       </div>
 

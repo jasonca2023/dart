@@ -111,7 +111,7 @@ export function JobActions({
         <>
           <Button onClick={download} loading={busy === "download"}>
             <Download className="text-[18px]" />
-            Download 4K
+            Download
           </Button>
 
           <div className="relative" ref={menuRef}>
