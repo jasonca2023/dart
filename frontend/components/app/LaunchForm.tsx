@@ -211,7 +211,7 @@ export function LaunchForm() {
     if (!file) return;
     const p = await prepareLogo(file);
     if (!p) {
-      setError("Couldn’t read that logo — try a PNG or JPG under 10 MB.");
+      setError("Couldn’t read that logo. Try a PNG or JPG under 10 MB.");
       return;
     }
     setError(null);
@@ -350,7 +350,7 @@ export function LaunchForm() {
       <div className="flex flex-col gap-6">
         <Field
           label="Product image"
-          hint="A clear photo of your product — ideally on a plain background."
+          hint="A clear photo of your product, ideally on a plain background."
         >
           <ImagePicker file={imageFile} onChange={setImageFile} />
         </Field>
@@ -359,7 +359,7 @@ export function LaunchForm() {
           <Field label="Product title" htmlFor="title">
             <Input
               id="title"
-              placeholder="Aero Runner — Lightweight Trainer"
+              placeholder="Aero Runner: Lightweight Trainer"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -399,7 +399,7 @@ export function LaunchForm() {
           </div>
         </Field>
 
-        <Field label="Formats" hint="Pick any — each is rendered and saved.">
+        <Field label="Formats" hint="Pick any. Each is rendered and saved.">
           <div className="flex flex-wrap gap-1.5">
             {FORMATS.map((f) => (
               <button
@@ -452,7 +452,7 @@ export function LaunchForm() {
           </div>
         </Field>
 
-        <Field label="Brand kit" hint="Optional — saved on this device for next time.">
+        <Field label="Brand kit" hint="Optional. Saved on this device for next time.">
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex cursor-pointer items-center gap-2 rounded-full border border-ash bg-white py-1 pl-1 pr-3 text-[13px] text-ink">
               <input
@@ -580,7 +580,12 @@ export function LaunchForm() {
                   onClick={() => setVariant((v) => v + 1)}
                   className="inline-flex items-center gap-1.5 text-[12px] font-medium text-driftwood transition-colors duration-150 ease-out hover:text-ink"
                 >
-                  <Refresh className="text-[14px]" />
+                  <span
+                    className="inline-flex transition-transform duration-500 ease-out"
+                    style={{ transform: `rotate(${variant * 360}deg)` }}
+                  >
+                    <Refresh className="text-[14px]" />
+                  </span>
                   Shuffle look
                 </button>
               </div>
@@ -608,7 +613,7 @@ export function LaunchForm() {
           </dl>
           <p className="mt-5 border-t border-ash pt-4 text-[13px] leading-relaxed text-fog">
             A live preview from your photo. Generating removes the background and
-            renders the final video(s) in your browser — nothing leaves your
+            renders the final video(s) in your browser. Nothing leaves your
             control until you publish.
           </p>
         </div>

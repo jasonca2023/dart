@@ -5,7 +5,7 @@ import { AuthForm } from "@/components/app/AuthForm";
 import { TONE_ACCENTS } from "@/lib/adSpec";
 
 export const metadata = {
-  title: "Sign in — Dart",
+  title: "Sign in · Dart",
 };
 
 export default function AuthPage() {
@@ -24,7 +24,7 @@ export default function AuthPage() {
             One photo. One finished ad.
           </h2>
           <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-driftwood">
-            Sign in to turn a product photo into a finished ad — rendered in your
+            Sign in to turn a product photo into a finished ad, rendered in your
             browser and saved to your library.
           </p>
         </div>

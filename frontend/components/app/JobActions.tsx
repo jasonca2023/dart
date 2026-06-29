@@ -136,7 +136,7 @@ export function JobActions({
                   </button>
                 ))}
                 <p className="px-3 py-2 text-[12px] leading-snug text-fog">
-                  Opens a draft handoff — nothing publishes without your confirm.
+                  Opens a draft handoff. Nothing publishes without your confirm.
                 </p>
               </div>
             )}

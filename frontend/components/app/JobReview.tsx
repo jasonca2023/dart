@@ -358,7 +358,7 @@ export function JobReview({ id }: { id: string }) {
               <Spinner className="size-6 text-driftwood" />
               <p className="text-[15px] font-medium text-ink">Rendering your ad…</p>
               <p className="max-w-sm text-[13px] leading-relaxed text-driftwood">
-                Your browser is rendering the video. Keep this tab open — it
+                Your browser is rendering the video. Keep this tab open. It
                 takes a few seconds.
               </p>
             </div>

@@ -49,7 +49,7 @@ export default function Home() {
       <div className="mb-10">
         <h1 className="t-heading">New ad</h1>
         <p className="mt-2 text-[16px] text-driftwood">
-          Upload a product photo — get a short, polished animated ad, rendered in
+          Upload a product photo. Get a short, polished animated ad, rendered in
           your browser.
         </p>
       </div>

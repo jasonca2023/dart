@@ -30,7 +30,7 @@ export function Logo({ href = "/" }: { href?: string }) {
   return (
     <Link
       href={href}
-      aria-label="Dart — home"
+      aria-label="Dart home"
       className="inline-flex items-center gap-2 text-ink transition-opacity duration-150 ease-out hover:opacity-70"
     >
       <DartMark className="text-[20px]" />

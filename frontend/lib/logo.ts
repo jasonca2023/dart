@@ -12,7 +12,7 @@ export interface PreparedLogo {
   transparent: boolean; // is the result transparent (a real cutout) vs an opaque image?
 }
 
-const MAX = 440;
+const MAX = 800;
 
 function loadImage(file: File): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -89,21 +89,28 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
 
   let removed = false;
   if (!hasAlpha && useless) {
-    // Colour-key the backdrop *everywhere*, not just the edge-connected exterior.
-    // A letter's counter (the hole in A, O, R, e…) is an island of backdrop colour
-    // that no edge flood can reach, so an edge-only flood leaves it filled — which
-    // then shows as a solid blob once the mark is knocked out to a flat colour.
-    // Keying by colour clears those counters too. Safe here because `useless`
-    // already established the backdrop is a uniform neutral, i.e. pure background.
-    const tol2 = 52 * 52;
+    // Colour-key the backdrop *everywhere*, not just the edge-connected exterior,
+    // so a letter's counter (the hole in A, O, R, e…), an island of backdrop the
+    // edge flood can't reach, is cleared too. Ramp the alpha across a feathered
+    // band at the colour boundary rather than a binary cut, so letter edges stay
+    // anti-aliased — a hard cut looks choppy once the cutout is shown large (the
+    // end-card). Safe here because `useless` established a uniform neutral backdrop.
+    const inner2 = 28 * 28; // ≤ this far from the backdrop ⇒ fully cleared
+    const outer2 = 160 * 160; // ≥ this far ⇒ untouched (the mark itself)
+    const band = outer2 - inner2;
     let count = 0;
     for (let i = 0; i < N; i++) {
       const dr = px[i * 4] - mean[0];
       const dg = px[i * 4 + 1] - mean[1];
       const db = px[i * 4 + 2] - mean[2];
-      if (dr * dr + dg * dg + db * db <= tol2) {
-        px[i * 4 + 3] = 0;
+      const d2 = dr * dr + dg * dg + db * db;
+      if (d2 <= inner2) {
+        px[i * 4 + 3] = 0; // unambiguous backdrop
         count++;
+      } else if (d2 < outer2) {
+        // boundary pixel: ease the alpha from 0 (inner) to full (outer)
+        px[i * 4 + 3] = Math.round(px[i * 4 + 3] * ((d2 - inner2) / band));
+        if (d2 - inner2 < band * 0.5) count++;
       }
     }
     const frac = count / N;

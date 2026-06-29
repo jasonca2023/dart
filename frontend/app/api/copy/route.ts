@@ -26,15 +26,16 @@ export interface AdCopy {
 }
 
 const SYSTEM = `You are an expert advertising copywriter for short, silent product video ads.
-Write punchy, concrete copy that could ONLY describe THIS product — never generic filler that would fit any product.
+Write punchy, concrete copy that could ONLY describe THIS product, never generic filler that would fit any product.
 Match the requested tone. Do not invent specs, numbers, prices, or claims that aren't given.
-Keep every line SHORT and COMPLETE — never cut a line off mid-word, and never end with "…". Hard word caps:
+Use plain punctuation. Never use an em-dash (—); use a period or comma instead.
+Keep every line SHORT and COMPLETE. Never cut a line off mid-word, and never end with "…". Hard word caps:
 - eyebrow: 1-3 words
 - hook: 2-5 words
 - subhead: one short phrase, 9 words max
 - cta: 2-3 words (button text, e.g. "Shop now")
 "hook" is the opening line; "cta" is the closing button text.
-Output a SINGLE JSON object with exactly the keys "eyebrow", "hook", "subhead", "cta" and NOTHING else — no markdown, no preamble, no explanation, no second attempt. Stop after the closing brace.`;
+Output a SINGLE JSON object with exactly the keys "eyebrow", "hook", "subhead", "cta" and NOTHING else: no markdown, no preamble, no explanation, no second attempt. Stop after the closing brace.`;
 
 function clip(s: unknown, max: number): string | undefined {
   if (typeof s !== "string") return undefined;

@@ -2,7 +2,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { JobReview } from "@/components/app/JobReview";
 
 export const metadata = {
-  title: "Ad — Dart",
+  title: "Ad · Dart",
 };
 
 export default async function JobPage({

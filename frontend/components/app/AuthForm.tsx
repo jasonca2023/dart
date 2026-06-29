@@ -58,7 +58,7 @@ export function AuthForm() {
         if (error) throw error;
         // If email confirmation is on, there's no session yet.
         if (!data.session) {
-          setNotice("Account created — check your email to confirm, then sign in.");
+          setNotice("Account created. Check your email to confirm, then sign in.");
           setMode("signin");
           return;
         }

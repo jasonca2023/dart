@@ -26,7 +26,7 @@ export function StageProgress({ status }: { status: JobStatus }) {
   const activeStage = STAGES.find((s) => stageState(s.key, status) === "active");
   const headline =
     status === "queued"
-      ? "Queued — starting up"
+      ? "Queued, starting up"
       : activeStage?.verb ?? "Working";
 
   return (

@@ -41,21 +41,21 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dart — Product photo to finished ad, in your browser",
+  title: "Dart · Product photo to finished ad, in your browser",
   description:
-    "Dart turns a product photo into a short, polished animated ad — AI-written copy, your colours and logo, rendered free in your browser. No editing suite, no render farm.",
+    "Dart turns a product photo into a short, polished animated ad: AI-written copy, your colours and logo, rendered free in your browser. No editing suite, no render farm.",
   metadataBase: new URL("https://dart-frontend.blink-cursor.workers.dev"),
   applicationName: "Dart",
   openGraph: {
-    title: "Dart — Product photo to finished ad",
+    title: "Dart · Product photo to finished ad",
     description:
-      "Upload a product photo. Dart writes the copy, designs a look in your colours, and renders a short animated ad in your browser — then saves it to your library.",
+      "Upload a product photo. Dart writes the copy, designs a look in your colours, and renders a short animated ad in your browser, then saves it to your library.",
     type: "website",
     siteName: "Dart",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Dart — Product photo to finished ad",
+    title: "Dart · Product photo to finished ad",
     description:
       "A short, polished animated ad from one product photo. Rendered free, in your browser.",
   },

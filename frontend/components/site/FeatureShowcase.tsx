@@ -55,7 +55,7 @@ export function FeatureShowcase() {
           </h2>
           <p className="mt-5 max-w-md text-[16px] leading-relaxed text-driftwood">
             Upload your product photo and Dart composes a short, polished animated
-            ad around it — motion, type and your branding. When it's ready, you see
+            ad around it: motion, type and your branding. When it's ready, you see
             the finished video right away, saved to your library.
           </p>
           <ul className="mt-6 flex flex-col gap-3">

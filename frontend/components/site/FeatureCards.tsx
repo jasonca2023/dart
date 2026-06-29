@@ -4,12 +4,12 @@ const CARDS = [
   {
     icon: Frame,
     title: "From photo to ad",
-    body: "Upload one product image and Dart composes a short, polished animated ad around it — dynamic motion, clean type and your branding, no editing suite required.",
+    body: "Upload one product image and Dart composes a short, polished animated ad around it: dynamic motion, clean type and your branding, no editing suite required.",
   },
   {
     icon: Clock,
     title: "Saved to your library",
-    body: "Every ad — the finished video, the product and the settings — is kept in your account, so nothing is lost and you can come back to it anytime.",
+    body: "Every ad keeps its finished video, product and settings in your account, so nothing is lost and you can come back to it anytime.",
   },
   {
     icon: Bolt,

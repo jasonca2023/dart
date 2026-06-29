@@ -24,7 +24,7 @@ export function Hero() {
       >
         Dart <span className="hero-em">writes the copy</span>, designs a look in{" "}
         <span className="hero-em">your colours</span>, and renders a short
-        animated ad around your <span className="hero-em">real product</span> —
+        animated ad around your <span className="hero-em">real product</span>,
         right in your browser. No editing suite, no render farm.
       </p>
 

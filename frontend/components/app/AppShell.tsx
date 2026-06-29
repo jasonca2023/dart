@@ -26,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="ml-auto flex items-center gap-3">
             {USING_MOCK && (
               <span
-                title="No backend connected — running the local mock pipeline."
+                title="No backend connected. Running the local mock pipeline."
                 className="hidden items-center gap-1.5 rounded-full border border-ash bg-sand px-2.5 py-1 font-mono text-[11px] text-driftwood sm:inline-flex"
               >
                 <span className="size-1.5 rounded-full bg-fog" />

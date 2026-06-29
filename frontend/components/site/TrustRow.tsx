@@ -6,7 +6,7 @@ export function TrustRow() {
   return (
     <section className="mx-auto max-w-[var(--page-max)] px-5 pb-8 sm:px-8">
       <p className="mb-4 text-center text-[14px] text-driftwood">
-        Reads the stores you already sell on — hands off where you advertise
+        For the channels you already sell and advertise on
       </p>
       <div className="rounded-card bg-sand px-6 py-7">
         <ul className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 md:grid-cols-6">
