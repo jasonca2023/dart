@@ -564,25 +564,16 @@ export function LaunchForm() {
                 />
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span className="flex min-w-0 items-center gap-2">
-                  {/* small mood ball — stays visible alongside the preview */}
-                  <Orb
-                    accent={previewSpecFinal.palette.accent}
-                    className="size-6 shrink-0"
-                    float={false}
-                  />
-                  <span
-                    className={
-                      "truncate text-[12px] text-fog " +
-                      (aiLoading ? "animate-pulse" : "")
-                    }
-                  >
-                    {aiLoading
-                      ? "Writing copy with AI…"
-                      : aiCopy
-                        ? "AI-written copy"
-                        : ""}
-                  </span>
+                <span
+                  className={
+                    "text-[12px] text-fog " + (aiLoading ? "animate-pulse" : "")
+                  }
+                >
+                  {aiLoading
+                    ? "Writing copy with AI…"
+                    : aiCopy
+                      ? "AI-written copy"
+                      : ""}
                 </span>
                 <button
                   type="button"
@@ -608,7 +599,9 @@ export function LaunchForm() {
           <dl className="mt-6 flex flex-col gap-3 text-[14px]">
             <div className="flex justify-between">
               <dt className="text-driftwood">Mood</dt>
-              <dd className="font-mono capitalize text-ink">
+              <dd className="flex items-center gap-2 font-mono capitalize text-ink">
+                {/* small mood ball — tinted to the mood's accent */}
+                <Orb accent={moodSpec.palette.accent} className="size-5 shrink-0" float={false} />
                 {moodSpec.tone} · {moodSpec.layout}
               </dd>
             </div>
