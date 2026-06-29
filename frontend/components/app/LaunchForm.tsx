@@ -564,16 +564,25 @@ export function LaunchForm() {
                 />
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span
-                  className={
-                    "text-[12px] text-fog " + (aiLoading ? "animate-pulse" : "")
-                  }
-                >
-                  {aiLoading
-                    ? "Writing copy with AI…"
-                    : aiCopy
-                      ? "AI-written copy"
-                      : ""}
+                <span className="flex min-w-0 items-center gap-2">
+                  {/* small mood ball — stays visible alongside the preview */}
+                  <Orb
+                    accent={previewSpecFinal.palette.accent}
+                    className="size-6 shrink-0"
+                    float={false}
+                  />
+                  <span
+                    className={
+                      "truncate text-[12px] text-fog " +
+                      (aiLoading ? "animate-pulse" : "")
+                    }
+                  >
+                    {aiLoading
+                      ? "Writing copy with AI…"
+                      : aiCopy
+                        ? "AI-written copy"
+                        : ""}
+                  </span>
                 </span>
                 <button
                   type="button"
