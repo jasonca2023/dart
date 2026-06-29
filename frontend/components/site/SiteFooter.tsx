@@ -27,7 +27,7 @@ export function SiteFooter() {
           <div className="max-w-xs">
             <Logo />
             <p className="mt-4 text-[14px] leading-relaxed text-driftwood">
-              A one-click ad factory. One product photo in, one on-brand animated
+              A one-click ad factory. One product photo in, one finished animated
               ad out.
             </p>
           </div>

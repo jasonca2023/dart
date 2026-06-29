@@ -21,7 +21,7 @@ export default function AuthPage() {
             <Orb accent={TONE_ACCENTS.energetic} className="size-20" />
           </div>
           <h2 className="t-heading-lg max-w-[14ch]">
-            One photo. One on-brand ad.
+            One photo. One finished ad.
           </h2>
           <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-driftwood">
             Sign in to turn a product photo into a finished ad — rendered in your

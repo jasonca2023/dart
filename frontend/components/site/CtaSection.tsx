@@ -8,7 +8,7 @@ export function CtaSection() {
           Your next ad is one upload away.
         </h2>
         <p className="mt-5 max-w-md text-[16px] leading-relaxed text-driftwood">
-          Upload a product image. Dart composes a short, on-brand animated ad
+          Upload a product image. Dart composes a short, polished animated ad
           around it — saved straight to your library, ready to post.
         </p>
         <div className="mt-8 flex w-full justify-center">

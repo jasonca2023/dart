@@ -16,14 +16,14 @@ export function Hero() {
         style={{ "--d": "90ms" } as React.CSSProperties}
       >
         One product photo.{" "}
-        <span className="hero-accent">One on-brand ad.</span>
+        <span className="hero-accent">One finished ad.</span>
       </h1>
       <p
         className="hero-rise mx-auto mt-6 max-w-xl text-[18px] leading-relaxed text-driftwood"
         style={{ "--d": "180ms" } as React.CSSProperties}
       >
-        Dart <span className="hero-em">writes the copy</span>, designs an{" "}
-        <span className="hero-em">on-brand look</span>, and renders a short
+        Dart <span className="hero-em">writes the copy</span>, designs a look in{" "}
+        <span className="hero-em">your colours</span>, and renders a short
         animated ad around your <span className="hero-em">real product</span> —
         right in your browser. No editing suite, no render farm.
       </p>

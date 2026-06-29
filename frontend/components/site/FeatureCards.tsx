@@ -4,7 +4,7 @@ const CARDS = [
   {
     icon: Frame,
     title: "From photo to ad",
-    body: "Upload one product image and Dart composes a short, on-brand animated ad around it — dynamic motion, clean type and your branding, no editing suite required.",
+    body: "Upload one product image and Dart composes a short, polished animated ad around it — dynamic motion, clean type and your branding, no editing suite required.",
   },
   {
     icon: Clock,

@@ -107,7 +107,7 @@ const STAGES: Stage[] = [
     key: "write",
     tab: "Write",
     title: "Writes the copy, picks the look.",
-    body: "AI writes a hook, headline and CTA, then Dart chooses an on-brand mood — palette, type and layout — tuned to the audience you pick.",
+    body: "AI writes a hook, headline and CTA, then Dart shapes the look — palette, type and layout — to your brand and the audience you pick.",
     visual: <ScriptVisual />,
   },
   {
