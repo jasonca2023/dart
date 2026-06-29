@@ -12,13 +12,13 @@ interface Stage {
   visual: React.ReactNode;
 }
 
-function ScrapeVisual() {
+function InputsVisual() {
   const rows: [string, string][] = [
     ["title", '"Aero Runner"'],
-    ["price", "14800"],
-    ["currency", '"USD"'],
-    ["specs.weight", '"238 g"'],
-    ["source", '"shopify"'],
+    ["audience", '"Runners"'],
+    ["price", '"$148"'],
+    ["format", '"16:9 · 9:16"'],
+    ["length", '"10s"'],
   ];
   return (
     <div className="font-mono text-[13px] leading-[1.7] text-driftwood">
@@ -34,10 +34,10 @@ function ScrapeVisual() {
 
 function ScriptVisual() {
   const scenes: [string, string][] = [
-    ["0–3s", "slow push-in"],
-    ["3–6s", "orbit-left"],
-    ["6–8s", "handheld follow"],
-    ["8–10s", "locked-off hero"],
+    ["0–3s", "hook"],
+    ["3–6s", "product hero"],
+    ["6–8s", "feature"],
+    ["8–10s", "brand sign-off"],
   ];
   return (
     <ul className="flex flex-col gap-2.5">
@@ -61,7 +61,7 @@ function RenderVisual() {
           <div className="h-full w-full rounded-full bg-ink" />
         </div>
         <div className="mt-3 flex gap-2">
-          {["2160p", "16:9", "10s"].map((c) => (
+          {["1080p", "16:9", "10s"].map((c) => (
             <span
               key={c}
               className="rounded-full border border-ash bg-white px-2.5 py-1 font-mono text-[11px] text-driftwood"
@@ -78,7 +78,7 @@ function RenderVisual() {
 function ExportVisual() {
   return (
     <div className="flex flex-wrap gap-2.5">
-      {["Download 4K", "TikTok Ads", "Meta Ads Manager"].map((d, i) => (
+      {["Download MP4", "TikTok Ads", "Meta Ads Manager"].map((d, i) => (
         <span
           key={d}
           className={
@@ -97,31 +97,31 @@ function ExportVisual() {
 
 const STAGES: Stage[] = [
   {
-    key: "scrape",
-    tab: "Scrape",
-    title: "Reads the page like a buyer would.",
-    body: "Dart pulls the title, price, specs and hero image straight from the product URL — Shopify, Amazon, or any page with structured data. No image, no job.",
-    visual: <ScrapeVisual />,
+    key: "upload",
+    tab: "Upload",
+    title: "Start with a product photo.",
+    body: "Drop in your product image and a few words — title, audience, price, length. No URL, no scraping, no asset library to wrangle.",
+    visual: <InputsVisual />,
   },
   {
-    key: "script",
-    tab: "Script",
-    title: "Directs the scene before a frame is shot.",
-    body: "A multimodal model turns the product into a shot list — camera moves, timing and a hero beat — tuned to the audience you choose. Structured, not prose.",
+    key: "write",
+    tab: "Write",
+    title: "Writes the copy, picks the look.",
+    body: "AI writes a hook, headline and CTA, then Dart chooses an on-brand mood — palette, type and layout — tuned to the audience you pick.",
     visual: <ScriptVisual />,
   },
   {
     key: "render",
     tab: "Render",
-    title: "Films it in 4K.",
-    body: "The shot list and the product image go to the video engine. Dart polls until the cut lands and stores the artifact — and the cost — against the job.",
+    title: "Renders in your browser.",
+    body: "Dart removes the product background, loads real fonts and renders every format with WebCodecs — free, and nothing leaves your machine until you publish.",
     visual: <RenderVisual />,
   },
   {
     key: "export",
     tab: "Export",
-    title: "Review, then publish on your terms.",
-    body: "Preview the cut with the exact script and product data behind it. Regenerate if it misses. Hand off to TikTok or Meta — or just download the file.",
+    title: "Save, download, hand off.",
+    body: "Every ad saves to your library and plays on any device. Download the MP4, or open a handoff to TikTok, Meta or YouTube.",
     visual: <ExportVisual />,
   },
 ];

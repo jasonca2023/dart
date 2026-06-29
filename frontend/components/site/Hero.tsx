@@ -9,24 +9,23 @@ export function Hero() {
         style={{ "--d": "0ms" } as React.CSSProperties}
       >
         <span className="hero-live-dot" aria-hidden />
-        Autonomous ad factory
+        One-click ad factory
       </p>
       <h1
         className="hero-rise mx-auto mt-5 max-w-[16ch] text-balance font-display text-[2.5rem] font-light leading-[1.05] tracking-[-0.025em] sm:text-[3.5rem] lg:text-[4.25rem]"
         style={{ "--d": "90ms" } as React.CSSProperties}
       >
-        One product link.{" "}
-        <span className="hero-accent">One cinematic ad.</span>
+        One product photo.{" "}
+        <span className="hero-accent">One on-brand ad.</span>
       </h1>
       <p
         className="hero-rise mx-auto mt-6 max-w-xl text-[18px] leading-relaxed text-driftwood"
         style={{ "--d": "180ms" } as React.CSSProperties}
       >
-        Dart reads your product page, directs the scene, and renders a{" "}
-        <span className="hero-em">4K commercial</span> — a{" "}
-        <span className="hero-em">virtual human</span> holding your{" "}
-        <span className="hero-em">real product</span>. No actors, no shoot, no
-        editing.
+        Dart <span className="hero-em">writes the copy</span>, designs an{" "}
+        <span className="hero-em">on-brand look</span>, and renders a short
+        animated ad around your <span className="hero-em">real product</span> —
+        right in your browser. No editing suite, no render farm.
       </p>
 
       {/* 3D centerpiece — glass orb, orbiting motion graphics */}
@@ -43,7 +42,7 @@ export function Hero() {
       >
         <SignInCta />
         <p className="font-mono text-[12px] text-fog">
-          4K render · 3–20s · 16:9 / 9:16 · review before you publish
+          Rendered free in-browser · 3–20s · 16:9 · 9:16 · 1:1 · 4:5
         </p>
       </div>
     </section>

@@ -27,7 +27,7 @@ export function SiteFooter() {
           <div className="max-w-xs">
             <Logo />
             <p className="mt-4 text-[14px] leading-relaxed text-driftwood">
-              An autonomous ad factory. One product link in, one cinematic 4K
+              A one-click ad factory. One product photo in, one on-brand animated
               ad out.
             </p>
           </div>

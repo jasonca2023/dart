@@ -4,7 +4,7 @@ const CARDS = [
   {
     icon: Frame,
     title: "From photo to ad",
-    body: "Upload one product image and Dart composes a cinematic ad around it — dynamic motion, clean type and your branding, no editing suite required.",
+    body: "Upload one product image and Dart composes a short, on-brand animated ad around it — dynamic motion, clean type and your branding, no editing suite required.",
   },
   {
     icon: Clock,
@@ -14,7 +14,7 @@ const CARDS = [
   {
     icon: Bolt,
     title: "Ready for any channel",
-    body: "Make ads on demand in 16:9 or 9:16, then post straight to your feed, story or reel.",
+    body: "Make ads on demand in 16:9, 9:16, 1:1 or 4:5, then post straight to your feed, story or reel.",
   },
 ];
 

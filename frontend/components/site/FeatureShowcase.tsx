@@ -54,15 +54,15 @@ export function FeatureShowcase() {
             You stay in the loop. Always.
           </h2>
           <p className="mt-5 max-w-md text-[16px] leading-relaxed text-driftwood">
-            Upload your product photo and Dart composes a cinematic ad around it —
-            motion, type and your branding. When it's ready, you see the finished
-            video right away, saved to your library.
+            Upload your product photo and Dart composes a short, on-brand animated
+            ad around it — motion, type and your branding. When it's ready, you see
+            the finished video right away, saved to your library.
           </p>
           <ul className="mt-6 flex flex-col gap-3">
             {[
-              "A polished cinematic ad from a single product photo",
+              "A polished, on-brand ad from a single product photo",
               "Every ad saved to your library automatically",
-              "Export in 16:9 or 9:16 for any channel",
+              "Export in 16:9, 9:16, 1:1 or 4:5 for any channel",
             ].map((t) => (
               <li key={t} className="flex items-start gap-3 text-[15px] text-ink">
                 <Check className="mt-0.5 shrink-0 text-[18px] text-driftwood" />
