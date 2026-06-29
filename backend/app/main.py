@@ -95,19 +95,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def proxy_image(url: str = Query(...)) -> Response:
         # Re-serves an external product image same-origin (with CORS) so the
         # browser can draw it into the Remotion canvas without tainting it.
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            raise DartError(INVALID_URL, "Bad image url.", status=400)
-        if not _is_public_host(parsed.hostname):
-            raise DartError(INVALID_URL, "Image host is not allowed.", status=400)
         try:
             import httpx
 
+            # Follow redirects manually so EVERY hop's host is re-checked — an
+            # auto-followed redirect to 169.254.169.254 (cloud metadata) or a
+            # private IP would otherwise bypass the initial SSRF guard.
             async with httpx.AsyncClient(
-                timeout=20.0, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"}
+                timeout=20.0, follow_redirects=False, headers={"User-Agent": "Mozilla/5.0"}
             ) as client:
-                r = await client.get(url)
+                current = url
+                r = None
+                for _ in range(5):
+                    p = urlparse(current)
+                    if p.scheme not in ("http", "https") or not p.netloc:
+                        raise DartError(INVALID_URL, "Bad image url.", status=400)
+                    if not _is_public_host(p.hostname):
+                        raise DartError(INVALID_URL, "Image host is not allowed.", status=400)
+                    r = await client.get(current)
+                    if r.is_redirect and "location" in r.headers:
+                        current = str(httpx.URL(current).join(r.headers["location"]))
+                        continue
+                    break
+                else:
+                    raise DartError(SCRAPE_FAILED, "Too many redirects.", status=502)
                 r.raise_for_status()
+        except DartError:
+            raise
         except Exception as e:
             raise DartError(SCRAPE_FAILED, "Could not fetch image.", status=502) from e
         media_type = r.headers.get("content-type", "image/jpeg")
@@ -142,6 +156,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 UNAUTHORIZED, "Invalid or expired session token.", status=401
             )
 
+        # The id is a client-generated UUID, but never trust it: it flows into
+        # Storage object keys and the row id. Strip to UUID-safe chars so it can't
+        # carry "/" or ".." into a path (a legit UUID is unchanged).
+        safe_id = "".join(c for c in id if c.isalnum() or c in "-_") or "ad"
+
         base = settings.supabase_url.rstrip("/")
         key = settings.supabase_service_key
         auth = {"Authorization": f"Bearer {key}", "apikey": key}
@@ -157,7 +176,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 img_bytes = await image.read()
                 ext = (image.filename or "img.png").rsplit(".", 1)[-1].lower()
                 ext = "".join(c for c in ext if c.isalnum()) or "png"
-                img_path = f"{user_id}/img-{id}.{ext}"
+                img_path = f"{user_id}/img-{safe_id}.{ext}"
                 r = await client.post(
                     f"{base}/storage/v1/object/{VIDEO_BUCKET}/{img_path}",
                     headers={
@@ -174,7 +193,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             vid_bytes = await video.read()
             vid_type = video.content_type or "video/mp4"
             vid_ext = "webm" if "webm" in vid_type else "mp4"
-            vid_path = f"{user_id}/{id}.{vid_ext}"
+            vid_path = f"{user_id}/{safe_id}.{vid_ext}"
             r = await client.post(
                 f"{base}/storage/v1/object/{VIDEO_BUCKET}/{vid_path}",
                 headers={**auth, "x-upsert": "true", "Content-Type": vid_type},
@@ -185,7 +204,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             video_url = public_url(vid_path)
 
             row = {
-                "id": id,
+                "id": safe_id,
                 "user_id": user_id,
                 "product_url": "",
                 "target_audience": target_audience or None,

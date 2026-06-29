@@ -90,12 +90,15 @@ export function useAiCopy(
   const [loading, setLoading] = useState(false);
   const reqId = useRef(0);
   useEffect(() => {
+    // Claim a request id first so this run invalidates any in-flight response —
+    // otherwise disabling (e.g. the image is removed) lets a late reply overwrite
+    // the cleared copy.
+    const id = ++reqId.current;
     if (!enabled || !debounced.title.trim()) {
       setCopy(null);
       setLoading(false);
       return;
     }
-    const id = ++reqId.current;
     setLoading(true);
     generateCopy(debounced).then((c) => {
       if (id !== reqId.current) return;

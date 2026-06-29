@@ -47,11 +47,13 @@ export async function renderAdInBrowser(props: ProductAdProps): Promise<Blob> {
     import("./remotion/fonts"),
   ]);
   // Wait for the real webfonts before rasterizing (cap at 5s so a slow/blocked
-  // font never stalls a render — the fallback stack renders either way).
+  // font never stalls a render — the fallback stack renders either way). The
+  // `.catch` matters too: if a font load *rejects*, we still proceed rather than
+  // letting the rejection fail the whole render.
   await Promise.race([
     fontsReady,
     new Promise((resolve) => setTimeout(resolve, 5000)),
-  ]);
+  ]).catch(() => {});
   return renderComponentInBrowser(
     ProductAd as unknown as React.FC<Record<string, unknown>>,
     props as unknown as Record<string, unknown>,
