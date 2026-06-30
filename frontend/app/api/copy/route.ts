@@ -95,7 +95,10 @@ function validName(v: unknown, title: string): string | undefined {
   const words = (s: string) => s.toLowerCase().match(/[a-z0-9]+/g) ?? [];
   const nameWords = words(name);
   const titleWords = words(title);
-  if (nameWords.length === 0) return undefined;
+  // Empty, or barely-trimmed (the model ignored the 2-6 word cap and echoed most of
+  // the title) → reject so we fall back to the deterministic coreName rather than
+  // headline a long name that just gets clipped to "…".
+  if (nameWords.length === 0 || name.trim().split(/\s+/).length > 6) return undefined;
   let ti = 0;
   for (const w of nameWords) {
     while (ti < titleWords.length && titleWords[ti] !== w) ti++;
