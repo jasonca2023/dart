@@ -60,6 +60,31 @@ def _is_public_host(host: str | None) -> bool:
     return True
 
 
+async def _ssrf_safe_get(url: str, *, max_redirects: int = 5):
+    """GET `url`, following redirects manually and re-validating every hop's host
+    against private/loopback/link-local ranges (SSRF guard). Raises DartError on a
+    disallowed host, a bad scheme, or too many redirects.
+    """
+    import httpx
+
+    async with httpx.AsyncClient(
+        timeout=20.0, follow_redirects=False, headers={"User-Agent": "Mozilla/5.0"}
+    ) as client:
+        current = url
+        for _ in range(max_redirects):
+            p = urlparse(current)
+            if p.scheme not in ("http", "https") or not p.netloc:
+                raise DartError(INVALID_URL, "Bad url.", status=400)
+            if not _is_public_host(p.hostname):
+                raise DartError(INVALID_URL, "Host is not allowed.", status=400)
+            r = await client.get(current)
+            if r.is_redirect and "location" in r.headers:
+                current = str(httpx.URL(current).join(r.headers["location"]))
+                continue
+            return r
+        raise DartError(SCRAPE_FAILED, "Too many redirects.", status=502)
+
+
 VIDEO_BUCKET = "dart-videos"
 
 
@@ -96,30 +121,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Re-serves an external product image same-origin (with CORS) so the
         # browser can draw it into the Remotion canvas without tainting it.
         try:
-            import httpx
-
-            # Follow redirects manually so EVERY hop's host is re-checked — an
-            # auto-followed redirect to 169.254.169.254 (cloud metadata) or a
-            # private IP would otherwise bypass the initial SSRF guard.
-            async with httpx.AsyncClient(
-                timeout=20.0, follow_redirects=False, headers={"User-Agent": "Mozilla/5.0"}
-            ) as client:
-                current = url
-                r = None
-                for _ in range(5):
-                    p = urlparse(current)
-                    if p.scheme not in ("http", "https") or not p.netloc:
-                        raise DartError(INVALID_URL, "Bad image url.", status=400)
-                    if not _is_public_host(p.hostname):
-                        raise DartError(INVALID_URL, "Image host is not allowed.", status=400)
-                    r = await client.get(current)
-                    if r.is_redirect and "location" in r.headers:
-                        current = str(httpx.URL(current).join(r.headers["location"]))
-                        continue
-                    break
-                else:
-                    raise DartError(SCRAPE_FAILED, "Too many redirects.", status=502)
-                r.raise_for_status()
+            r = await _ssrf_safe_get(url)
+            r.raise_for_status()
         except DartError:
             raise
         except Exception as e:
@@ -128,6 +131,45 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not media_type.startswith("image/"):
             raise DartError(SCRAPE_FAILED, "URL is not an image.", status=400)
         return Response(content=r.content, media_type=media_type)
+
+    @app.get("/store-products")
+    async def store_products(url: str = Query(...)) -> dict:
+        # Pull a store's PUBLIC Shopify products feed (`/products.json`) so a merchant
+        # can batch-generate ads for their whole catalogue — no app, no OAuth, no key.
+        # SSRF-guarded like the image proxy.
+        parsed = urlparse(url if "://" in url else f"https://{url}")
+        if not parsed.netloc:
+            raise DartError(INVALID_URL, "Enter your store URL.", status=400)
+        feed = f"https://{parsed.netloc}/products.json?limit=100"
+        try:
+            r = await _ssrf_safe_get(feed)
+            r.raise_for_status()
+            data = r.json()
+        except DartError:
+            raise
+        except Exception as e:
+            raise DartError(
+                SCRAPE_FAILED,
+                "Couldn't read that store — it needs a public Shopify products feed.",
+                status=502,
+            ) from e
+
+        out: list[dict] = []
+        for p in (data.get("products") or [])[:100]:
+            images = p.get("images") or []
+            variants = p.get("variants") or []
+            image = images[0].get("src") if images and isinstance(images[0], dict) else None
+            price = variants[0].get("price") if variants and isinstance(variants[0], dict) else None
+            title = p.get("title")
+            if title and image:
+                out.append(
+                    {
+                        "title": str(title),
+                        "image": str(image),
+                        "price": f"${price}" if price else "",
+                    }
+                )
+        return {"products": out}
 
     @app.post("/save-ad")
     async def save_ad(

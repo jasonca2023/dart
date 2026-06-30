@@ -10,7 +10,7 @@ import { CtaSection } from "@/components/site/CtaSection";
 import { Reveal } from "@/components/Reveal";
 import { HomeSwitch } from "@/components/app/HomeSwitch";
 import { AppShell } from "@/components/app/AppShell";
-import { LaunchForm } from "@/components/app/LaunchForm";
+import { Generate } from "@/components/app/Generate";
 import { RecentJobs } from "@/components/app/RecentJobs";
 
 export default function Home() {
@@ -46,15 +46,7 @@ export default function Home() {
   // Signed-in: the app — generate, plus the user's saved ads.
   const app = (
     <AppShell>
-      <div className="mb-10">
-        <h1 className="t-heading">New ad</h1>
-        <p className="mt-2 text-[16px] text-driftwood">
-          Upload a product photo. Get a short, polished animated ad, rendered in
-          your browser.
-        </p>
-      </div>
-
-      <LaunchForm />
+      <Generate />
 
       <section className="mt-16">
         <div className="mb-5 flex items-baseline justify-between">
