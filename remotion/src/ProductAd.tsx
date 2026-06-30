@@ -807,13 +807,10 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
   // type-checks like the frontend source it mirrors.
   const spec: AdSpec = (props.spec as AdSpec | undefined) ?? fallbackSpec(props);
   const { width, height } = useVideoConfig();
-  const frame = useCurrentFrame();
   const portrait = height > width;
   const wide = width > height * 1.2; // only 16:9 — square/vertical stack
-  const u = Math.min(width, height) / 1080;
 
   let offset = 0;
-  const total = spec.scenes.reduce((a, s) => a + s.frames, 0);
 
   return (
     <AbsoluteFill style={{ backgroundColor: spec.palette.panel, fontFamily: FONT_FAMILY[spec.font] }}>
@@ -836,19 +833,6 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
           </Sequence>
         );
       })}
-
-      {/* slim progress hairline */}
-      <AbsoluteFill style={{ justifyContent: "flex-end" }}>
-        <div style={{ height: 3 * u, backgroundColor: "#ffffff14" }}>
-          <div
-            style={{
-              height: "100%",
-              width: `${Math.min(100, (frame / Math.max(1, total)) * 100)}%`,
-              backgroundColor: spec.palette.accent,
-            }}
-          />
-        </div>
-      </AbsoluteFill>
     </AbsoluteFill>
   );
 };

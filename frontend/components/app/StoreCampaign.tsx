@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { API_BASE } from "@/lib/api";
-import { fetchStoreProducts, type StoreProduct } from "@/lib/store";
+import { fetchStoreProducts, fetchStoreLogo, type StoreProduct } from "@/lib/store";
+import type { PreparedLogo } from "@/lib/logo";
 import { buildAdSpec } from "@/lib/adSpec";
 import { generateCopy, applyCopy } from "@/lib/copy";
-import { applyBrand, loadBrandKit, type BrandKit } from "@/lib/brand";
 import { removeProductBackground } from "@/lib/bgRemove";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
@@ -38,13 +38,11 @@ export function StoreCampaign() {
   const [audience, setAudience] = useState("");
   const [formats, setFormats] = useState<AspectRatio[]>(["9:16"]);
   const [duration, setDuration] = useState<Duration>(10);
-  const [brand, setBrand] = useState<BrandKit>({});
+  const [storeLogo, setStoreLogo] = useState<PreparedLogo | null>(null);
 
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => setBrand(loadBrandKit()), []);
 
   const total = useMemo(() => picked.size * formats.length, [picked, formats]);
 
@@ -56,6 +54,9 @@ export function StoreCampaign() {
       const list = await fetchStoreProducts(storeUrl);
       setProducts(list);
       setPicked(new Set()); // start empty — the user picks what to turn into ads
+      // Pull the store's own brand mark for the end-card (best-effort).
+      setStoreLogo(null);
+      fetchStoreLogo(storeUrl).then(setStoreLogo);
       if (list.length === 0) setError("No products found in that store's public feed.");
     } catch (err) {
       setProducts(null);
@@ -125,7 +126,7 @@ export function StoreCampaign() {
             price: product.price,
             tone: baseSpec.tone,
           });
-          const spec = applyBrand(applyCopy(baseSpec, copy), brand);
+          const spec = applyCopy(baseSpec, copy);
 
           for (const fmt of formats) {
             const id = crypto.randomUUID();
@@ -139,8 +140,8 @@ export function StoreCampaign() {
               durationInSeconds: duration,
               aspectRatio: fmt,
               accent: spec.palette.accent,
-              brandLogo: brand.logo,
-              brandLogoKnockout: brand.logoTransparent,
+              brandLogo: storeLogo?.cutout,
+              brandLogoKnockout: storeLogo?.transparent,
               spec,
             });
             const job: Job = {
