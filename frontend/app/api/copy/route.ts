@@ -31,7 +31,7 @@ Write punchy, concrete copy that could ONLY describe THIS product, never generic
 Match the requested tone. Do not invent specs, numbers, prices, or claims that aren't given.
 Use plain punctuation. Never use an em-dash (—); use a period or comma instead.
 Keep every line SHORT and COMPLETE. Never cut a line off mid-word, and never end with "…". Hard word caps:
-- name: the core product, meaning its product type and edition or model. Read the WHOLE title and drop every colour, size, material, capacity, pack count, condition and marketing or variant word WHEREVER it sits (start, middle, end, parentheses, or after a dash or slash), keeping only the words a shopper would actually use to name the product. Copy the kept words verbatim from the title in their original order; never invent, translate, or reorder. 2 to 6 words. Example: "Sony WH-1000XM5 Wireless Noise Cancelling Black Headphones" becomes "Sony WH-1000XM5 Headphones".
+- name: the core product, meaning its product type and edition or model. Read the WHOLE title and drop every colour, size, material, capacity, pack count, condition and marketing or variant word WHEREVER it sits (start, middle, end, parentheses, or after a dash or slash), keeping only the words a shopper would actually use to name the product. ALWAYS keep the brand and any audience or gender qualifier (Men's, Women's, Kids', Unisex, Youth) — those are part of the name, not noise. Copy the kept words verbatim from the title in their original order; never invent, translate, or reorder. 2 to 6 words. Examples: "Sony WH-1000XM5 Wireless Noise Cancelling Black Headphones" becomes "Sony WH-1000XM5 Headphones"; "Men's Strider - Natural Black (Natural Black Sole)" becomes "Men's Strider".
 - eyebrow: 1-3 words
 - hook: 2-5 words
 - subhead: one short phrase, 9 words max. Describe the product itself, not its colour or variant.
@@ -101,11 +101,21 @@ function validName(v: unknown, title: string): string | undefined {
   return name;
 }
 
+// A leading audience/gender qualifier (Men's, Women's, Kids'…) is part of the
+// product's identity, not noise — re-add it if the model trimmed it off.
+function withQualifier(name: string | undefined, title: string): string | undefined {
+  if (!name) return name;
+  const m = title.trim().match(/^(men'?s|women'?s|kids'?|boys'?|girls'?|unisex|youth|childrens?'?)\b/i);
+  if (!m) return name;
+  const firstWord = (s: string) => (s.toLowerCase().match(/[a-z]+/) ?? [""])[0];
+  return firstWord(name).startsWith(firstWord(m[0])) ? name : `${m[0]} ${name}`;
+}
+
 function parseCopy(raw: string, title: string): AdCopy | null {
   const obj = firstJsonObject(raw);
   if (!obj) return null;
   const copy: AdCopy = {
-    name: validName(obj.name, title),
+    name: withQualifier(validName(obj.name, title), title),
     eyebrow: clip(obj.eyebrow, 28),
     hook: clip(obj.hook, 40),
     subhead: clip(obj.subhead, 58),
