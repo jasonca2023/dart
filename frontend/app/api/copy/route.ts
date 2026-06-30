@@ -19,6 +19,7 @@ interface WorkersAI {
 }
 
 export interface AdCopy {
+  name?: string; // the core product name (colour/variant stripped)
   eyebrow?: string;
   hook?: string;
   subhead?: string;
@@ -30,12 +31,13 @@ Write punchy, concrete copy that could ONLY describe THIS product, never generic
 Match the requested tone. Do not invent specs, numbers, prices, or claims that aren't given.
 Use plain punctuation. Never use an em-dash (—); use a period or comma instead.
 Keep every line SHORT and COMPLETE. Never cut a line off mid-word, and never end with "…". Hard word caps:
+- name: the core product, meaning its product type and edition or model ONLY. Strip the colour, size, material, pack count, "for X" suffixes, and anything after a dash or slash or inside parentheses. Copy the words verbatim from the product title, in their original order; never invent, translate, or reorder. 2 to 6 words.
 - eyebrow: 1-3 words
 - hook: 2-5 words
-- subhead: one short phrase, 9 words max
+- subhead: one short phrase, 9 words max. Describe the product itself, not its colour or variant.
 - cta: 2-3 words (button text, e.g. "Shop now")
 "hook" is the opening line; "cta" is the closing button text.
-Output a SINGLE JSON object with exactly the keys "eyebrow", "hook", "subhead", "cta" and NOTHING else: no markdown, no preamble, no explanation, no second attempt. Stop after the closing brace.`;
+Output a SINGLE JSON object with exactly the keys "name", "eyebrow", "hook", "subhead", "cta" and NOTHING else: no markdown, no preamble, no explanation, no second attempt. Stop after the closing brace.`;
 
 function clip(s: unknown, max: number): string | undefined {
   if (typeof s !== "string") return undefined;
@@ -76,16 +78,29 @@ function firstJsonObject(raw: string): Record<string, unknown> | null {
   return null;
 }
 
-function parseCopy(raw: string): AdCopy | null {
+// The model returns a shortened product name; trust it only if it's actually a
+// contiguous slice of the given title (anti-hallucination) — so we never rename the
+// product, just trim the colour/variant noise it was told to drop.
+function validName(v: unknown, title: string): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const name = v.trim().replace(/^["']|["']$/g, "");
+  if (name.length < 2) return undefined;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  const n = norm(name);
+  return n && norm(title).includes(n) ? name : undefined;
+}
+
+function parseCopy(raw: string, title: string): AdCopy | null {
   const obj = firstJsonObject(raw);
   if (!obj) return null;
   const copy: AdCopy = {
+    name: validName(obj.name, title),
     eyebrow: clip(obj.eyebrow, 28),
     hook: clip(obj.hook, 40),
     subhead: clip(obj.subhead, 58),
     cta: clip(obj.cta, 22),
   };
-  return copy.hook || copy.subhead ? copy : null;
+  return copy.name || copy.hook || copy.subhead ? copy : null;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -136,5 +151,5 @@ export async function POST(req: Request): Promise<Response> {
     text = await run({ prompt: `${SYSTEM}\n\n${user}`, max_tokens: 256 });
   }
 
-  return Response.json({ copy: text ? parseCopy(text) : null });
+  return Response.json({ copy: text ? parseCopy(text, title) : null });
 }

@@ -238,6 +238,18 @@ function clip(s: string, max: number): string {
   return cut.replace(/[\s([{,;:.–-]+$/, "") + "…";
 }
 
+// Trim a noisy marketplace title down to the core product — its type and edition,
+// the way a human titles an ad. Drops a "(...)"/"[...]" variant block and a
+// trailing "- colour/size/material" (or " | " / " / "-style) segment. Deterministic
+// baseline; the LLM `name` refines it further. Keeps the whole title if trimming
+// would leave too little.
+export function coreName(title: string): string {
+  let t = title.replace(/\s*[([{][^)\]}]*[)\]}]?\s*/g, " ").trim(); // drop (variant) blocks
+  const parts = t.split(/\s+(?:[–—|]|-)\s+/); // " - " / " – " / " | " separators
+  if (parts.length > 1 && parts[0].trim().length >= 8) t = parts[0].trim();
+  return t.replace(/\s+/g, " ").trim() || title.trim();
+}
+
 /** Distribute `total` frames across the given weights, exact sum, min per scene. */
 function distribute(total: number, weights: number[]): number[] {
   const min = Math.round(FPS * 0.6);
@@ -252,6 +264,7 @@ function distribute(total: number, weights: number[]): number[] {
 
 export function buildAdSpec(input: AdSpecInput): AdSpec {
   const title = input.title.trim() || "Your product";
+  const display = coreName(title); // the headline shows the core product, not the variant noise
   const audience = input.audience.trim() || "everyone";
   const tone = toneFor(audience, title);
   const seed = hash(`${title}|${audience}|${input.variant ?? 0}`);
@@ -293,7 +306,7 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
   const scenes: Scene[] = types.map((type, i) => {
     const base: Scene = { type, frames: frames[i], motion };
     if (type === "hook") base.text = clip(hook, 42);
-    if (type === "hero") base.text = clip(title, 48);
+    if (type === "hero") base.text = clip(display, 48);
     if (type === "feature") {
       base.label = clip(feature.label, 22);
       base.value = clip(feature.value, 34);
@@ -308,7 +321,7 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
     layout,
     palette,
     font,
-    headline: clip(title, 48),
+    headline: clip(display, 48),
     subhead: clip(subhead, 60),
     cta,
     eyebrow: clip(eyebrow, 32),

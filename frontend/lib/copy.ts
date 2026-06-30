@@ -7,6 +7,7 @@ import { useDebounced } from "./hooks";
 import type { AdSpec } from "./adSpec";
 
 export interface AdCopy {
+  name?: string; // the core product name (colour/variant stripped), used as the headline
   eyebrow?: string;
   hook?: string;
   subhead?: string;
@@ -62,20 +63,24 @@ function clip(s: string | undefined, max: number): string | undefined {
 }
 
 // Overlay LLM copy onto a template-built spec. Pure; only replaces the fields the
-// model actually returned, re-clipped to the renderer's safe lengths. The product
-// title stays the headline (never let the model rename the product).
+// model actually returned, re-clipped to the renderer's safe lengths. `name` is the
+// model's trimmed core product name — validated server-side to be a slice of the
+// real title (no rename, just colour/variant noise dropped) — used as the headline
+// so a long marketplace title never overflows or cuts off.
 export function applyCopy(spec: AdSpec, copy: AdCopy | null): AdSpec {
   if (!copy) return spec;
   const eyebrow = clip(copy.eyebrow, 32) ?? spec.eyebrow;
   const subhead = clip(copy.subhead, 60) ?? spec.subhead;
   const cta = clip(copy.cta, 24) ?? spec.cta;
   const hook = clip(copy.hook, 42);
+  const headline = clip(copy.name, 48) ?? spec.headline;
   const scenes = spec.scenes.map((s) => {
     if (s.type === "hook" && hook) return { ...s, text: hook };
+    if (s.type === "hero") return { ...s, text: headline };
     if (s.type === "outro") return { ...s, text: cta };
     return s;
   });
-  return { ...spec, eyebrow, subhead, cta, scenes };
+  return { ...spec, headline, eyebrow, subhead, cta, scenes };
 }
 
 // Debounced fetch for the live preview. Returns the latest copy for `input` plus
