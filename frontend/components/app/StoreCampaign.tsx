@@ -13,7 +13,7 @@ import { saveRenderedAdViaBackend } from "@/lib/ads";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Button } from "../ui/Button";
-import { Alert, ArrowRight } from "../icons";
+import { Alert, ArrowRight, Check } from "../icons";
 
 const FORMATS: { value: AspectRatio; label: string }[] = [
   { value: "16:9", label: "16:9" },
@@ -55,7 +55,7 @@ export function StoreCampaign() {
     try {
       const list = await fetchStoreProducts(storeUrl);
       setProducts(list);
-      setPicked(new Set(list.map((_, i) => i))); // select all by default
+      setPicked(new Set()); // start empty — the user picks what to turn into ads
       if (list.length === 0) setError("No products found in that store's public feed.");
     } catch (err) {
       setProducts(null);
@@ -194,23 +194,25 @@ export function StoreCampaign() {
   return (
     <div className="flex flex-col gap-6">
       {/* Import */}
-      <form onSubmit={onImport} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <Field
-            label="Your store"
-            hint="A Shopify store with a public products feed — Dart pulls the catalogue."
-          >
-            <Input
-              value={storeUrl}
-              onChange={(e) => setStoreUrl(e.target.value)}
-              placeholder="yourstore.com"
-              inputMode="url"
-            />
-          </Field>
-        </div>
-        <Button type="submit" loading={importing} variant="secondary">
-          Import products
-        </Button>
+      <form onSubmit={onImport}>
+        <Field
+          label="Your store"
+          hint="A Shopify store with a public products feed. Dart pulls the catalogue."
+        >
+          <div className="flex items-stretch gap-2">
+            <div className="flex-1">
+              <Input
+                value={storeUrl}
+                onChange={(e) => setStoreUrl(e.target.value)}
+                placeholder="yourstore.com"
+                inputMode="url"
+              />
+            </div>
+            <Button type="submit" loading={importing} variant="secondary">
+              Import
+            </Button>
+          </div>
+        </Field>
       </form>
 
       {error && (
@@ -272,12 +274,17 @@ export function StoreCampaign() {
             </div>
           </Field>
 
-          {/* Product picker */}
+          {/* Product picker — tap the products you want as ads */}
           <div>
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-[14px] font-medium text-ink">
-                {picked.size} of {products.length} products
-              </p>
+            <div className="mb-3 flex items-end justify-between">
+              <div>
+                <p className="text-[14px] font-medium text-ink">
+                  Pick the products to turn into ads
+                </p>
+                <p className="mt-0.5 text-[12px] text-fog">
+                  {picked.size} selected · {products.length} found
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() =>
@@ -287,12 +294,12 @@ export function StoreCampaign() {
                       : new Set(products.map((_, i) => i)),
                   )
                 }
-                className="text-[13px] font-medium text-driftwood hover:text-ink"
+                className="text-[13px] font-medium text-driftwood transition-colors duration-150 ease-out hover:text-ink"
               >
-                {picked.size === products.length ? "Clear all" : "Select all"}
+                {picked.size === products.length ? "Clear" : "Select all"}
               </button>
             </div>
-            <ul className="grid max-h-[420px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+            <ul className="grid max-h-[440px] grid-cols-1 gap-2 overflow-y-auto px-0.5 py-0.5 sm:grid-cols-2 lg:grid-cols-3">
               {products.map((p, i) => {
                 const on = picked.has(i);
                 return (
@@ -300,32 +307,38 @@ export function StoreCampaign() {
                     <button
                       type="button"
                       onClick={() => toggle(i)}
+                      aria-pressed={on}
                       className={
-                        "flex w-full items-center gap-2.5 rounded-card border p-2 text-left transition-colors " +
-                        (on
-                          ? "border-ink bg-white"
-                          : "border-transparent bg-sand hover:border-ash")
+                        "group flex w-full items-center gap-3 rounded-[12px] border bg-white p-2.5 text-left transition-colors duration-150 ease-out " +
+                        (on ? "border-ink" : "border-ash hover:border-driftwood")
                       }
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={p.image}
                         alt=""
-                        className="size-11 shrink-0 rounded-[8px] bg-white object-contain"
+                        loading="lazy"
+                        className="size-12 shrink-0 rounded-[8px] bg-sand object-contain"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-medium text-ink">
                           {p.title}
                         </span>
-                        <span className="font-mono text-[12px] text-fog">{p.price}</span>
+                        {p.price && (
+                          <span className="font-mono text-[12px] text-driftwood">{p.price}</span>
+                        )}
                       </span>
                       <span
                         className={
-                          "size-4 shrink-0 rounded-full border " +
-                          (on ? "border-ink bg-ink" : "border-mist")
+                          "grid size-5 shrink-0 place-items-center rounded-[6px] border transition-colors duration-150 ease-out " +
+                          (on
+                            ? "border-ink bg-ink text-white"
+                            : "border-mist bg-white text-transparent group-hover:border-driftwood")
                         }
                         aria-hidden
-                      />
+                      >
+                        <Check className="text-[12px]" />
+                      </span>
                     </button>
                   </li>
                 );
@@ -333,14 +346,18 @@ export function StoreCampaign() {
             </ul>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <Button onClick={onGenerate} size="lg" loading={running} disabled={total === 0}>
-              {running ? status ?? "Rendering…" : `Generate ${total} ad${total === 1 ? "" : "s"}`}
-              {!running && <ArrowRight className="text-[18px]" />}
+              {running
+                ? status ?? "Rendering…"
+                : total === 0
+                  ? "Pick products to start"
+                  : `Generate ${total} ad${total === 1 ? "" : "s"}`}
+              {!running && total > 0 && <ArrowRight className="text-[18px]" />}
             </Button>
             {!running && total > 12 && (
               <span className="text-[13px] text-fog">
-                {total} ads render one by one in your browser — this can take a while.
+                {total} ads render one by one in your browser, so this can take a while.
               </span>
             )}
           </div>
