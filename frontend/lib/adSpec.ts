@@ -229,7 +229,13 @@ function pick<T>(arr: T[], seed: number): T {
 
 function clip(s: string, max: number): string {
   const t = s.trim();
-  return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + "…";
+  if (t.length <= max) return t;
+  // Truncate on a word boundary so a long title never cuts mid-word ("Bark B…").
+  let cut = t.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  if (lastSpace > max * 0.55) cut = cut.slice(0, lastSpace);
+  // Trim a dangling separator / open bracket so it ends clean.
+  return cut.replace(/[\s([{,;:.–-]+$/, "") + "…";
 }
 
 /** Distribute `total` frames across the given weights, exact sum, min per scene. */
@@ -287,7 +293,7 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
   const scenes: Scene[] = types.map((type, i) => {
     const base: Scene = { type, frames: frames[i], motion };
     if (type === "hook") base.text = clip(hook, 42);
-    if (type === "hero") base.text = clip(title, 40);
+    if (type === "hero") base.text = clip(title, 48);
     if (type === "feature") {
       base.label = clip(feature.label, 22);
       base.value = clip(feature.value, 34);
@@ -302,7 +308,7 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
     layout,
     palette,
     font,
-    headline: clip(title, 40),
+    headline: clip(title, 48),
     subhead: clip(subhead, 60),
     cta,
     eyebrow: clip(eyebrow, 32),

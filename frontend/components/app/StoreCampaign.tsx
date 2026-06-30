@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { API_BASE } from "@/lib/api";
-import { fetchStoreProducts, fetchStoreLogo, type StoreProduct } from "@/lib/store";
+import { fetchStoreProducts, prepareStoreLogo, type StoreProduct } from "@/lib/store";
 import type { PreparedLogo } from "@/lib/logo";
 import { buildAdSpec } from "@/lib/adSpec";
 import { generateCopy, applyCopy } from "@/lib/copy";
@@ -51,12 +51,12 @@ export function StoreCampaign() {
     setError(null);
     setImporting(true);
     try {
-      const list = await fetchStoreProducts(storeUrl);
+      const { products: list, logo } = await fetchStoreProducts(storeUrl);
       setProducts(list);
       setPicked(new Set()); // start empty — the user picks what to turn into ads
       // Pull the store's own brand mark for the end-card (best-effort).
       setStoreLogo(null);
-      fetchStoreLogo(storeUrl).then(setStoreLogo);
+      prepareStoreLogo(logo, storeUrl).then(setStoreLogo);
       if (list.length === 0) setError("No products found in that store's public feed.");
     } catch (err) {
       setProducts(null);
@@ -203,13 +203,14 @@ export function StoreCampaign() {
           <div className="flex items-stretch gap-2">
             <div className="flex-1">
               <Input
+                className="h-11"
                 value={storeUrl}
                 onChange={(e) => setStoreUrl(e.target.value)}
                 placeholder="yourstore.com"
                 inputMode="url"
               />
             </div>
-            <Button type="submit" loading={importing} variant="secondary">
+            <Button type="submit" size="lg" loading={importing} variant="secondary">
               Import
             </Button>
           </div>

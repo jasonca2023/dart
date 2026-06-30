@@ -85,6 +85,42 @@ async def _ssrf_safe_get(url: str, *, max_redirects: int = 5):
         raise DartError(SCRAPE_FAILED, "Too many redirects.", status=502)
 
 
+async def _fetch_store_logo(origin: str) -> str | None:
+    """Best-effort: scrape the store homepage for its highest-resolution brand mark
+    (apple-touch-icon / icon link). Returns an absolute URL, or None. Free — just an
+    HTTP fetch + a regex over the <link> tags.
+    """
+    import re
+
+    import httpx
+
+    try:
+        r = await _ssrf_safe_get(origin)
+        r.raise_for_status()
+        html = r.text[:1_000_000]
+    except Exception:
+        return None
+
+    best: tuple[int, str] | None = None  # (size, href)
+    for m in re.finditer(r"<link\b[^>]*>", html, re.IGNORECASE):
+        tag = m.group(0)
+        rel = re.search(r'rel=["\']([^"\']+)["\']', tag, re.IGNORECASE)
+        href = re.search(r'href=["\']([^"\']+)["\']', tag, re.IGNORECASE)
+        if not rel or not href or "icon" not in rel.group(1).lower():
+            continue
+        sz = re.search(r'sizes=["\']?(\d+)', tag, re.IGNORECASE)
+        # apple-touch-icon is usually a clean 180px brand mark; weight it high.
+        size = int(sz.group(1)) if sz else (180 if "apple-touch-icon" in rel.group(1).lower() else 32)
+        if best is None or size > best[0]:
+            best = (size, href.group(1))
+    if not best:
+        return None
+    try:
+        return str(httpx.URL(origin).join(best[1]))
+    except Exception:
+        return None
+
+
 VIDEO_BUCKET = "dart-videos"
 
 
@@ -169,7 +205,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         "price": f"${price}" if price else "",
                     }
                 )
-        return {"products": out}
+        logo = await _fetch_store_logo(f"https://{parsed.netloc}")
+        return {"products": out, "logo": logo}
 
     @app.post("/save-ad")
     async def save_ad(
