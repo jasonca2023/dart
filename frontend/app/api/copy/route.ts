@@ -31,7 +31,7 @@ Write punchy, concrete copy that could ONLY describe THIS product, never generic
 Match the requested tone. Do not invent specs, numbers, prices, or claims that aren't given.
 Use plain punctuation. Never use an em-dash (—); use a period or comma instead.
 Keep every line SHORT and COMPLETE. Never cut a line off mid-word, and never end with "…". Hard word caps:
-- name: the core product, meaning its product type and edition or model ONLY. Strip the colour, size, material, pack count, "for X" suffixes, and anything after a dash or slash or inside parentheses. Copy the words verbatim from the product title, in their original order; never invent, translate, or reorder. 2 to 6 words.
+- name: the core product, meaning its product type and edition or model. Read the WHOLE title and drop every colour, size, material, capacity, pack count, condition and marketing or variant word WHEREVER it sits (start, middle, end, parentheses, or after a dash or slash), keeping only the words a shopper would actually use to name the product. Copy the kept words verbatim from the title in their original order; never invent, translate, or reorder. 2 to 6 words. Example: "Sony WH-1000XM5 Wireless Noise Cancelling Black Headphones" becomes "Sony WH-1000XM5 Headphones".
 - eyebrow: 1-3 words
 - hook: 2-5 words
 - subhead: one short phrase, 9 words max. Describe the product itself, not its colour or variant.
@@ -78,16 +78,27 @@ function firstJsonObject(raw: string): Record<string, unknown> | null {
   return null;
 }
 
-// The model returns a shortened product name; trust it only if it's actually a
-// contiguous slice of the given title (anti-hallucination) — so we never rename the
-// product, just trim the colour/variant noise it was told to drop.
+// The model returns a shortened product name. Trust it only if every kept word is
+// drawn from the title, in the title's own order — a word-subsequence. That lets the
+// model drop colour/size/variant words from ANYWHERE in the name (start, middle, or
+// end), while still blocking invented or reordered words, so it trims rather than
+// renames. e.g. from "Sony WH-1000XM5 Wireless Noise Cancelling Black Headphones" it
+// may keep "Sony WH-1000XM5 Headphones"; "Premium Running Shoe" is rejected.
 function validName(v: unknown, title: string): string | undefined {
   if (typeof v !== "string") return undefined;
   const name = v.trim().replace(/^["']|["']$/g, "");
   if (name.length < 2) return undefined;
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
-  const n = norm(name);
-  return n && norm(title).includes(n) ? name : undefined;
+  const words = (s: string) => s.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  const nameWords = words(name);
+  const titleWords = words(title);
+  if (nameWords.length === 0) return undefined;
+  let ti = 0;
+  for (const w of nameWords) {
+    while (ti < titleWords.length && titleWords[ti] !== w) ti++;
+    if (ti >= titleWords.length) return undefined; // word missing (or out of order) → invented
+    ti++;
+  }
+  return name;
 }
 
 function parseCopy(raw: string, title: string): AdCopy | null {
