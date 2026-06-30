@@ -626,15 +626,19 @@ const OutroScene: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogo
   const { panel, accent, text } = spec.palette;
   const m = margin(u, portrait);
 
+  // All reveals are computed unconditionally (Rules of Hooks); the JSX below picks
+  // which to use. The brand end-card uses a crisp high-damping ease-out (no
+  // overshoot) so the brand moment never reads bouncy/templated.
+  const clean: Tempo = { ...t, dur: Math.min(t.dur, 26), damping: Math.max(t.damping, 190) };
+  const logoIn = useReveal(4, clean);
+  const ctaIn = useReveal(4 + clean.stagger * 2, clean);
+  const r = useReveal(2, t);
+  const c = useReveal(14, t);
+
   // Brand end-card: when a logo is set, the outro becomes a clean, centered
-  // sign-off — the logo *reveals* as the final beat (one orchestrated moment),
-  // CTA staggered just after. A crisp ease-out (high damping, no overshoot) so
-  // the brand moment never reads bouncy/templated. White knockout on the dark
-  // panel; an opaque logo (knockout === false) renders as-is.
+  // sign-off — the logo reveals as the final beat, CTA staggered just after.
+  // White knockout on the dark panel; an opaque logo (knockout === false) as-is.
   if (brandLogo) {
-    const clean: Tempo = { ...t, dur: Math.min(t.dur, 26), damping: Math.max(t.damping, 190) };
-    const logoIn = useReveal(4, clean);
-    const ctaIn = useReveal(4 + clean.stagger * 2, clean);
     const knockout = brandLogoKnockout !== false;
     return (
       <AbsoluteFill
@@ -680,8 +684,6 @@ const OutroScene: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogo
   }
 
   // No brand logo → the product title is the sign-off, left-hung as before.
-  const r = useReveal(2, t);
-  const c = useReveal(14, t);
   return (
     <AbsoluteFill
       style={{
