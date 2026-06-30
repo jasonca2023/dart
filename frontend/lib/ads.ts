@@ -18,6 +18,11 @@ export interface SavedAd {
   status: string;
   cost_cents: number;
   created_at: string;
+  // Branding + price kept per ad so editing can reproduce them faithfully.
+  price_cents: number | null;
+  logo_url: string | null;
+  logo_knockout: boolean | null;
+  brand_accent: string | null;
 }
 
 const VIDEO_BUCKET = "dart-videos";
@@ -89,6 +94,7 @@ export async function saveRenderedAdViaBackend(
   job: Job,
   blob: Blob,
   imageFile: File | null,
+  brand?: { accent?: string; logo?: string; logoKnockout?: boolean },
 ): Promise<string> {
   if (!API_BASE) throw new Error("Backend URL is not configured.");
   if (!supabase) throw new Error("Auth is not configured.");
@@ -107,6 +113,18 @@ export async function saveRenderedAdViaBackend(
   fd.append("aspect_ratio", job.aspect_ratio);
   fd.append("duration_sec", String(job.duration_sec));
   fd.append("resolution", job.resolution);
+  fd.append("price_cents", String(job.product?.price ?? 0));
+  // Persist the branding used, so a later edit reproduces it exactly.
+  if (brand?.accent) fd.append("brand_accent", brand.accent);
+  if (brand?.logoKnockout != null) fd.append("logo_knockout", String(brand.logoKnockout));
+  if (brand?.logo) {
+    try {
+      const logoBlob = await (await fetch(brand.logo)).blob();
+      fd.append("logo", logoBlob, "logo.png");
+    } catch {
+      /* logo couldn't be read — save the ad without it */
+    }
+  }
   const vext = (blob.type || "video/mp4").includes("webm") ? "webm" : "mp4";
   fd.append("video", blob, `${job.id}.${vext}`);
   if (imageFile) fd.append("image", imageFile, imageFile.name || "image.png");
@@ -153,7 +171,7 @@ export function savedAdToJob(ad: SavedAd): Job {
     product: ad.product_title
       ? {
           title: ad.product_title,
-          price: 0,
+          price: ad.price_cents ?? 0,
           currency: "USD",
           images: ad.product_image ? [ad.product_image] : [],
           specs: {},

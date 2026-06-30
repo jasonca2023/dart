@@ -219,7 +219,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         duration_sec: int = Form(10),
         resolution: str = Form("1080p"),
         cost_cents: int = Form(0),
+        price_cents: int = Form(0),
+        brand_accent: str = Form(""),
+        logo_knockout: bool = Form(False),
         image: UploadFile | None = File(None),
+        logo: UploadFile | None = File(None),
     ) -> dict:
         # Persist a browser-rendered ad using the service-role key (bypasses
         # Storage RLS), scoped to the user id carried by their session token.
@@ -269,6 +273,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     raise DartError(SCRAPE_FAILED, f"Image upload failed: {r.text}", status=502)
                 image_url = public_url(img_path)
 
+            # The brand mark used for this ad, so editing it later can reproduce the
+            # exact branding. Best-effort — a failed logo upload must not fail the save.
+            logo_url: str | None = None
+            if logo is not None:
+                logo_bytes = await logo.read()
+                lext = (logo.filename or "logo.png").rsplit(".", 1)[-1].lower()
+                lext = "".join(c for c in lext if c.isalnum()) or "png"
+                logo_path = f"{user_id}/logo-{safe_id}.{lext}"
+                lr = await client.post(
+                    f"{base}/storage/v1/object/{VIDEO_BUCKET}/{logo_path}",
+                    headers={
+                        **auth,
+                        "x-upsert": "true",
+                        "Content-Type": logo.content_type or "image/png",
+                    },
+                    content=logo_bytes,
+                )
+                if lr.status_code < 300:
+                    logo_url = public_url(logo_path)
+
             vid_bytes = await video.read()
             vid_type = video.content_type or "video/mp4"
             vid_ext = "webm" if "webm" in vid_type else "mp4"
@@ -295,6 +319,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "resolution": resolution,
                 "status": "ready",
                 "cost_cents": cost_cents,
+                "price_cents": price_cents or None,
+                "brand_accent": brand_accent or None,
+                "logo_url": logo_url,
+                "logo_knockout": logo_knockout if logo_url else None,
             }
             r = await client.post(
                 f"{base}/rest/v1/dart_ads",

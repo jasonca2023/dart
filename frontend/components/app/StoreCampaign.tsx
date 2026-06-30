@@ -167,7 +167,11 @@ export function StoreCampaign() {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             };
-            await saveRenderedAdViaBackend(job, blob, imageFile);
+            await saveRenderedAdViaBackend(job, blob, imageFile, {
+              accent: spec.palette.accent,
+              logo: storeLogo?.cutout,
+              logoKnockout: storeLogo?.transparent,
+            });
             made++;
           }
         } catch {

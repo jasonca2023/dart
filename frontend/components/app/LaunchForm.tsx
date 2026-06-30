@@ -323,7 +323,11 @@ export function LaunchForm() {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
-          await saveRenderedAdViaBackend(job, blob, imageFile);
+          await saveRenderedAdViaBackend(job, blob, imageFile, {
+            accent: spec.palette.accent,
+            logo: brand.logo,
+            logoKnockout: brand.logoTransparent,
+          });
         }
       } finally {
         URL.revokeObjectURL(objectUrl);

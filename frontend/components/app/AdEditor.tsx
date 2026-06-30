@@ -1,20 +1,21 @@
 "use client";
 
-// Edit a finished ad in place: tweak the copy, shuffle the look, change the format
-// or length, then re-render in the browser and overwrite the same library entry.
-// A saved ad stores its inputs + the original product image, so we rebuild the
-// spec from those and let the user adjust before re-rendering.
+// Edit a finished ad: tweak the copy, shuffle the look, change the format or
+// length, then re-render in the browser and either overwrite this ad or save a
+// copy. A saved ad stores its inputs, original product image, price and the
+// branding (logo/accent) it used, so the editor reproduces it faithfully.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { buildAdSpec } from "@/lib/adSpec";
 import { applyCopy, generateCopy, type AdCopy } from "@/lib/copy";
-import { applyBrand, loadBrandKit, type BrandKit } from "@/lib/brand";
-import { useDebounced } from "@/lib/hooks";
+import { applyBrand, loadBrandKit } from "@/lib/brand";
 import { removeProductBackground } from "@/lib/bgRemove";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { API_BASE } from "@/lib/api";
+import { useDebounced } from "@/lib/hooks";
 import type { AspectRatio, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Button } from "../ui/Button";
@@ -28,6 +29,10 @@ const AdPreview = dynamic(() => import("./AdPreview"), {
 const FORMATS: AspectRatio[] = ["16:9", "1:1", "4:5", "9:16"];
 const DURATIONS = [5, 10, 15, 20];
 const clampDuration = (n: number) => Math.min(20, Math.max(3, Math.round(n) || 10));
+const priceToCents = (raw: string) => {
+  const n = parseFloat(raw.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+};
 
 const pillBase =
   "rounded-full border px-2.5 py-1 text-[12px] transition-colors duration-150 ease-out ";
@@ -37,14 +42,21 @@ const pillOff = "border-ash bg-white text-driftwood hover:text-ink";
 export function AdEditor({
   job,
   imageUrl,
+  savedLogoUrl,
+  savedKnockout,
+  savedAccent,
   onSaved,
   onCancel,
 }: {
   job: Job;
   imageUrl: string;
+  savedLogoUrl?: string | null;
+  savedKnockout?: boolean | null;
+  savedAccent?: string | null;
   onSaved: (localVideoUrl: string, aspect: AspectRatio) => void;
   onCancel: () => void;
 }) {
+  const router = useRouter();
   const title = job.product?.title ?? "Your product";
   const audience = job.target_audience || "everyone";
 
@@ -52,27 +64,61 @@ export function AdEditor({
   const [cutoutUrl, setCutoutUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  // Resolved branding for this ad: the stored logo/accent if present, else the
+  // device's brand kit (covers ads saved before branding was persisted).
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [knockout, setKnockout] = useState<boolean | undefined>(undefined);
+  const [accent, setAccent] = useState<string | undefined>(undefined);
+
   // Editable creative.
   const [headline, setHeadline] = useState("");
   const [eyebrow, setEyebrow] = useState("");
   const [hook, setHook] = useState("");
   const [subhead, setSubhead] = useState("");
   const [cta, setCta] = useState("");
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState(
+    job.product?.price ? `$${(job.product.price / 100).toFixed(2)}` : "",
+  );
   const [format, setFormat] = useState<AspectRatio>(job.aspect_ratio);
   const [duration, setDuration] = useState(clampDuration(job.duration_sec));
   const [variant, setVariant] = useState(0);
-  const [brand, setBrand] = useState<BrandKit>({});
 
   const [prefilled, setPrefilled] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<"save" | "copy" | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setBrand(loadBrandKit()), []);
+  // Resolve branding once on mount (fetch the stored logo CORS-clean via the proxy).
+  useEffect(() => {
+    let active = true;
+    let revoke: string | null = null;
+    const kit = loadBrandKit();
+    setAccent(savedAccent ?? kit.accent);
+    setKnockout(savedKnockout ?? kit.logoTransparent);
+    if (savedLogoUrl) {
+      const src = API_BASE
+        ? `${API_BASE}/proxy-image?url=${encodeURIComponent(savedLogoUrl)}`
+        : savedLogoUrl;
+      fetch(src)
+        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error("logo"))))
+        .then((b) => {
+          if (!active) return;
+          const u = URL.createObjectURL(b);
+          revoke = u;
+          setLogoUrl(u);
+        })
+        .catch(() => active && setLogoUrl(kit.logo ?? null));
+    } else {
+      setLogoUrl(kit.logo ?? null);
+    }
+    return () => {
+      active = false;
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Fetch the product image (via proxy → CORS-clean), strip its background once,
-  // and keep both the cutout (preview + render) and the original file (re-save).
+  // Fetch the product image (CORS-clean via proxy), strip its background once.
   useEffect(() => {
     let active = true;
     let revoke: string | null = null;
@@ -101,8 +147,7 @@ export function AdEditor({
     };
   }, [imageUrl]);
 
-  // Prefill the copy fields from this ad's inputs + a fresh AI pass, so the editor
-  // opens on the current creative rather than blank fields.
+  // Prefill the copy fields from this ad's inputs + a fresh AI pass.
   const seedSpec = useMemo(
     () => buildAdSpec({ title, audience, price: "", durationSec: duration, variant: 0 }),
     [title, audience, duration],
@@ -122,12 +167,9 @@ export function AdEditor({
     return () => {
       active = false;
     };
-    // Prefill once; later edits are the user's. seedSpec is stable for the initial title/audience.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Build the spec from a set of copy values: rebuilt base (so shuffle/format/length/
-  // price take effect), the manual copy overlaid, and the device's brand applied.
   const specFrom = useCallback(
     (c: { headline: string; eyebrow: string; hook: string; subhead: string; cta: string; price: string }) => {
       const base = buildAdSpec({ title, audience, price: c.price.trim(), durationSec: duration, variant });
@@ -138,13 +180,12 @@ export function AdEditor({
         subhead: c.subhead.trim() || undefined,
         cta: c.cta.trim() || undefined,
       };
-      return applyBrand(applyCopy(base, manual), brand);
+      return applyBrand(applyCopy(base, manual), { accent });
     },
-    [title, audience, duration, variant, brand],
+    [title, audience, duration, variant, accent],
   );
 
-  // Debounce the text fields so the player re-renders only after typing settles
-  // (format/duration/variant are discrete and pass through live).
+  // Debounce the text fields so the player re-renders only after typing settles.
   const liveCopy = useMemo(
     () => ({ headline, eyebrow, hook, subhead, cta, price }),
     [headline, eyebrow, hook, subhead, cta, price],
@@ -154,12 +195,12 @@ export function AdEditor({
 
   const ready = !!cutoutUrl && prefilled;
 
-  async function onSave() {
+  async function save(asCopy: boolean) {
     if (!cutoutUrl || !imageFile) return;
     if (!canRenderInBrowser()) {
       return setError("In-browser rendering needs a recent Chrome or Edge.");
     }
-    setSaving(true);
+    setSaving(asCopy ? "copy" : "save");
     setError(null);
     setStatus("Re-rendering…");
     try {
@@ -172,21 +213,31 @@ export function AdEditor({
         durationInSeconds: duration,
         aspectRatio: format,
         accent: spec.palette.accent,
-        brandLogo: brand.logo,
-        brandLogoKnockout: brand.logoTransparent,
+        brandLogo: logoUrl ?? undefined,
+        brandLogoKnockout: knockout,
         spec,
       });
       setStatus("Saving…");
+      const id = asCopy ? crypto.randomUUID() : job.id;
       const updated: Job = {
         ...job,
+        id,
         aspect_ratio: format,
         duration_sec: duration,
+        product: job.product
+          ? { ...job.product, price: priceToCents(price) }
+          : job.product,
       };
-      await saveRenderedAdViaBackend(updated, blob, imageFile);
-      onSaved(URL.createObjectURL(blob), format);
+      await saveRenderedAdViaBackend(updated, blob, imageFile, {
+        accent,
+        logo: logoUrl ?? undefined,
+        logoKnockout: knockout,
+      });
+      if (asCopy) router.push(`/jobs/${id}`);
+      else onSaved(URL.createObjectURL(blob), format);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn’t save the edit.");
-      setSaving(false);
+      setSaving(null);
       setStatus(null);
     }
   }
@@ -226,12 +277,7 @@ export function AdEditor({
           <Field label="Length" hint="Seconds.">
             <div className="flex flex-wrap gap-1.5">
               {DURATIONS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDuration(d)}
-                  className={pillBase + (duration === d ? pillOn : pillOff)}
-                >
+                <button key={d} type="button" onClick={() => setDuration(d)} className={pillBase + (duration === d ? pillOn : pillOff)}>
                   {d}s
                 </button>
               ))}
@@ -242,13 +288,7 @@ export function AdEditor({
         <Field label="Format" hint="Re-render at a different aspect ratio.">
           <div className="flex flex-wrap gap-1.5">
             {FORMATS.map((f) => (
-              <button
-                key={f}
-                type="button"
-                aria-pressed={format === f}
-                onClick={() => setFormat(f)}
-                className={pillBase + (format === f ? pillOn : pillOff)}
-              >
+              <button key={f} type="button" aria-pressed={format === f} onClick={() => setFormat(f)} className={pillBase + (format === f ? pillOn : pillOff)}>
                 {f}
               </button>
             ))}
@@ -263,10 +303,13 @@ export function AdEditor({
         )}
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <Button onClick={onSave} size="lg" loading={saving} disabled={!ready}>
-            {saving ? status ?? "Saving…" : "Save changes"}
+          <Button onClick={() => save(false)} size="lg" loading={saving === "save"} disabled={!ready || saving === "copy"}>
+            {saving === "save" ? status ?? "Saving…" : "Save changes"}
           </Button>
-          <Button variant="ghost" onClick={onCancel} disabled={saving}>
+          <Button variant="secondary" onClick={() => save(true)} loading={saving === "copy"} disabled={!ready || saving === "save"}>
+            {saving === "copy" ? status ?? "Saving…" : "Save as copy"}
+          </Button>
+          <Button variant="ghost" onClick={onCancel} disabled={!!saving}>
             Cancel
           </Button>
         </div>
@@ -286,8 +329,8 @@ export function AdEditor({
                   durationInSeconds={duration}
                   aspectRatio={format}
                   accent={previewSpec.palette.accent}
-                  brandLogo={brand.logo}
-                  brandLogoKnockout={brand.logoTransparent}
+                  brandLogo={logoUrl ?? undefined}
+                  brandLogoKnockout={knockout}
                   spec={previewSpec}
                 />
               </div>
@@ -297,10 +340,7 @@ export function AdEditor({
                   onClick={() => setVariant((v) => v + 1)}
                   className="inline-flex items-center gap-1.5 text-[12px] font-medium text-driftwood transition-colors duration-150 ease-out hover:text-ink"
                 >
-                  <span
-                    className="inline-flex transition-transform duration-500 ease-out"
-                    style={{ transform: `rotate(${variant * 360}deg)` }}
-                  >
+                  <span className="inline-flex transition-transform duration-500 ease-out" style={{ transform: `rotate(${variant * 360}deg)` }}>
                     <Refresh className="text-[14px]" />
                   </span>
                   Shuffle look
@@ -314,8 +354,8 @@ export function AdEditor({
             </div>
           )}
           <p className="mt-5 border-t border-ash pt-4 text-[13px] leading-relaxed text-fog">
-            Edits re-render the video in your browser and replace this ad in your
-            library.
+            Save changes replaces this ad. Save as copy keeps the original and adds a
+            new one.
           </p>
         </div>
       </aside>

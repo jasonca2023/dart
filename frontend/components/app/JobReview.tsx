@@ -144,6 +144,9 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
         <AdEditor
           job={job}
           imageUrl={ad.product_image}
+          savedLogoUrl={ad.logo_url}
+          savedKnockout={ad.logo_knockout}
+          savedAccent={ad.brand_accent}
           onSaved={(v, asp) => {
             setEditedVideo(v);
             setEditedAspect(asp);
