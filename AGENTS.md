@@ -1,45 +1,43 @@
-# AGENTS.md — coordination for parallel agents
+# AGENTS.md — working in this repo
 
-This repo is built by **two agents working at the same time**. The rules below keep your
-commits conflict-free. Read this before touching anything.
+Orientation for anyone (human or AI) touching Dart. Dart turns a product photo into a
+short, silent, animated ad: a rule-based **mood brain** plus **AI copy** produce an ad
+spec, and the spec is **rendered to an MP4 in the browser** with Remotion. The backend
+only persists finished ads and proxies images.
 
-## Ownership map (hard boundaries)
+> Historical note: Dart was bootstrapped by two agents working in parallel (a `backend`
+> and a `frontend` branch, joined by an HTTP contract). That split is done — everything
+> now lives on `main` as one codebase.
 
-| Path | Owner | Branch |
-|---|---|---|
-| `backend/**` | **Backend agent** | `backend` |
-| `frontend/**` | **Frontend agent** | `frontend` |
-| `docs/**`, `AGENTS.md`, `README.md`, `.gitignore`, `.env.example` | **Shared / setup** | `main` |
+## Repo structure
 
-**Golden rule:** never edit files outside your owned path. The two owned trees do not
-overlap, so two agents can commit in parallel and merge to `main` cleanly.
+| Path | What |
+|---|---|
+| `frontend/` | Next.js app: the brain (`lib/adSpec.ts`), the renderer (`lib/remotion/`), AI copy route, brand kit, auth, library. Deploys to Cloudflare. |
+| `remotion/` | Standalone Remotion Studio project — mirrors `frontend/lib/remotion/ProductAd.tsx` for still-render verification. |
+| `backend/` | FastAPI: `/save-ad` (service-role save), `/proxy-image` (SSRF-guarded), `/health`. Deploys to Render. |
+| `docs/` | [PRD](./docs/PRD.md) · [API contract](./docs/API_CONTRACT.md) |
 
-## Branch & merge workflow
-1. Each agent works **only on its own branch** (`backend` or `frontend`), already created
-   and synced to `main`.
-2. Commit early and often on your branch. Push to your branch.
-3. Merge into `main` via PR. Because file trees don't overlap, merges are conflict-free.
-4. **Do not commit to `main` directly** and **do not touch the other agent's branch.**
-5. If you discover you need a change in a shared/root file or in `docs/`, do **not** edit
-   it on your feature branch. Propose it as a separate small PR to `main` so the other
-   agent picks it up. This is the only synchronization point.
+## Conventions that matter
 
-## The contract is the seam
-- `backend/` and `frontend/` communicate **only** over the HTTP API in
-  [`docs/API_CONTRACT.md`](./docs/API_CONTRACT.md).
-- Neither side imports the other's code or reads the other's files.
-- Need a contract change? Edit `docs/API_CONTRACT.md` first (PR to `main`), then both
-  sides build to the new shape. Until backend implements an endpoint, **frontend mocks it.**
+- **Keep the renderer mirror in sync.** `frontend/lib/remotion/ProductAd.tsx` (the
+  production, in-browser renderer) and `remotion/src/ProductAd.tsx` (Studio + still
+  verification) must stay identical. Edit both.
+- **The renderer only consumes a validated `AdSpec`** — never AI-authored code — so
+  output is always safe. New creative goes through `adSpec.ts`, not the renderer.
+- **Secrets are server-side only.** Never put the Supabase service-role key (or any
+  secret) in `frontend/` or commit it. Only `NEXT_PUBLIC_*` reaches the browser, and
+  the Supabase publishable/anon key is browser-safe.
+- **Don't hard-code model ids** — read them from config. Current Claude ids:
+  `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`. Ad copy runs on
+  Cloudflare Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`).
+- **Verify renders without ffmpeg:** from `remotion/`,
+  `npx remotion still ProductAd-genz out/frame.png --frame=90 --props=props.json`.
+- **Typecheck both** `frontend/` and `remotion/` with `npx tsc --noEmit`.
 
-## Working agreements
-- Keep secrets server-side; never put a provider key in `frontend/`. See `.env.example`.
-- Don't hard-code model ids — read from env. Current Anthropic ids: `claude-opus-4-8`,
-  `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`.
-- The kickoff reference snippets are illustrative and buggy — follow `docs/PRD.md`, not them.
-- Add a one-line entry to your app's own `README` when you add a runnable command.
+## Deploy
 
-## Quick start by role
-- **Backend agent:** `git checkout backend`, work under `backend/`. Implement the
-  endpoints in the contract. Stub the video/LLM/scraper providers behind interfaces first.
-- **Frontend agent:** `git checkout frontend`, work under `frontend/`. Build the dashboard
-  against the contract; mock responses until backend is live.
+- Frontend → Cloudflare: `cd frontend && npm run deploy`.
+- Backend → Render: manual deploy from the dashboard (no `render.yaml`, no auto-deploy).
+
+See [`DEPLOY.md`](./DEPLOY.md).

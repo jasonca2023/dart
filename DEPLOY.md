@@ -2,91 +2,83 @@
 
 Dart is two services plus Supabase:
 
-- **Frontend** (Next.js) → **Cloudflare** (Workers, via the OpenNext adapter)
-- **Backend** (FastAPI) → **a container host** (Fly.io / Render / Railway) — Cloudflare
-  Workers can't run it (it writes video files to disk, runs background render jobs,
-  and keeps an in-memory job store)
-- **Supabase** → already cloud-hosted (auth + saved-ads library + Storage)
+- **Frontend** (Next.js) → **Cloudflare Workers** (via the OpenNext adapter). The ad
+  itself renders in the visitor's browser (WebCodecs), and the ad copy runs on
+  **Cloudflare Workers AI**, so there's no server-side render or LLM key.
+- **Backend** (FastAPI) → **Render** (any container host works; a `backend/Dockerfile`
+  is included). It's a thin service: it saves a browser-rendered ad to Supabase with
+  the service-role key, and proxies product images. No video generation, no queue.
+- **Supabase** → auth, the saved-ads library (Postgres `dart_ads`, row-level secured),
+  and Storage (`dart-videos` bucket).
 
-Deploy the **backend first** so you have its URL for the frontend.
+Deploy the **backend first** so you have its URL for the frontend build.
 
 ---
 
-## 1. Backend → Fly.io (or Render)
+## 1. Backend → Render
 
-A `backend/Dockerfile` is included. From `backend/`:
-
-### Fly.io
-```bash
-cd backend
-fly launch --no-deploy            # detects the Dockerfile; pick a name e.g. dart-backend
-fly secrets set \
-  VIDEO_PROVIDER=ltx \
-  LTX_API_KEY=ltxv_your_key \
-  LTX_MODEL=ltx-2-fast \
-  LTX_GENERATE_AUDIO=true \
-  SCRAPER_PROVIDER=jsonld \
-  PUBLIC_BASE_URL=https://dart-backend.fly.dev \
-  CORS_ORIGINS='["https://dart-frontend.YOURNAME.workers.dev"]'
-fly deploy
-```
-Note the resulting URL (e.g. `https://dart-backend.fly.dev`).
-
-### Render (dashboard)
 New **Web Service** → connect the repo → **Root Directory** `backend`, **Runtime**
-Docker → add the same env vars above → Create. Note the `*.onrender.com` URL.
+Docker → add the env vars below → Create. Note the `*.onrender.com` URL.
 
-**Key env vars** (all server-side):
+There's no `render.yaml`, so Render does **not** auto-deploy on push — redeploy with
+**Manual Deploy → "Deploy latest commit"**.
+
+**Env vars** (all server-side):
 
 | Var | Value |
 |---|---|
-| `VIDEO_PROVIDER` | `ltx` |
-| `LTX_API_KEY` | your LTX key (or leave unset and paste it from the in-app **LTX key** menu) |
-| `SCRAPER_PROVIDER` | `jsonld` |
-| `PUBLIC_BASE_URL` | the backend's own public URL — so video links resolve |
-| `CORS_ORIGINS` | JSON array incl. the frontend URL, e.g. `'["https://dart-frontend.x.workers.dev"]'` |
-| `SUPABASE_URL` | your Supabase project URL — **required for auth**: makes write endpoints (jobs, LTX-key) require a valid login. Omit and the public backend is open to anyone. |
-| `ANTHROPIC_API_KEY` | optional — real Claude scripts |
+| `SUPABASE_URL` | your Supabase project URL, e.g. `https://<ref>.supabase.co`. **Required** for `/save-ad`, and setting it makes the write endpoints require a valid login. |
+| `SUPABASE_SERVICE_KEY` | the Supabase **service-role** key. Used by `/save-ad` to upload the video/image and write the library row (Storage rejects user JWTs directly). **Secret — never expose to the browser.** |
+| `CORS_ORIGINS` | JSON array including the frontend origin, e.g. `'["https://dart-frontend.YOURNAME.workers.dev"]'` |
+
+> The legacy `VIDEO_PROVIDER` / `LTX_API_KEY` / `SCRAPER_PROVIDER` / `ANTHROPIC_API_KEY`
+> vars belong to an older server-side video pipeline that the shipped app no longer
+> uses. Leave them unset.
+
+Verify: `GET https://<backend>/health` → `{"status":"ok","save_ad_ready":true,...}`.
 
 ---
 
 ## 2. Frontend → Cloudflare
 
-Already set up: `@opennextjs/cloudflare`, `wrangler.jsonc`, `open-next.config.ts`, and
-`npm run deploy`. `NEXT_PUBLIC_*` values are inlined at **build time**, so they must be
-present when the build runs.
+Already set up: `@opennextjs/cloudflare`, `wrangler.jsonc` (with the Workers **AI**
+binding for the copy route), `open-next.config.ts`, and `npm run deploy`.
+`NEXT_PUBLIC_*` values are inlined at **build time**, so they must be present when the
+build runs.
 
-### Deploy from your machine
 ```bash
 cd frontend
-wrangler login                    # opens a browser to authorize Cloudflare
+wrangler login                    # authorize Cloudflare
 
-# build-time public env (inlined into the bundle)
-export NEXT_PUBLIC_API_BASE_URL=https://dart-backend.fly.dev
-export NEXT_PUBLIC_SUPABASE_URL=https://lhculyshwpvewmhlwlom.supabase.co
+# build-time public env (inlined into the bundle; the anon/publishable key is browser-safe)
+export NEXT_PUBLIC_API_BASE_URL=https://<backend>.onrender.com
+export NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 export NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxx
 
-npm run deploy                    # builds the Worker bundle and deploys it
+npm run deploy                    # OpenNext build + wrangler deploy
 ```
 
-### Or via Cloudflare git integration
-Workers → Create → connect the repo → **Root directory** `frontend`, **Build command**
-`npm run deploy` (or `npx opennextjs-cloudflare build` + framework deploy) → add the
-three `NEXT_PUBLIC_*` vars as **build** environment variables.
+Or via the Cloudflare git integration: Workers → Create → connect the repo →
+**Root directory** `frontend`, **Build command** `npm run deploy` → add the three
+`NEXT_PUBLIC_*` vars as **build** environment variables.
 
 Note the Worker URL (e.g. `https://dart-frontend.YOURNAME.workers.dev`).
+Rendering needs WebCodecs, so visitors use a recent Chrome or Edge.
 
 ---
 
 ## 3. Wire the two together
-1. Set the backend's `CORS_ORIGINS` to include the **Cloudflare Worker URL**, and
-   `PUBLIC_BASE_URL` to the **backend URL**; redeploy the backend.
+
+1. Set the backend's `CORS_ORIGINS` to include the Cloudflare Worker URL; redeploy.
 2. In **Supabase → Authentication → URL Configuration**, set the **Site URL** to the
-   Cloudflare Worker URL (so email-confirmation links point at production).
+   Worker URL (so email-confirmation links point at production).
+3. In **Supabase Storage**, create a public **`dart-videos`** bucket, and create the
+   **`dart_ads`** table with row-level security scoping rows to `auth.uid()`.
 
 ## Notes
-- The backend's local `media/` is ephemeral — fine, because finished ads are uploaded
-  to **Supabase Storage** (`dart-videos`) and the saved record uses that durable URL.
-- The LTX key can live in backend env **or** be pasted at runtime from the top-bar
-  **LTX key** menu (held in memory; reverts to env on restart).
+
+- The backend holds no durable state: rendered ads live in Supabase Storage and the
+  `dart_ads` row points at the durable public URL.
+- With **zero config** the frontend still runs (a local mock drives every screen) and
+  copy falls back to rule-based templates when Workers AI is unavailable.
 - `.open-next/` and `.wrangler/` are build artifacts (gitignored).

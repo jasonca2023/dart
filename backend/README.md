@@ -1,66 +1,71 @@
 # Dart — Backend
 
-> **Owned by the backend agent. Work on the `backend` branch, only under `backend/`.**
-> See [`../AGENTS.md`](../AGENTS.md) and the API spec in [`../docs/API_CONTRACT.md`](../docs/API_CONTRACT.md).
+FastAPI service for Dart. The ad is written, designed and **rendered in the user's
+browser**; the backend's job is to **persist** a finished ad and to proxy product
+images. It does no video generation.
 
-FastAPI service that orchestrates the pipeline: **scrape → script → render → job store**.
+## What it does
 
-## Scope
-- Implement the endpoints in `docs/API_CONTRACT.md`.
-- Keep each stage behind an interface so providers are swappable:
-  `ProductScraper`, `ScriptGenerator`, `VideoGenerator`.
-- All provider keys are server-side (see `../.env.example`). Read model ids from env.
+- **`POST /save-ad`** — accepts a browser-rendered ad (the MP4 + the product image +
+  metadata) and a Supabase access token. It verifies the token via Supabase's own
+  `/auth/v1/user` endpoint, then uploads the files to Storage and writes the library
+  row using the **service-role key** (the project's Storage rejects user JWTs
+  directly). The `id` is sanitised before it touches any Storage path.
+- **`GET /proxy-image?url=`** — re-serves an external product image same-origin so the
+  browser can draw it onto the render canvas without tainting it. Guarded against SSRF:
+  the scheme + host are checked, and redirects are followed manually with every hop
+  re-validated against private/loopback/link-local ranges.
+- **`GET /health`** — liveness + which providers are wired + whether `/save-ad` is
+  configured.
+
+> A legacy mock/LTX pipeline (`/jobs`, `/settings`, the `providers/` adapters and the
+> in-memory `JobStore`) is retained behind the same app but is **not used by the
+> shipped product**. Tests exercise it with the all-mock providers.
 
 ## Layout
+
 ```
 app/
-  main.py            # FastAPI app factory + entrypoint
-  config.py          # env-driven settings (provider selection, keys, model id)
-  models.py          # Pydantic shapes mirroring docs/API_CONTRACT.md
+  main.py            # app factory + /save-ad, /proxy-image, /health, SSRF guard
+  auth.py            # verify_token via Supabase /auth/v1/user; require_user dependency
+  config.py          # env-driven settings (pydantic-settings)
   errors.py          # DartError + contract error envelope
-  auth.py            # Supabase JWT verification (require_user dependency)
-  store.py           # in-memory JobStore (Postgres swap in M3)
-  pipeline.py        # async orchestrator: scrape -> script -> render
-  api/jobs.py        # job routes (write routes require login)
-  api/settings.py    # runtime LTX key: GET /settings, POST /settings/ltx-key (auth)
-  providers/         # swappable seams: scraper, script (Claude), video (LTX/Kling)
+  models.py          # pydantic shapes
+  store.py           # in-memory JobStore        (legacy pipeline)
+  pipeline.py        # async orchestrator        (legacy pipeline)
+  api/jobs.py        # /jobs routes              (legacy pipeline, auth-gated)
+  api/settings.py    # /settings routes          (legacy pipeline, auth-gated)
+  providers/         # scraper / script / video adapters (legacy, mock by default)
 tests/               # end-to-end API tests against the mock pipeline
 ```
 
 ## Getting started
+
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-# Run the API (zero config = all-mock pipeline, runs end-to-end)
 uvicorn app.main:app --reload         # http://localhost:8000  (docs at /docs)
-
-# Run tests
-pytest
+pytest                                # 9 end-to-end tests, no network/keys
 ```
 
-## Providers
-Each stage runs a **mock** by default so the service boots with no keys. Switch a
-stage to its real adapter by copying `../.env.example` → `../.env` and setting:
+## Configuration
 
-| Stage | Env | Real adapter |
-|---|---|---|
-| Script | `ANTHROPIC_API_KEY` (+ `SCRIPT_MODEL`) | Claude Messages API (`claude-opus-4-8`) |
-| Video | `VIDEO_PROVIDER=ltx` + `LTX_API_KEY` (`LTX_MODEL=ltx-2-fast`) | LTX Video image-to-video, with audio (`kling` adapter also present) |
-| Scraper | `SCRAPER_PROVIDER=jsonld` | JSON-LD / OpenGraph scraper |
+| Env | Purpose |
+|---|---|
+| `SUPABASE_URL` | Supabase project URL. Required for `/save-ad`; setting it also makes the legacy write endpoints require a valid login. Unset → auth disabled for local dev. |
+| `SUPABASE_SERVICE_KEY` | Service-role key used by `/save-ad` for Storage + DB writes that bypass RLS. **Server-side only.** |
+| `CORS_ORIGINS` | JSON array of allowed browser origins (default `["http://localhost:3000"]`). |
 
-A real provider selected without its key falls back to mock with a logged warning,
-so the app always runs. `GET /health` reports which providers are active.
-
-The LTX key can also be set **at runtime** — `POST /settings/ltx-key {"api_key": "..."}`
-rebuilds the video provider in place (the in-app "LTX key" menu uses this). The key
-is held in memory only and reverts to `.env` on restart.
+The legacy provider vars (`VIDEO_PROVIDER`, `LTX_API_KEY`, `SCRAPER_PROVIDER`,
+`ANTHROPIC_API_KEY`, …) only affect the unused pipeline; leave them at their mock
+defaults.
 
 ## Auth
-Write endpoints (`POST /jobs`, regenerate, export, `POST /settings/ltx-key`) require a
-valid **Supabase login**. The frontend sends the user's access token as
-`Authorization: Bearer <token>`; `auth.py` verifies its ES256 signature against the
-project's JWKS. Enforced only when **`SUPABASE_URL`** is set (e.g. the deployed
-backend); unset locally → endpoints are open for dev. Reads (`/health`, `GET /jobs`,
-`GET /settings`) stay public.
+
+`/save-ad` requires a Supabase login: the frontend sends the user's access token (in
+the multipart body), and `auth.py` validates it by calling Supabase's `/auth/v1/user`
+— signing-algorithm agnostic, so it works regardless of the token format. The legacy
+`/jobs` and `/settings` write routes use the same check via `require_user`. Enforced
+only when `SUPABASE_URL` is set; unset locally → open for dev.

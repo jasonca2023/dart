@@ -1,118 +1,66 @@
 # Dart — API Contract
 
-**Status:** Draft v0.1 — the seam between `backend/` and `frontend/`.
-
-This is the **single coordination point** between the two agents. Frontend codes against
-these shapes; backend implements them. Change a shape only via PR that edits *this file*
-first, so both sides see it. Until backend is live, frontend mocks these responses.
+The HTTP surface between the browser app and the FastAPI backend. The ad is rendered in
+the browser; the backend persists the result and proxies images.
 
 Base URL (local dev): `http://localhost:8000`
-Content type: `application/json`
 
 ---
 
 ## Conventions
-- All IDs are UUID strings.
-- All timestamps are ISO-8601 UTC.
-- Errors use the shape in [Error model](#error-model) with appropriate HTTP status.
-- Money is integer **cents** (`cost_cents`), with a `currency` string elsewhere.
+- IDs are UUID strings; timestamps are ISO-8601 UTC.
+- Errors use the [error model](#error-model) with an appropriate HTTP status.
+- Money is integer **cents** (`cost_cents`); for Dart it's always `0`.
 
 ---
 
-## `POST /jobs` — create a generation job
+## `POST /save-ad` — persist a browser-rendered ad
 
-Creates a job and kicks off the async pipeline. Returns immediately with `status: "queued"`.
+`multipart/form-data`. Stores the rendered video + product image in Supabase Storage
+and writes the library row with the service-role key, scoped to the user the token
+identifies.
 
-**Request**
-```json
-{
-  "product_url": "https://store.example.com/products/widget",
-  "target_audience": "Gen Z tech enthusiasts",
-  "aspect_ratio": "9:16",          // one of "16:9" | "9:16" | "1:1", default "16:9"
-  "duration_sec": 10,               // one of 5 | 10, default 10
-  "resolution": "2160p"             // "1080p" | "2160p", default "1080p"
-}
-```
+**Form fields**
 
-**Response `201`** — a [Job](#job-object).
-
----
-
-## `GET /jobs/{id}` — poll job status
-
-Returns the current [Job](#job-object). Frontend polls this (suggested 2s interval)
-until `status` is `ready` or `failed`.
-
-**Response `200`** — a [Job](#job-object). **`404`** if unknown id.
-
----
-
-## `GET /jobs` — list current user's jobs
+| Field | Type | Notes |
+|---|---|---|
+| `video` | file | the rendered MP4 (or WebM) |
+| `token` | string | the user's Supabase access token (validated via `/auth/v1/user`) |
+| `id` | string | client UUID; sanitised to `[A-Za-z0-9_-]` before use in any path |
+| `product_title` | string | optional |
+| `target_audience` | string | optional |
+| `aspect_ratio` | string | `16:9` \| `1:1` \| `4:5` \| `9:16` |
+| `duration_sec` | int | 3–20 |
+| `resolution` | string | `1080p` |
+| `cost_cents` | int | `0` |
+| `image` | file | optional product image |
 
 **Response `200`**
 ```json
-{ "jobs": [ /* Job objects, newest first */ ], "next_cursor": null }
+{ "video_url": "https://<project>.supabase.co/storage/v1/object/public/dart-videos/<uid>/<id>.mp4",
+  "image_url": "https://.../img-<id>.png" }
 ```
+`401` invalid/expired token · `500` server missing Supabase config · `502` upload failed.
 
 ---
 
-## `POST /jobs/{id}/regenerate` — new job from same inputs
+## `GET /proxy-image?url=` — same-origin image proxy
 
-**Response `201`** — a new [Job](#job-object).
+Re-serves an external product image so the browser can draw it onto the render canvas
+without tainting it. SSRF-guarded: scheme + host are validated, and redirects are
+followed manually with every hop re-checked against private/loopback/link-local ranges.
 
----
-
-## `POST /jobs/{id}/export` — assisted export
-
-**Request**
-```json
-{ "destination": "tiktok" }   // "tiktok" | "meta" | "download"
-```
-
-**Response `200`**
-```json
-{ "destination": "tiktok", "handoff_url": "https://...", "expires_at": "..." }
-```
+**Response `200`** — the image bytes (`Content-Type: image/*`).
+`400` bad/disallowed URL or non-image · `502` fetch failed.
 
 ---
 
-## Job object
+## `GET /health`
 
 ```json
-{
-  "id": "b3f1...",
-  "status": "queued",                 // queued | scraping | scripting | rendering | ready | failed
-  "product_url": "https://...",
-  "target_audience": "Gen Z tech enthusiasts",
-  "aspect_ratio": "9:16",
-  "duration_sec": 10,
-  "resolution": "2160p",
-  "product": {                         // null until scraping completes
-    "title": "Widget Pro",
-    "price": 4999,                     // integer cents
-    "currency": "USD",
-    "images": ["https://..."],
-    "specs": { "color": "black" },
-    "source": "shopify"
-  },
-  "script": {                          // null until scripting completes
-    "video_prompt": "Cinematic product ad ...",
-    "scenes": [
-      { "t_start": 0, "t_end": 3, "description": "...", "camera": "pan-right" }
-    ]
-  },
-  "video_url": null,                   // populated when status == ready
-  "error": null,                       // populated when status == failed
-  "cost_cents": 0,
-  "created_at": "2026-06-16T12:00:00Z",
-  "updated_at": "2026-06-16T12:00:00Z"
-}
-```
-
-### Status lifecycle
-```
-queued → scraping → scripting → rendering → ready
-                                     └────────────→ failed (from any stage)
+{ "status": "ok",
+  "save_ad_ready": true,
+  "providers": { "scraper": "...", "script": "...", "video": "..." } }
 ```
 
 ---
@@ -120,21 +68,17 @@ queued → scraping → scripting → rendering → ready
 ## Error model
 
 ```json
-{
-  "error": {
-    "code": "scrape_failed",          // machine-readable
-    "message": "Could not resolve product data from URL.",
-    "retryable": true
-  }
-}
+{ "error": { "code": "invalid_url", "message": "Image host is not allowed.", "retryable": false } }
 ```
-
-Suggested codes: `invalid_url`, `scrape_failed`, `no_product_image`, `script_failed`,
-`render_failed`, `rate_limited`, `not_found`, `internal`.
+Codes in use: `invalid_url`, `scrape_failed`, `unauthorized`, `not_found`, `internal`.
 
 ---
 
-## Auth (placeholder)
-v1 may start unauthenticated for local dev. When auth lands, all `/jobs*` routes require
-a bearer token; `GET /jobs` is scoped to the token's user. Mechanism TBD in an ADR — this
-section will be updated **before** the frontend wires real auth.
+## Legacy `/jobs` + `/settings` (retained, unused by the app)
+
+An earlier server-side pipeline (`POST /jobs`, `GET /jobs/{id}`, `GET /jobs`,
+`POST /jobs/{id}/regenerate`, `POST /jobs/{id}/export`, `GET/POST /settings*`) still
+exists behind the same app and is covered by tests with all-mock providers, but the
+shipped product does not call it — generation and rendering happen in the browser, and
+persistence goes through `/save-ad`. Those write routes require a Supabase login when
+`SUPABASE_URL` is set.
