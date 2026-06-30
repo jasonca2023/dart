@@ -16,8 +16,9 @@ import { VideoPlayer } from "./VideoPlayer";
 import { ProductCard } from "./ProductCard";
 import { ScriptView } from "./ScriptView";
 import { JobActions } from "./JobActions";
+import { AdEditor } from "./AdEditor";
 import { Button } from "../ui/Button";
-import { ArrowRight, Alert, Download, Refresh, Spinner } from "../icons";
+import { ArrowRight, Alert, Download, Refresh, Spinner, Wand } from "../icons";
 
 function title(job: Job): string {
   if (job.product?.title) return job.product.title;
@@ -73,12 +74,21 @@ function ScanningCard() {
   );
 }
 
-// Read-only view of an ad loaded from the user's saved library (used when the
-// backend no longer has the live job — e.g. a past session or after a restart).
+// View of an ad loaded from the user's saved library (all browser-rendered ads
+// land here — the backend has no live job for them). Supports editing in place:
+// re-render with tweaked copy/look/format and overwrite the same entry.
 function SavedAdView({ ad }: { ad: SavedAd }) {
   const job = savedAdToJob(ad);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  // After an edit, show the freshly rendered video (a local blob URL) — avoids any
+  // CDN staleness from overwriting the same Storage object.
+  const [editedVideo, setEditedVideo] = useState<string | null>(null);
+  const [editedAspect, setEditedAspect] = useState<Job["aspect_ratio"] | null>(null);
+  const videoUrl = editedVideo ?? ad.video_url;
+  const aspect = editedAspect ?? job.aspect_ratio;
+  const canEdit = !!ad.product_image && !!ad.product_title;
 
   function flash(msg: string) {
     setDone(msg);
@@ -86,10 +96,10 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
   }
 
   async function download() {
-    if (!ad.video_url) return;
+    if (!videoUrl) return;
     setBusy(true);
     try {
-      const r = await fetch(ad.video_url);
+      const r = await fetch(videoUrl);
       if (!r.ok) throw new Error("fetch failed");
       const blob = await r.blob();
       const u = URL.createObjectURL(blob);
@@ -102,7 +112,7 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
       URL.revokeObjectURL(u);
       flash("Downloaded");
     } catch {
-      window.open(ad.video_url, "_blank", "noopener");
+      window.open(videoUrl, "_blank", "noopener");
       flash("Opened in new tab");
     } finally {
       setBusy(false);
@@ -123,37 +133,57 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
           <h1 className="t-heading">{title(job)}</h1>
           <StatusPill status={job.status} />
         </div>
-        {job.product_url && (
-          <p className="mt-2 break-all font-mono text-[12px] text-fog">
-            {job.product_url}
+        {editing && (
+          <p className="mt-2 text-[13px] text-driftwood">
+            Editing — tweak the copy, look, or format and save.
           </p>
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="flex flex-col gap-6">
-          {ad.video_url ? (
-            <>
-              <VideoPlayer src={ad.video_url} aspect={job.aspect_ratio} />
-              <div className="flex flex-wrap items-center gap-2.5">
-                <Button onClick={download} loading={busy}>
-                  <Download className="text-[18px]" />
-                  Download
-                </Button>
-                {done && <span className="text-[13px] text-driftwood">{done}</span>}
+      {editing && ad.product_image ? (
+        <AdEditor
+          job={job}
+          imageUrl={ad.product_image}
+          onSaved={(v, asp) => {
+            setEditedVideo(v);
+            setEditedAspect(asp);
+            setEditing(false);
+            flash("Saved");
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+          <div className="flex flex-col gap-6">
+            {videoUrl ? (
+              <>
+                <VideoPlayer src={videoUrl} aspect={aspect} />
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <Button onClick={download} loading={busy}>
+                    <Download className="text-[18px]" />
+                    Download
+                  </Button>
+                  {canEdit && (
+                    <Button variant="secondary" onClick={() => setEditing(true)}>
+                      <Wand className="text-[18px]" />
+                      Edit
+                    </Button>
+                  )}
+                  {done && <span className="text-[13px] text-driftwood">{done}</span>}
+                </div>
+              </>
+            ) : (
+              <div className="rounded-card bg-sand p-8 text-[14px] text-driftwood">
+                This saved ad has no video.
               </div>
-            </>
-          ) : (
-            <div className="rounded-card bg-sand p-8 text-[14px] text-driftwood">
-              This saved ad has no video.
-            </div>
-          )}
+            )}
+          </div>
+          <aside className="flex flex-col gap-6">
+            {job.product ? <ProductCard product={job.product} /> : null}
+            <MetaCard job={job} />
+          </aside>
         </div>
-        <aside className="flex flex-col gap-6">
-          {job.product ? <ProductCard product={job.product} /> : null}
-          <MetaCard job={job} />
-        </aside>
-      </div>
+      )}
     </div>
   );
 }
