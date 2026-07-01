@@ -15,12 +15,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-40 border-b border-ash bg-parchment/85 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-[var(--page-max)] items-center gap-5 px-5 sm:px-8">
           <Logo />
-          <nav className="hidden items-center gap-1 sm:flex">
+          <nav className="hidden items-center gap-1.5 sm:flex">
             <Link
               href="/"
               className="rounded-full px-3 py-1.5 text-[14px] text-ink transition-colors duration-150 ease-out hover:text-driftwood"
             >
               Dashboard
+            </Link>
+            <Link
+              href="/ads"
+              className="rounded-full border border-ash bg-white px-3 py-1.5 text-[14px] text-ink transition-colors duration-150 ease-out hover:border-driftwood"
+            >
+              Ads
             </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3">

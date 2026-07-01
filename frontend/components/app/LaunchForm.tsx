@@ -10,6 +10,7 @@ import { removeProductBackground } from "@/lib/bgRemove";
 import { generateCopy, applyCopy, useAiCopy } from "@/lib/copy";
 import { applyBrand, loadBrandKit, saveBrandKit, type BrandKit } from "@/lib/brand";
 import { prepareLogo } from "@/lib/logo";
+import { setBatch } from "@/lib/batch";
 import { useDebounced } from "@/lib/hooks";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
@@ -276,12 +277,12 @@ export function LaunchForm() {
       const renderFile: Blob = cleaned ?? imageFile;
       const objectUrl = URL.createObjectURL(renderFile);
 
-      let firstId: string | null = null;
+      const ids: string[] = [];
       try {
         for (let i = 0; i < formats.length; i++) {
           const fmt = formats[i];
           const id = crypto.randomUUID();
-          if (!firstId) firstId = id;
+          ids.push(id);
           setStatus(
             formats.length > 1
               ? `Rendering ${fmt} (${i + 1}/${formats.length})…`
@@ -332,7 +333,8 @@ export function LaunchForm() {
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
-      router.push(`/jobs/${firstId}`);
+      setBatch(ids);
+      router.push(`/jobs/${ids[0]}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not render the ad.");
       setStatus(null);

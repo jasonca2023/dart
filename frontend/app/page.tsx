@@ -11,7 +11,6 @@ import { Reveal } from "@/components/Reveal";
 import { HomeSwitch } from "@/components/app/HomeSwitch";
 import { AppShell } from "@/components/app/AppShell";
 import { Generate } from "@/components/app/Generate";
-import { RecentJobs } from "@/components/app/RecentJobs";
 
 export default function Home() {
   // Signed-out: the marketing landing (generate CTAs → sign-in).
@@ -43,18 +42,10 @@ export default function Home() {
     </>
   );
 
-  // Signed-in: the app — generate, plus the user's saved ads.
+  // Signed-in: the app — just the generator. The saved ads live on /ads.
   const app = (
     <AppShell>
       <Generate />
-
-      <section className="mt-16">
-        <div className="mb-5 flex items-baseline justify-between">
-          <h2 className="text-[18px] font-medium text-ink">Your ads</h2>
-          <span className="text-[13px] text-fog">Newest first</span>
-        </div>
-        <RecentJobs />
-      </section>
     </AppShell>
   );
 

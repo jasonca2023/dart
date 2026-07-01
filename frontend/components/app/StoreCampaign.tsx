@@ -10,6 +10,7 @@ import { generateCopy, applyCopy } from "@/lib/copy";
 import { removeProductBackground } from "@/lib/bgRemove";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
+import { setBatch } from "@/lib/batch";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Button } from "../ui/Button";
@@ -87,7 +88,7 @@ export function StoreCampaign() {
 
     setRunning(true);
     setError(null);
-    let firstId: string | null = null;
+    const ids: string[] = [];
     let made = 0;
     let skipped = 0;
     try {
@@ -130,7 +131,7 @@ export function StoreCampaign() {
 
           for (const fmt of formats) {
             const id = crypto.randomUUID();
-            if (!firstId) firstId = id;
+            ids.push(id);
             setStatus(`Rendering ${product.title} · ${fmt} ${at}…`);
             const blob = await renderAdInBrowser({
               productTitle: product.title,
@@ -187,8 +188,9 @@ export function StoreCampaign() {
         setRunning(false);
         return;
       }
-      // Land on the first ad; the rest are in the library.
-      router.push(firstId ? `/jobs/${firstId}` : "/");
+      // Land on the first ad; the pager flips through the rest of this batch.
+      setBatch(ids);
+      router.push(ids[0] ? `/jobs/${ids[0]}` : "/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed.");
       setStatus(null);
