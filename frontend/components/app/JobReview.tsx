@@ -17,6 +17,7 @@ import { ProductCard } from "./ProductCard";
 import { ScriptView } from "./ScriptView";
 import { JobActions } from "./JobActions";
 import { AdEditor } from "./AdEditor";
+import { AdPager } from "./AdPager";
 import { Button } from "../ui/Button";
 import { ArrowRight, Alert, Download, Refresh, Spinner, Wand } from "../icons";
 
@@ -129,9 +130,12 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
           <ArrowRight className="rotate-180 text-[15px]" />
           Dashboard
         </Link>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 className="t-heading">{title(job)}</h1>
-          <StatusPill status={job.status} />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h1 className="t-heading">{title(job)}</h1>
+            <StatusPill status={job.status} />
+          </div>
+          {!editing && <AdPager currentId={ad.id} />}
         </div>
         {editing && (
           <p className="mt-2 text-[13px] text-driftwood">
@@ -361,9 +365,12 @@ export function JobReview({ id }: { id: string }) {
           <ArrowRight className="rotate-180 text-[15px]" />
           Dashboard
         </Link>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 className="t-heading">{title(job)}</h1>
-          <StatusPill status={job.status} />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h1 className="t-heading">{title(job)}</h1>
+            <StatusPill status={job.status} />
+          </div>
+          <AdPager currentId={id} />
         </div>
         {job.product_url && (
           <p className="mt-2 break-all font-mono text-[12px] text-fog">
