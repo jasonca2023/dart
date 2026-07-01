@@ -18,6 +18,8 @@ import { ScriptView } from "./ScriptView";
 import { JobActions } from "./JobActions";
 import { AdEditor } from "./AdEditor";
 import { AdPager } from "./AdPager";
+import { getBatch } from "@/lib/batch";
+import { downloadUrl, adFileName } from "@/lib/download";
 import { Button } from "../ui/Button";
 import { ArrowRight, Alert, Download, Refresh, Spinner, Wand } from "../icons";
 
@@ -91,9 +93,35 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
   const aspect = editedAspect ?? job.aspect_ratio;
   const canEdit = !!ad.product_image && !!ad.product_title;
 
+  // When this ad is part of the batch generated this session, offer the whole
+  // batch as one download. (Set after mount — sessionStorage isn't SSR-safe.)
+  const [batchIds, setBatchIds] = useState<string[]>([]);
+  useEffect(() => setBatchIds(getBatch()), []);
+  const [busyAll, setBusyAll] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const inBatch = batchIds.length > 1 && batchIds.includes(ad.id);
+
   function flash(msg: string) {
     setDone(msg);
     setTimeout(() => setDone(null), 2400);
+  }
+
+  async function downloadBatch() {
+    setBusyAll(true);
+    let ok = 0;
+    for (let i = 0; i < batchIds.length; i++) {
+      setProgress(`${i + 1}/${batchIds.length}`);
+      const a = await getAd(batchIds[i]);
+      if (
+        a?.video_url &&
+        (await downloadUrl(a.video_url, adFileName(a.product_title, a.aspect_ratio, a.id)))
+      ) {
+        ok++;
+      }
+    }
+    setProgress(null);
+    setBusyAll(false);
+    flash(ok === batchIds.length ? "Downloaded all" : `Downloaded ${ok} of ${batchIds.length}`);
   }
 
   async function download() {
@@ -174,6 +202,14 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
                     <Button variant="secondary" onClick={() => setEditing(true)}>
                       <Wand className="text-[18px]" />
                       Edit
+                    </Button>
+                  )}
+                  {inBatch && (
+                    <Button variant="secondary" onClick={downloadBatch} loading={busyAll}>
+                      <Download className="text-[18px]" />
+                      {busyAll && progress
+                        ? `Downloading ${progress}…`
+                        : `Download all (${batchIds.length})`}
                     </Button>
                   )}
                   {done && <span className="text-[13px] text-driftwood">{done}</span>}

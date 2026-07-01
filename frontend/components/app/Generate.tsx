@@ -31,7 +31,7 @@ export function Generate() {
         <p className="mt-2 max-w-xl text-[16px] text-driftwood">
           {mode === "one"
             ? "Upload a product photo. Get a short, polished animated ad, rendered in your browser."
-            : "Paste your store URL and make an on-brand ad for every product at once."}
+            : "Paste your store URL, or any product link, and make an ad for every product at once."}
         </p>
         <div
           ref={groupRef}

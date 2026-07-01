@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import { fetchStoreProducts, prepareStoreLogo, type StoreProduct } from "@/lib/store";
@@ -11,10 +11,11 @@ import { removeProductBackground } from "@/lib/bgRemove";
 import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { setBatch } from "@/lib/batch";
+import { downloadUrl, adFileName } from "@/lib/download";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
-import { Button } from "../ui/Button";
-import { Alert, ArrowRight, Check } from "../icons";
+import { Button, ButtonLink } from "../ui/Button";
+import { Alert, ArrowRight, Check, Download } from "../icons";
 
 const FORMATS: { value: AspectRatio; label: string }[] = [
   { value: "16:9", label: "16:9" },
@@ -29,8 +30,16 @@ function priceToCents(raw: string): number {
   return Number.isFinite(n) ? Math.round(n * 100) : 0;
 }
 
+// One finished ad from a batch run, for the summary grid + download-all.
+interface MadeAd {
+  id: string;
+  title: string;
+  fmt: AspectRatio;
+  image: string;
+  video: string;
+}
+
 export function StoreCampaign() {
-  const router = useRouter();
   const [storeUrl, setStoreUrl] = useState("");
   const [importing, setImporting] = useState(false);
   const [products, setProducts] = useState<StoreProduct[] | null>(null);
@@ -44,6 +53,11 @@ export function StoreCampaign() {
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Set once a run finishes — the form gives way to the batch summary.
+  const [result, setResult] = useState<{ made: MadeAd[]; skipped: string[] } | null>(null);
+  const [dlBusy, setDlBusy] = useState(false);
+  const [dlMsg, setDlMsg] = useState<string | null>(null);
 
   const total = useMemo(() => picked.size * formats.length, [picked, formats]);
 
@@ -88,9 +102,8 @@ export function StoreCampaign() {
 
     setRunning(true);
     setError(null);
-    const ids: string[] = [];
-    let made = 0;
-    let skipped = 0;
+    const made: MadeAd[] = [];
+    const skipped: string[] = [];
     try {
       for (let i = 0; i < chosen.length; i++) {
         const product = chosen[i];
@@ -110,7 +123,7 @@ export function StoreCampaign() {
           const cleaned = (await removeProductBackground(blob)) ?? blob;
           objectUrl = URL.createObjectURL(cleaned);
         } catch {
-          skipped++;
+          skipped.push(product.title);
           continue; // a product whose image won't load shouldn't kill the batch
         }
 
@@ -131,7 +144,6 @@ export function StoreCampaign() {
 
           for (const fmt of formats) {
             const id = crypto.randomUUID();
-            ids.push(id);
             setStatus(`Rendering ${product.title} · ${fmt} ${at}…`);
             const blob = await renderAdInBrowser({
               productTitle: product.title,
@@ -168,34 +180,120 @@ export function StoreCampaign() {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             };
-            await saveRenderedAdViaBackend(job, blob, imageFile, {
+            const videoUrl = await saveRenderedAdViaBackend(job, blob, imageFile, {
               accent: spec.palette.accent,
               logo: storeLogo?.cutout,
               logoKnockout: storeLogo?.transparent,
             });
-            made++;
+            made.push({ id, title: product.title, fmt, image: product.image, video: videoUrl });
           }
         } catch {
-          skipped++;
+          skipped.push(product.title);
         } finally {
           URL.revokeObjectURL(objectUrl);
         }
       }
 
-      if (made === 0) {
+      if (made.length === 0) {
         setError("Couldn't generate any ads — try different products or formats.");
         setStatus(null);
         setRunning(false);
         return;
       }
-      // Land on the first ad; the pager flips through the rest of this batch.
-      setBatch(ids);
-      router.push(ids[0] ? `/jobs/${ids[0]}` : "/");
+      // The pager on each ad page flips through this batch.
+      setBatch(made.map((m) => m.id));
+      setResult({ made, skipped });
+      setStatus(null);
+      setRunning(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed.");
       setStatus(null);
       setRunning(false);
     }
+  }
+
+  async function downloadAll() {
+    if (!result) return;
+    setDlBusy(true);
+    let ok = 0;
+    for (let i = 0; i < result.made.length; i++) {
+      const m = result.made[i];
+      setDlMsg(`Downloading ${i + 1}/${result.made.length}…`);
+      if (await downloadUrl(m.video, adFileName(m.title, m.fmt, m.id))) ok++;
+    }
+    setDlBusy(false);
+    setDlMsg(ok === result.made.length ? "All downloaded" : `Downloaded ${ok} of ${result.made.length}`);
+    setTimeout(() => setDlMsg(null), 3000);
+  }
+
+  // Batch finished — show what was made instead of dumping the user on one ad.
+  if (result) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <p className="text-[16px] font-medium text-ink">
+            Made {result.made.length} ad{result.made.length === 1 ? "" : "s"}
+            {result.skipped.length > 0 && (
+              <span className="font-normal text-driftwood">
+                {" "}
+                · {result.skipped.length} skipped
+              </span>
+            )}
+          </p>
+          <p className="mt-1 text-[13px] text-fog">
+            Saved to your library. Open one and flip through the batch with the arrows.
+          </p>
+        </div>
+
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {result.made.map((m) => (
+            <li key={m.id}>
+              <Link
+                href={`/jobs/${m.id}`}
+                className="group flex items-center gap-3 rounded-[12px] border border-ash bg-white p-2.5 transition-colors duration-150 ease-out hover:border-driftwood"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={m.image}
+                  alt=""
+                  loading="lazy"
+                  className="size-12 shrink-0 rounded-[8px] bg-sand object-contain"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium text-ink">
+                    {m.title}
+                  </span>
+                  <span className="font-mono text-[12px] text-driftwood">{m.fmt}</span>
+                </span>
+                <ArrowRight className="shrink-0 text-[16px] text-driftwood transition-colors duration-150 ease-out group-hover:text-ink" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        {result.skipped.length > 0 && (
+          <p className="flex items-start gap-2 text-[13px] text-driftwood">
+            <Alert className="mt-0.5 shrink-0 text-[16px]" />
+            <span>Skipped (image or render failed): {result.skipped.join(", ")}</span>
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button onClick={downloadAll} loading={dlBusy}>
+            <Download className="text-[18px]" />
+            {dlBusy ? dlMsg ?? "Downloading…" : "Download all"}
+          </Button>
+          <ButtonLink href={`/jobs/${result.made[0].id}`} variant="secondary">
+            Open first ad
+            <ArrowRight className="text-[16px]" />
+          </ButtonLink>
+          <Button variant="ghost" onClick={() => setResult(null)}>
+            Make more
+          </Button>
+          {!dlBusy && dlMsg && <span className="text-[13px] text-driftwood">{dlMsg}</span>}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -204,7 +302,7 @@ export function StoreCampaign() {
       <form onSubmit={onImport}>
         <Field
           label="Your store"
-          hint="A Shopify store with a public products feed. Dart pulls the catalogue."
+          hint="A Shopify store URL pulls the whole catalogue. A product page link imports just that product."
         >
           <div className="flex items-stretch gap-2">
             <div className="flex-1">

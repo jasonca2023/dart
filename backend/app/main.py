@@ -68,7 +68,17 @@ async def _ssrf_safe_get(url: str, *, max_redirects: int = 5):
     import httpx
 
     async with httpx.AsyncClient(
-        timeout=20.0, follow_redirects=False, headers={"User-Agent": "Mozilla/5.0"}
+        timeout=20.0,
+        follow_redirects=False,
+        # A realistic browser UA — several stores' bot filters reject the bare
+        # "Mozilla/5.0" but serve the same public page to a normal browser string.
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,image/webp,*/*;q=0.8",
+        },
     ) as client:
         current = url
         for _ in range(max_redirects):
@@ -119,6 +129,124 @@ async def _fetch_store_logo(origin: str) -> str | None:
         return str(httpx.URL(origin).join(best[1]))
     except Exception:
         return None
+
+
+async def _fetch_shopify_product(netloc: str, handle: str) -> dict | None:
+    """A Shopify product page also exposes `/products/<handle>.json` — fetch just
+    that product, so pasting a product link imports one product, not the catalogue.
+    Returns {title, image, price} or None.
+    """
+    try:
+        r = await _ssrf_safe_get(f"https://{netloc}/products/{handle}.json")
+        r.raise_for_status()
+        p = r.json().get("product") or {}
+    except Exception:
+        return None
+    images = p.get("images") or []
+    variants = p.get("variants") or []
+    image = images[0].get("src") if images and isinstance(images[0], dict) else None
+    price = variants[0].get("price") if variants and isinstance(variants[0], dict) else None
+    title = p.get("title")
+    if title and image:
+        return {"title": str(title), "image": str(image), "price": f"${price}" if price else ""}
+    return None
+
+
+async def _fetch_product_page(url: str) -> dict | None:
+    """Best-effort: read a single product page (any platform) via the structured
+    data most stores embed for search engines — JSON-LD Product first, OpenGraph
+    product tags second. Returns {title, image, price} or None. Free — an HTTP
+    fetch + parsing, no APIs.
+    """
+    import html as html_lib
+    import json
+    import re
+
+    import httpx
+
+    try:
+        r = await _ssrf_safe_get(url)
+        r.raise_for_status()
+        page = r.text[:1_500_000]
+    except Exception:
+        return None
+
+    def absolute(img: str | None) -> str | None:
+        if not img:
+            return None
+        try:
+            return str(httpx.URL(url).join(img))
+        except Exception:
+            return None
+
+    def from_json_ld() -> dict | None:
+        for m in re.finditer(
+            r'<script\b[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+            page,
+            re.IGNORECASE | re.DOTALL,
+        ):
+            try:
+                data = json.loads(m.group(1).strip())
+            except Exception:
+                continue
+            nodes = data if isinstance(data, list) else [data]
+            graph: list[dict] = []
+            for n in nodes:
+                if isinstance(n, dict):
+                    graph.append(n)
+                    more = n.get("@graph")
+                    if isinstance(more, list):
+                        graph.extend(x for x in more if isinstance(x, dict))
+            for node in graph:
+                types = node.get("@type")
+                types = types if isinstance(types, list) else [types]
+                if "Product" not in [str(t) for t in types]:
+                    continue
+                title = node.get("name")
+                image = node.get("image")
+                if isinstance(image, list):
+                    image = image[0] if image else None
+                if isinstance(image, dict):
+                    image = image.get("url")
+                offers = node.get("offers") or {}
+                if isinstance(offers, list):
+                    offers = next((o for o in offers if isinstance(o, dict)), {})
+                if not isinstance(offers, dict):
+                    offers = {}
+                price = offers.get("price") or offers.get("lowPrice")
+                image_url = absolute(str(image)) if image else None
+                if title and image_url:
+                    return {
+                        "title": html_lib.unescape(str(title)).strip(),
+                        "image": image_url,
+                        "price": f"${price}" if price else "",
+                    }
+        return None
+
+    def from_open_graph() -> dict | None:
+        og: dict[str, str] = {}
+        for m in re.finditer(r"<meta\b[^>]*>", page, re.IGNORECASE):
+            tag = m.group(0)
+            k = re.search(r'(?:property|name)=["\']([^"\']+)["\']', tag, re.IGNORECASE)
+            v = re.search(r'content=["\']([^"\']*)["\']', tag, re.IGNORECASE)
+            if k and v:
+                og.setdefault(k.group(1).lower(), v.group(1))
+        # Only trust OpenGraph when the page declares itself a product — otherwise a
+        # homepage's og:title/og:image would import as a junk "product".
+        if "product" not in og.get("og:type", ""):
+            return None
+        title = og.get("og:title")
+        image = absolute(og.get("og:image"))
+        price = og.get("product:price:amount") or og.get("og:price:amount")
+        if title and image:
+            return {
+                "title": html_lib.unescape(title).strip(),
+                "image": image,
+                "price": f"${price}" if price else "",
+            }
+        return None
+
+    return from_json_ld() or from_open_graph()
 
 
 VIDEO_BUCKET = "dart-videos"
@@ -173,9 +301,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Pull a store's PUBLIC Shopify products feed (`/products.json`) so a merchant
         # can batch-generate ads for their whole catalogue — no app, no OAuth, no key.
         # SSRF-guarded like the image proxy.
+        import re
+
         parsed = urlparse(url if "://" in url else f"https://{url}")
         if not parsed.netloc:
             raise DartError(INVALID_URL, "Enter your store URL.", status=400)
+
+        # A product-page link imports just that product (Shopify exposes
+        # /products/<handle>.json); a store URL imports the whole catalogue.
+        handle = re.match(r"^/products/([^/?#.]+)", parsed.path or "")
+        if handle:
+            product = await _fetch_shopify_product(parsed.netloc, handle.group(1))
+            if product:
+                logo = await _fetch_store_logo(f"https://{parsed.netloc}")
+                return {"products": [product], "logo": logo}
+
         feed = f"https://{parsed.netloc}/products.json?limit=100"
         try:
             r = await _ssrf_safe_get(feed)
@@ -184,9 +324,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except DartError:
             raise
         except Exception as e:
+            # Not a Shopify feed — fall back to reading the pasted page itself as a
+            # single product (JSON-LD / OpenGraph), so any product link works.
+            page_url = url if "://" in url else f"https://{url}"
+            product = await _fetch_product_page(page_url)
+            if product:
+                logo = await _fetch_store_logo(f"https://{parsed.netloc}")
+                return {"products": [product], "logo": logo}
             raise DartError(
                 SCRAPE_FAILED,
-                "Couldn't read that store — it needs a public Shopify products feed.",
+                "Couldn't read that link — paste a Shopify store URL, or a product page that publishes its product data.",
                 status=502,
             ) from e
 
