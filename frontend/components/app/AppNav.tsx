@@ -13,18 +13,34 @@ const LINKS: { href: string; label: string }[] = [
   { href: "/ads", label: "Ads" },
 ];
 
+// Navigating between Dashboard and Ads remounts this component (separate pages),
+// so the slide has to survive a remount: the pill's last position is stashed in
+// sessionStorage, the fresh mount renders it there first, then animates to the
+// newly measured spot.
+const POS_KEY = "dart:nav-pill";
+
+function storedPill(): { left: number; width: number } | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(POS_KEY) || "null");
+    return v && typeof v.left === "number" && typeof v.width === "number" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AppNav() {
   const pathname = usePathname();
   const navRef = useRef<HTMLElement | null>(null);
-  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(storedPill);
 
   const activeIndex = LINKS.findIndex(({ href }) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href),
   );
 
-  // Measure the active link and park the pill under it. Re-measures on path
+  // Measure the active link and slide the pill under it. Re-measures on path
   // change and on resize (font metrics/layout can shift the offsets).
   useEffect(() => {
+    let raf = 0;
     const measure = () => {
       const nav = navRef.current;
       const el = nav?.querySelectorAll("a")[activeIndex];
@@ -34,11 +50,21 @@ export function AppNav() {
       }
       const navBox = nav.getBoundingClientRect();
       const box = el.getBoundingClientRect();
-      setPill({ left: box.left - navBox.left, width: box.width });
+      const next = { left: box.left - navBox.left, width: box.width };
+      try {
+        sessionStorage.setItem(POS_KEY, JSON.stringify(next));
+      } catch {
+        /* fine — the slide just won't survive a remount */
+      }
+      // Let the stored (old) position paint first so the move transitions.
+      raf = requestAnimationFrame(() => setPill(next));
     };
     measure();
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      cancelAnimationFrame(raf);
+    };
   }, [activeIndex]);
 
   return (
