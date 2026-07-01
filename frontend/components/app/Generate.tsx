@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LaunchForm } from "./LaunchForm";
 import { StoreCampaign } from "./StoreCampaign";
 
@@ -8,6 +8,22 @@ import { StoreCampaign } from "./StoreCampaign";
 // (import the catalogue and render an ad for every product).
 export function Generate() {
   const [mode, setMode] = useState<"one" | "store">("one");
+  const groupRef = useRef<HTMLDivElement | null>(null);
+  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null);
+
+  // The white thumb slides under the active option instead of jumping.
+  const activeIndex = mode === "one" ? 0 : 1;
+  useEffect(() => {
+    const measure = () => {
+      const el = groupRef.current?.querySelectorAll("button")[activeIndex];
+      if (!el) return;
+      setThumb({ left: el.offsetLeft, width: el.offsetWidth });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [activeIndex]);
+
   return (
     <>
       <div className="mb-8">
@@ -17,7 +33,17 @@ export function Generate() {
             ? "Upload a product photo. Get a short, polished animated ad, rendered in your browser."
             : "Paste your store URL and make an on-brand ad for every product at once."}
         </p>
-        <div className="mt-5 inline-flex rounded-full border border-ash bg-sand p-1">
+        <div
+          ref={groupRef}
+          className="relative mt-5 inline-flex rounded-full border border-ash bg-sand p-1"
+        >
+          {thumb && (
+            <span
+              aria-hidden
+              className="absolute top-1 bottom-1 rounded-full bg-white shadow-[var(--shadow-inset)] transition-[left,width] duration-300 ease-out motion-reduce:transition-none"
+              style={{ left: thumb.left, width: thumb.width }}
+            />
+          )}
           {([
             ["one", "One ad"],
             ["store", "From your store"],
@@ -26,11 +52,10 @@ export function Generate() {
               key={v}
               type="button"
               onClick={() => setMode(v)}
+              aria-pressed={mode === v}
               className={
-                "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors duration-150 ease-out " +
-                (mode === v
-                  ? "bg-white text-ink shadow-[var(--shadow-inset)]"
-                  : "text-driftwood hover:text-ink")
+                "relative rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors duration-150 ease-out " +
+                (mode === v ? "text-ink" : "text-driftwood hover:text-ink")
               }
             >
               {label}
