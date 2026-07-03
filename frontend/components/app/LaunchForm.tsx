@@ -437,7 +437,11 @@ export function LaunchForm() {
               max={DURATION_MAX}
               step={1}
               value={Number.isFinite(duration) ? duration : ""}
-              onChange={(e) => setDuration(Number(e.target.value))}
+              // Number("") is 0, not NaN — map a cleared field to NaN so it can
+              // actually be emptied (the render fallback handles NaN).
+              onChange={(e) =>
+                setDuration(e.target.value === "" ? NaN : Number(e.target.value))
+              }
               onBlur={(e) => setDuration(clampDuration(Number(e.target.value) || 10))}
               className="w-24"
               aria-label="Duration in seconds"

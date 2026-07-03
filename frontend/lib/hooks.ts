@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api } from "./api";
+import { api, ApiRequestError } from "./api";
 import { isTerminal } from "./format";
 import type { Job } from "./types";
 
@@ -57,8 +57,12 @@ export function useJobPolling(id: string | null, intervalMs = 2000) {
         }
       } catch (e) {
         if (!active) return;
+        // A definitive "not found" isn't a transient blip — fail immediately so
+        // the caller can fall back (browser-rendered ads only exist in the
+        // library, and retrying five times kept them loading for ~10s).
+        const notFound = e instanceof ApiRequestError && e.status === 404;
         fails += 1;
-        if (fails >= 5) {
+        if (notFound || fails >= 5) {
           setError(e instanceof Error ? e.message : "Could not load job.");
           setLoading(false);
         } else {

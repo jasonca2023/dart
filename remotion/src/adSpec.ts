@@ -284,9 +284,14 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
   // Scene set is per-mood (TONE_STRUCTURE): hook -> hero -> (feature) -> (price)
   // -> outro, with mood-specific pacing weights. The optional feature beat only
   // appears for moods that want it AND when there's room.
-  const totalFrames = Math.max(1, Math.round(input.durationSec * FPS));
+  // Guard the duration: a NaN/0/negative/Infinity slips past `Math.max(1, …)`
+  // (Math.max(1, NaN) === NaN) and would emit NaN scene frames → a broken
+  // composition. Callers already clamp, but the brain must never produce one.
+  const durationSec =
+    Number.isFinite(input.durationSec) && input.durationSec > 0 ? input.durationSec : 10;
+  const totalFrames = Math.max(1, Math.round(durationSec * FPS));
   const hasPrice = !!input.price.trim();
-  const longEnough = input.durationSec >= 8;
+  const longEnough = durationSec >= 8;
   const w = structure.weights;
 
   const types: SceneType[] = ["hook", "hero"];
@@ -343,9 +348,11 @@ export function clampSpec(spec: AdSpec): AdSpec {
     onStage: safe(p.onStage, "#0b0b12"),
   };
   const min = Math.round(FPS * 0.6);
+  // Math.max(min, NaN) is NaN — a non-finite frame count must clamp to the
+  // floor, or one bad scene breaks the whole composition.
   const scenes = (spec.scenes.length ? spec.scenes : DEFAULT_SPEC.scenes).map((s) => ({
     ...s,
-    frames: Math.max(min, Math.round(s.frames)),
+    frames: Number.isFinite(s.frames) ? Math.max(min, Math.round(s.frames)) : min,
   }));
   return { ...spec, palette, scenes };
 }

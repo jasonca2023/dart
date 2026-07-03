@@ -119,11 +119,13 @@ server-side except the `NEXT_PUBLIC_*` values.
 | Backend URL | `frontend/.env.local`: `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` | Unset → frontend uses its local mock. |
 | Supabase (browser) | `frontend/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Auth + saved-ads library (the publishable/anon key is browser-safe). |
 | Supabase (backend) | `.env`: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Service-role key used by `POST /save-ad` to store the video + library row. Setting `SUPABASE_URL` also makes write endpoints require a valid login. |
+| CORS (backend, prod) | `.env`: `CORS_ORIGINS` | JSON array of allowed frontend origins. Local default already allows `http://localhost:3000`. |
 | Workers AI (copy) | `frontend/wrangler.jsonc`: the `AI` binding | No key — Cloudflare provides inference on the free tier. Locally unavailable, so dev falls back to rule-based copy. |
 
-> `.env.example` at the root documents the **legacy** server-side video pipeline
-> (Anthropic script model, LTX/Kling video providers, web scraper). The shipped app
-> renders client-side and doesn't need any of those keys.
+> `.env.example` at the root walks through every backend variable — the shipped app
+> only needs the Supabase pair (plus `CORS_ORIGINS` in production). The legacy
+> server-side pipeline keys (Anthropic script model, LTX/Kling video providers, web
+> scraper) are listed at the bottom of it and stay unset.
 
 ## What it does
 

@@ -1,11 +1,17 @@
 import type { JobStatus } from "./types";
 
 export function money(cents: number, currency = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
+  // `currency` can come from scraped page data and isn't always a valid ISO
+  // 4217 code ("US Dollar", "£") — Intl throws a RangeError on those.
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(cents / 100);
+  } catch {
+    return `$${(cents / 100).toFixed(2)}`;
+  }
 }
 
 export function cost(cents: number): string {

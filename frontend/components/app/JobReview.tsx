@@ -321,6 +321,12 @@ export function JobReview({ id }: { id: string }) {
     "idle",
   );
   const renderRef = useRef(false);
+  // Release the rendered blob when it's replaced or the page unmounts.
+  useEffect(() => {
+    return () => {
+      if (clientVideo) URL.revokeObjectURL(clientVideo);
+    };
+  }, [clientVideo]);
   useEffect(() => {
     if (!job || job.status !== "ready" || job.video_url || clientVideo) return;
     if (!job.product?.images?.[0] || renderRef.current) return;

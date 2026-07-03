@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import { fetchStoreProducts, prepareStoreLogo, type StoreProduct } from "@/lib/store";
 import type { PreparedLogo } from "@/lib/logo";
@@ -61,6 +61,8 @@ export function StoreCampaign() {
 
   const total = useMemo(() => picked.size * formats.length, [picked, formats]);
 
+  const importSeq = useRef(0);
+
   async function onImport(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -69,9 +71,14 @@ export function StoreCampaign() {
       const { products: list, logo } = await fetchStoreProducts(storeUrl);
       setProducts(list);
       setPicked(new Set()); // start empty — the user picks what to turn into ads
-      // Pull the store's own brand mark for the end-card (best-effort).
+      // Pull the store's own brand mark for the end-card (best-effort). Guard
+      // against a slow earlier import landing after a newer one and attaching
+      // the wrong store's logo.
       setStoreLogo(null);
-      prepareStoreLogo(logo, storeUrl).then(setStoreLogo);
+      const seq = ++importSeq.current;
+      prepareStoreLogo(logo, storeUrl).then((l) => {
+        if (seq === importSeq.current) setStoreLogo(l);
+      });
       if (list.length === 0) setError("No products found in that store's public feed.");
     } catch (err) {
       setProducts(null);

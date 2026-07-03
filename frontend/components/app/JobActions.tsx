@@ -95,6 +95,8 @@ export function JobActions({
     try {
       const job = await api.regenerate(jobId);
       router.push(`/jobs/${job.id}`);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Couldn’t regenerate.");
     } finally {
       setBusy(null);
     }

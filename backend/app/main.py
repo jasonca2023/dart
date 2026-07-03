@@ -5,9 +5,7 @@ Run: uvicorn app.main:app --reload  (from the backend/ directory)
 
 from __future__ import annotations
 
-import ipaddress
 import logging
-import socket
 
 from urllib.parse import urlparse
 
@@ -27,72 +25,14 @@ from .errors import (
     DartError,
     dart_error_handler,
 )
+from .netguard import is_public_host, ssrf_safe_get
 from .pipeline import Orchestrator
 from .providers.factory import build_providers
 from .store import JobStore
 
-
-def _is_public_host(host: str | None) -> bool:
-    """True only when every address `host` resolves to is a public IP — blocks
-    SSRF to loopback/link-local/private/reserved ranges (e.g. cloud metadata at
-    169.254.169.254) via the image proxy.
-    """
-    if not host:
-        return False
-    try:
-        infos = socket.getaddrinfo(host, None)
-    except OSError:
-        return False
-    for info in infos:
-        try:
-            addr = ipaddress.ip_address(info[4][0])
-        except ValueError:
-            return False
-        if (
-            addr.is_private
-            or addr.is_loopback
-            or addr.is_link_local
-            or addr.is_reserved
-            or addr.is_multicast
-            or addr.is_unspecified
-        ):
-            return False
-    return True
-
-
-async def _ssrf_safe_get(url: str, *, max_redirects: int = 5):
-    """GET `url`, following redirects manually and re-validating every hop's host
-    against private/loopback/link-local ranges (SSRF guard). Raises DartError on a
-    disallowed host, a bad scheme, or too many redirects.
-    """
-    import httpx
-
-    async with httpx.AsyncClient(
-        timeout=20.0,
-        follow_redirects=False,
-        # A realistic browser UA — several stores' bot filters reject the bare
-        # "Mozilla/5.0" but serve the same public page to a normal browser string.
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-            ),
-            "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,image/webp,*/*;q=0.8",
-        },
-    ) as client:
-        current = url
-        for _ in range(max_redirects):
-            p = urlparse(current)
-            if p.scheme not in ("http", "https") or not p.netloc:
-                raise DartError(INVALID_URL, "Bad url.", status=400)
-            if not _is_public_host(p.hostname):
-                raise DartError(INVALID_URL, "Host is not allowed.", status=400)
-            r = await client.get(current)
-            if r.is_redirect and "location" in r.headers:
-                current = str(httpx.URL(current).join(r.headers["location"]))
-                continue
-            return r
-        raise DartError(SCRAPE_FAILED, "Too many redirects.", status=502)
+# Back-compat aliases (the guard moved to netguard so the scraper shares it).
+_is_public_host = is_public_host
+_ssrf_safe_get = ssrf_safe_get
 
 
 async def _fetch_store_logo(origin: str) -> str | None:
@@ -251,6 +191,12 @@ async def _fetch_product_page(url: str) -> dict | None:
 
 VIDEO_BUCKET = "dart-videos"
 
+# Upload/proxy caps — a browser render tops out well under these; anything
+# bigger is hostile or a mistake, and the whole body is held in memory.
+MAX_PROXY_IMAGE_BYTES = 25 * 1024 * 1024
+MAX_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_VIDEO_UPLOAD_BYTES = 300 * 1024 * 1024
+
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
@@ -285,7 +231,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Re-serves an external product image same-origin (with CORS) so the
         # browser can draw it into the Remotion canvas without tainting it.
         try:
-            r = await _ssrf_safe_get(url)
+            r = await ssrf_safe_get(url, max_bytes=MAX_PROXY_IMAGE_BYTES)
             r.raise_for_status()
         except DartError:
             raise
@@ -294,7 +240,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         media_type = r.headers.get("content-type", "image/jpeg")
         if not media_type.startswith("image/"):
             raise DartError(SCRAPE_FAILED, "URL is not an image.", status=400)
-        return Response(content=r.content, media_type=media_type)
+        return Response(
+            content=r.content,
+            media_type=media_type,
+            headers={
+                # The upstream content type is attacker-influenced; never let the
+                # browser sniff it into something else, and make sure an SVG's
+                # scripts can't run if the proxied URL is opened directly.
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+                "Cache-Control": "public, max-age=86400",
+            },
+        )
 
     @app.get("/store-products")
     async def store_products(url: str = Query(...)) -> dict:
@@ -308,8 +265,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise DartError(INVALID_URL, "Enter your store URL.", status=400)
 
         # A product-page link imports just that product (Shopify exposes
-        # /products/<handle>.json); a store URL imports the whole catalogue.
-        handle = re.match(r"^/products/([^/?#.]+)", parsed.path or "")
+        # /products/<handle>.json) — whether at /products/x or nested under a
+        # collection (/collections/y/products/x); a bare store URL imports all.
+        handle = re.search(r"/products/([^/?#.]+)", parsed.path or "")
         if handle:
             product = await _fetch_shopify_product(parsed.netloc, handle.group(1))
             if product:
@@ -321,6 +279,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             r = await _ssrf_safe_get(feed)
             r.raise_for_status()
             data = r.json()
+            # A real Shopify feed is {"products": [...]}. Anything else (a bare
+            # array, an HTML error page that happens to parse, a JSON object with
+            # no products) is "not a feed" → fall through to page scraping.
+            products = data.get("products") if isinstance(data, dict) else None
+            if not isinstance(products, list):
+                raise ValueError("not a Shopify products feed")
         except DartError:
             raise
         except Exception as e:
@@ -338,7 +302,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ) from e
 
         out: list[dict] = []
-        for p in (data.get("products") or [])[:100]:
+        for p in products[:100]:
             images = p.get("images") or []
             variants = p.get("variants") or []
             image = images[0].get("src") if images and isinstance(images[0], dict) else None
@@ -401,9 +365,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return f"{base}/storage/v1/object/public/{VIDEO_BUCKET}/{path}"
 
         async with httpx.AsyncClient(timeout=120.0) as client:
+            # The row id is client-chosen and the write below runs with the
+            # service-role key (bypasses RLS) as an upsert — so before touching
+            # anything, make sure the id doesn't already belong to ANOTHER user,
+            # or one user could overwrite someone else's library entry.
+            r = await client.get(
+                f"{base}/rest/v1/dart_ads",
+                headers=auth,
+                params={"id": f"eq.{safe_id}", "select": "user_id", "limit": "1"},
+            )
+            if r.status_code != 200:
+                raise DartError(
+                    SCRAPE_FAILED, "Could not verify the ad id.", status=502
+                )
+            rows = r.json()
+            if rows and rows[0].get("user_id") != user_id:
+                raise DartError(
+                    UNAUTHORIZED, "That ad id belongs to another user.", status=403
+                )
+
             image_url: str | None = None
             if image is not None:
                 img_bytes = await image.read()
+                if len(img_bytes) > MAX_IMAGE_UPLOAD_BYTES:
+                    raise DartError(SCRAPE_FAILED, "Image is too large.", status=413)
                 ext = (image.filename or "img.png").rsplit(".", 1)[-1].lower()
                 ext = "".join(c for c in ext if c.isalnum()) or "png"
                 img_path = f"{user_id}/img-{safe_id}.{ext}"
@@ -421,26 +406,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 image_url = public_url(img_path)
 
             # The brand mark used for this ad, so editing it later can reproduce the
-            # exact branding. Best-effort — a failed logo upload must not fail the save.
+            # exact branding. Best-effort — a failed (or oversized) logo upload must
+            # not fail the save.
             logo_url: str | None = None
             if logo is not None:
                 logo_bytes = await logo.read()
-                lext = (logo.filename or "logo.png").rsplit(".", 1)[-1].lower()
-                lext = "".join(c for c in lext if c.isalnum()) or "png"
-                logo_path = f"{user_id}/logo-{safe_id}.{lext}"
-                lr = await client.post(
-                    f"{base}/storage/v1/object/{VIDEO_BUCKET}/{logo_path}",
-                    headers={
-                        **auth,
-                        "x-upsert": "true",
-                        "Content-Type": logo.content_type or "image/png",
-                    },
-                    content=logo_bytes,
-                )
-                if lr.status_code < 300:
-                    logo_url = public_url(logo_path)
+                if logo_bytes and len(logo_bytes) <= MAX_IMAGE_UPLOAD_BYTES:
+                    lext = (logo.filename or "logo.png").rsplit(".", 1)[-1].lower()
+                    lext = "".join(c for c in lext if c.isalnum()) or "png"
+                    logo_path = f"{user_id}/logo-{safe_id}.{lext}"
+                    lr = await client.post(
+                        f"{base}/storage/v1/object/{VIDEO_BUCKET}/{logo_path}",
+                        headers={
+                            **auth,
+                            "x-upsert": "true",
+                            "Content-Type": logo.content_type or "image/png",
+                        },
+                        content=logo_bytes,
+                    )
+                    if lr.status_code < 300:
+                        logo_url = public_url(logo_path)
 
             vid_bytes = await video.read()
+            if len(vid_bytes) > MAX_VIDEO_UPLOAD_BYTES:
+                raise DartError(SCRAPE_FAILED, "Video is too large.", status=413)
             vid_type = video.content_type or "video/mp4"
             vid_ext = "webm" if "webm" in vid_type else "mp4"
             vid_path = f"{user_id}/{safe_id}.{vid_ext}"

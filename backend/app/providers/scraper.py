@@ -21,18 +21,8 @@ from urllib.parse import urlparse
 
 from ..errors import INVALID_URL, NO_PRODUCT_IMAGE, SCRAPE_FAILED, DartError
 from ..models import Product
+from ..netguard import BROWSER_HEADERS as _BROWSER_HEADERS, ssrf_safe_get
 from .base import ProductScraper
-
-_BROWSER_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    # gzip/deflate only — httpx decodes these without the optional brotli dep.
-    "Accept-Encoding": "gzip, deflate",
-}
 
 # Common main-image patterns, in priority order (Amazon hiRes/landing, then generic).
 _IMAGE_PATTERNS = [
@@ -223,18 +213,14 @@ class WebProductScraper(ProductScraper):
 
     async def scrape(self, url: str) -> Product:
         _validate_url(url)
+        # The URL is user-supplied, so it goes through the shared SSRF guard —
+        # public hosts only, every redirect hop re-validated.
         try:
-            import httpx
-        except ImportError as e:  # pragma: no cover - dependency guard
-            raise DartError(SCRAPE_FAILED, "httpx is not installed.", status=500) from e
-
-        try:
-            async with httpx.AsyncClient(
-                timeout=self.timeout, follow_redirects=True, headers=_BROWSER_HEADERS
-            ) as client:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                html = resp.text
+            resp = await ssrf_safe_get(url, timeout=self.timeout, headers=_BROWSER_HEADERS)
+            resp.raise_for_status()
+            html = resp.text
+        except DartError:
+            raise
         except Exception as e:
             raise DartError(
                 SCRAPE_FAILED,
