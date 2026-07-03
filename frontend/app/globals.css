@@ -430,12 +430,15 @@ h3 {
   }
 }
 
-/* ── Grid tiles — staggered pop-in on mount ───────────────── */
-/* Each tile scales + rises in with a slight overshoot; callers set an
- * animation-delay per index so the grid cascades in. `both` holds the hidden
- * start state through the delay (no flash of the settled tile first). The
- * reduced-motion block below collapses this to an instant appearance. */
-.dart-tile-in {
+/* ── Grid tiles — pop in as they scroll into view ─────────── */
+/* Tiles start hidden; an IntersectionObserver scoped to the scroll container
+ * sets data-revealed as each enters view, playing the pop (scale + rise with a
+ * slight overshoot). `both` holds the hidden start state so there's no flash of
+ * the settled tile. The reduced-motion block below collapses it to instant. */
+.tile-reveal {
+  opacity: 0;
+}
+.tile-reveal[data-revealed="true"] {
   animation: dart-tile-in var(--dur-slow) var(--ease-out) both;
 }
 @keyframes dart-tile-in {

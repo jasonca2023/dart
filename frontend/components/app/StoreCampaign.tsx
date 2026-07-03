@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import { fetchStoreProducts, prepareStoreLogo, type StoreProduct } from "@/lib/store";
 import type { PreparedLogo } from "@/lib/logo";
@@ -60,6 +60,40 @@ export function StoreCampaign() {
   const [dlMsg, setDlMsg] = useState<string | null>(null);
 
   const total = useMemo(() => picked.size * formats.length, [picked, formats]);
+
+  // Pop each tile in as it scrolls into the picker's own scroll area. The tiles
+  // live in an overflow container, so the observer's root is that container (not
+  // the page) or nothing below the fold would ever count as "in view". One-shot
+  // per tile; re-runs (and re-hides) when the product set changes.
+  const gridRef = useRef<HTMLUListElement | null>(null);
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const tiles = Array.from(grid.querySelectorAll<HTMLElement>(":scope > li"));
+    tiles.forEach((t) => delete t.dataset.revealed);
+    if (typeof IntersectionObserver === "undefined") {
+      tiles.forEach((t) => (t.dataset.revealed = "true"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        // Reveal top-to-bottom, with a small stagger within each wave so a
+        // scrolled-in batch cascades instead of popping all at once.
+        entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+          .forEach((e, idx) => {
+            const el = e.target as HTMLElement;
+            el.style.animationDelay = `${Math.min(idx * 45, 180)}ms`;
+            el.dataset.revealed = "true";
+            io.unobserve(el);
+          });
+      },
+      { root: grid, rootMargin: "0px 0px -6% 0px", threshold: 0.1 },
+    );
+    tiles.forEach((t) => io.observe(t));
+    return () => io.disconnect();
+  }, [products]);
 
   const importSeq = useRef(0);
 
@@ -415,40 +449,41 @@ export function StoreCampaign() {
                 {picked.size === products.length ? "Clear all" : "Select all"}
               </button>
             </div>
-            <ul className="grid max-h-[560px] grid-cols-2 gap-3 overflow-y-auto px-1 py-1 sm:grid-cols-3 lg:grid-cols-4">
+            <ul
+              ref={gridRef}
+              className="grid max-h-[560px] grid-cols-2 gap-x-4 gap-y-6 overflow-y-auto px-1 py-1 sm:grid-cols-3 lg:grid-cols-4"
+            >
               {products.map((p, i) => {
                 const on = picked.has(i);
                 return (
-                  // Staggered pop-in: each tile animates in a beat after the last
-                  // (capped so a big catalogue still finishes quickly). One-shot on
-                  // mount — toggling selection doesn't remount, so it won't replay.
-                  <li
-                    key={i}
-                    className="dart-tile-in"
-                    style={{ animationDelay: `${Math.min(i * 22, 400)}ms` }}
-                  >
+                  // Hidden until it scrolls into view, then pops in (see the
+                  // IntersectionObserver above). Reveal is imperative, so toggling
+                  // selection doesn't replay it.
+                  <li key={i} className="tile-reveal">
                     <button
                       type="button"
                       onClick={() => toggle(i)}
                       aria-pressed={on}
                       title={p.title}
-                      className={
-                        "group relative flex w-full flex-col overflow-hidden rounded-[16px] border bg-white text-left " +
-                        "transition-[border-color,box-shadow,transform] duration-200 ease-out " +
-                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink " +
-                        (on
-                          ? "border-ink shadow-[var(--shadow-elevated)]"
-                          : "border-ash hover:-translate-y-0.5 hover:border-driftwood hover:shadow-[var(--shadow-ring)]")
-                      }
+                      className="group block w-full text-left transition-transform duration-200 ease-out hover:-translate-y-1 focus:outline-none"
                     >
-                      <div className="relative aspect-square overflow-hidden bg-sand">
+                      {/* No card frame — just the photo on a soft rounded ground.
+                          Selection reads as an ink ring on the image itself. */}
+                      <div
+                        className={
+                          "relative aspect-square overflow-hidden rounded-[14px] bg-sand ring-2 transition-shadow duration-200 ease-out " +
+                          (on
+                            ? "ring-ink"
+                            : "ring-transparent group-hover:ring-ash group-focus-visible:ring-ink")
+                        }
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={p.image}
                           alt=""
                           loading="lazy"
                           className={
-                            "size-full object-contain p-3 transition-transform duration-300 ease-out group-hover:scale-[1.04] " +
+                            "size-full object-contain p-3 transition-transform duration-300 ease-out group-hover:scale-[1.05] " +
                             (on ? "scale-[1.02]" : "")
                           }
                         />
@@ -466,12 +501,12 @@ export function StoreCampaign() {
                           <Check className="text-[13px]" />
                         </span>
                       </div>
-                      <div className="flex flex-1 flex-col gap-1 p-3">
+                      <div className="flex flex-col gap-0.5 px-0.5 pt-2.5">
                         <span className="line-clamp-2 text-[13px] font-medium leading-snug text-ink">
                           {p.title}
                         </span>
                         {p.price && (
-                          <span className="mt-auto pt-0.5 font-mono text-[12px] tabular-nums text-driftwood">
+                          <span className="font-mono text-[12px] tabular-nums text-driftwood">
                             {p.price}
                           </span>
                         )}
