@@ -419,7 +419,14 @@ export function StoreCampaign() {
               {products.map((p, i) => {
                 const on = picked.has(i);
                 return (
-                  <li key={i}>
+                  // Staggered pop-in: each tile animates in a beat after the last
+                  // (capped so a big catalogue still finishes quickly). One-shot on
+                  // mount — toggling selection doesn't remount, so it won't replay.
+                  <li
+                    key={i}
+                    className="dart-tile-in"
+                    style={{ animationDelay: `${Math.min(i * 22, 400)}ms` }}
+                  >
                     <button
                       type="button"
                       onClick={() => toggle(i)}

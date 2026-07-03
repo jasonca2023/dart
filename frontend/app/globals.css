@@ -430,6 +430,29 @@ h3 {
   }
 }
 
+/* ── Grid tiles — staggered pop-in on mount ───────────────── */
+/* Each tile scales + rises in with a slight overshoot; callers set an
+ * animation-delay per index so the grid cascades in. `both` holds the hidden
+ * start state through the delay (no flash of the settled tile first). The
+ * reduced-motion block below collapses this to an instant appearance. */
+.dart-tile-in {
+  animation: dart-tile-in var(--dur-slow) var(--ease-out) both;
+}
+@keyframes dart-tile-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ── Scanning dots ────────────────────────────────────────── */
 @keyframes dart-bounce {
   0%,
