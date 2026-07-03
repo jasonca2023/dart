@@ -387,15 +387,18 @@ export function StoreCampaign() {
             </div>
           </Field>
 
-          {/* Product picker — tap the products you want as ads */}
+          {/* Product picker — an image-forward grid; tap a tile to select it. */}
           <div>
-            <div className="mb-3 flex items-end justify-between">
+            <div className="mb-4 flex items-end justify-between gap-3">
               <div>
                 <p className="text-[14px] font-medium text-ink">
                   Pick the products to turn into ads
                 </p>
                 <p className="mt-0.5 text-[12px] text-fog">
-                  {picked.size} selected · {products.length} found
+                  <span className={picked.size > 0 ? "font-medium text-ink" : ""}>
+                    {picked.size} selected
+                  </span>{" "}
+                  · {products.length} found
                 </p>
               </div>
               <button
@@ -407,12 +410,12 @@ export function StoreCampaign() {
                       : new Set(products.map((_, i) => i)),
                   )
                 }
-                className="text-[13px] font-medium text-driftwood transition-colors duration-150 ease-out hover:text-ink"
+                className="shrink-0 rounded-full border border-ash bg-white px-3 py-1.5 text-[12px] font-medium text-driftwood transition-colors duration-150 ease-out hover:border-driftwood hover:text-ink"
               >
-                {picked.size === products.length ? "Clear" : "Select all"}
+                {picked.size === products.length ? "Clear all" : "Select all"}
               </button>
             </div>
-            <ul className="grid max-h-[440px] grid-cols-1 gap-2 overflow-y-auto px-0.5 py-0.5 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid max-h-[560px] grid-cols-2 gap-3 overflow-y-auto px-1 py-1 sm:grid-cols-3 lg:grid-cols-4">
               {products.map((p, i) => {
                 const on = picked.has(i);
                 return (
@@ -421,37 +424,51 @@ export function StoreCampaign() {
                       type="button"
                       onClick={() => toggle(i)}
                       aria-pressed={on}
+                      title={p.title}
                       className={
-                        "group flex w-full items-center gap-3 rounded-[12px] border bg-white p-2.5 text-left transition-colors duration-150 ease-out " +
-                        (on ? "border-ink" : "border-ash hover:border-driftwood")
+                        "group relative flex w-full flex-col overflow-hidden rounded-[16px] border bg-white text-left " +
+                        "transition-[border-color,box-shadow,transform] duration-200 ease-out " +
+                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink " +
+                        (on
+                          ? "border-ink shadow-[var(--shadow-elevated)]"
+                          : "border-ash hover:-translate-y-0.5 hover:border-driftwood hover:shadow-[var(--shadow-ring)]")
                       }
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={p.image}
-                        alt=""
-                        loading="lazy"
-                        className="size-12 shrink-0 rounded-[8px] bg-sand object-contain"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-medium text-ink">
+                      <div className="relative aspect-square overflow-hidden bg-sand">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.image}
+                          alt=""
+                          loading="lazy"
+                          className={
+                            "size-full object-contain p-3 transition-transform duration-300 ease-out group-hover:scale-[1.04] " +
+                            (on ? "scale-[1.02]" : "")
+                          }
+                        />
+                        {/* Selection check — a hollow ink ring at rest (so tiles read
+                            as selectable), filled ink when chosen. */}
+                        <span
+                          aria-hidden
+                          className={
+                            "absolute right-2.5 top-2.5 grid size-6 place-items-center rounded-full border backdrop-blur-sm transition-all duration-150 ease-out " +
+                            (on
+                              ? "border-ink bg-ink text-white"
+                              : "border-mist bg-white/80 text-transparent group-hover:border-driftwood")
+                          }
+                        >
+                          <Check className="text-[13px]" />
+                        </span>
+                      </div>
+                      <div className="flex flex-1 flex-col gap-1 p-3">
+                        <span className="line-clamp-2 text-[13px] font-medium leading-snug text-ink">
                           {p.title}
                         </span>
                         {p.price && (
-                          <span className="font-mono text-[12px] text-driftwood">{p.price}</span>
+                          <span className="mt-auto pt-0.5 font-mono text-[12px] tabular-nums text-driftwood">
+                            {p.price}
+                          </span>
                         )}
-                      </span>
-                      <span
-                        className={
-                          "grid size-5 shrink-0 place-items-center rounded-[6px] border transition-colors duration-150 ease-out " +
-                          (on
-                            ? "border-ink bg-ink text-white"
-                            : "border-mist bg-white text-transparent group-hover:border-driftwood")
-                        }
-                        aria-hidden
-                      >
-                        <Check className="text-[12px]" />
-                      </span>
+                      </div>
                     </button>
                   </li>
                 );
