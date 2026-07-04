@@ -317,37 +317,61 @@ const Copy: React.FC<{ spec: AdSpec; color: string; u: number; portrait: boolean
 
 // --- Scenes ---------------------------------------------------------------
 
-const HookScene: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
+const HookScene: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
   const u = useUnit();
   const t = TEMPO[spec.tone];
-  // The hook owns the first ~3s — the single highest-leverage beat for retention.
-  // Snap it in fast (low dur/stagger so the words land in well under a second),
-  // big and bold, then hold. A thick accent rule swipes under it as the anchor.
+  // The hook owns the first ~3s — the highest-leverage beat for retention. Open
+  // on the REAL product (research: the first frames should show the product, not
+  // a blank title card), then land the hook line fast in a gradient lockup so the
+  // copy stays legible over the photo. A thick accent rule anchors it.
   const hookT: Tempo = { ...t, dur: Math.min(t.dur, 16), stagger: Math.min(t.stagger, 4) };
-  const { panel, accent, text } = spec.palette;
+  const { panel, stage, accent, text, onStage } = spec.palette;
   const rule = useReveal(2 + hookT.stagger * 2, hookT);
   const m = margin(u, portrait);
+  // Darken the copy end (bottom for tall, left for wide) so text reads over the
+  // product; the opposite end stays clear so the product is visible immediately.
+  const scrim = portrait
+    ? `linear-gradient(to top, ${panel} 4%, ${panel}e6 20%, ${panel}00 60%)`
+    : `linear-gradient(to right, ${panel} 2%, ${panel}e6 30%, ${panel}00 66%)`;
   return (
-    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", padding: `0 ${m}px` }}>
-      <KineticText
-        text={scene.text || ""}
-        start={2}
-        t={hookT}
-        fontSize={(portrait ? 84 : 122) * u}
-        weight={780}
-        color={text}
-        letterSpacing={-3.6 * u}
-        align="left"
-        maxWidth="13ch"
+    <AbsoluteFill style={{ backgroundColor: panel }}>
+      <ProductStage
+        src={productImage}
+        motion={scene.motion}
+        t={t}
+        sceneFrames={scene.frames}
+        stage={stage}
+        onStage={onStage}
+        accent={accent}
+        widthPct={portrait ? "84%" : "58%"}
       />
-      <div
+      <AbsoluteFill style={{ backgroundImage: scrim }} />
+      <AbsoluteFill
         style={{
-          marginTop: 44 * u,
-          width: interpolate(rule, [0, 1], [0, 132 * u]),
-          height: 4 * u,
-          backgroundColor: accent,
+          justifyContent: portrait ? "flex-end" : "center",
+          padding: portrait ? `0 ${m}px ${58 * u}px` : `0 ${m}px`,
         }}
-      />
+      >
+        <KineticText
+          text={scene.text || ""}
+          start={2}
+          t={hookT}
+          fontSize={(portrait ? 76 : 112) * u}
+          weight={780}
+          color={text}
+          letterSpacing={-3.2 * u}
+          align="left"
+          maxWidth="13ch"
+        />
+        <div
+          style={{
+            marginTop: 34 * u,
+            width: interpolate(rule, [0, 1], [0, 132 * u]),
+            height: 4 * u,
+            backgroundColor: accent,
+          }}
+        />
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };
@@ -804,35 +828,64 @@ const SceneStage: React.FC<{
   );
 };
 
+// Reel-safe insets (fractions of the frame). Vertical formats get a bottom-
+// weighted safe frame so legible copy never lands under a platform's UI (TikTok
+// covers the bottom ~17% and Reels even more); the panel-coloured margin mats
+// the rest, so the ad reads as a deliberately framed reel. Landscape and square
+// bleed full-frame (no reel chrome to dodge). Derived from the actual dims, so
+// it's right regardless of how the composition was sized.
+function safeInsets(width: number, height: number) {
+  const ratio = height / width;
+  if (ratio >= 1.7) return { top: 0.05, bottom: 0.17, left: 0.045, right: 0.045 }; // 9:16
+  if (ratio >= 1.2) return { top: 0.035, bottom: 0.09, left: 0.03, right: 0.03 }; // 4:5
+  return { top: 0, bottom: 0, left: 0, right: 0 }; // 16:9, 1:1
+}
+
 export const ProductAd: React.FC<ProductAdProps> = (props) => {
   const spec = props.spec ?? fallbackSpec(props);
   const { width, height } = useVideoConfig();
   const portrait = height > width;
   const wide = width > height * 1.2; // only 16:9 — square/vertical stack
+  const ins = safeInsets(width, height);
 
   let offset = 0;
 
   return (
     <AbsoluteFill style={{ backgroundColor: spec.palette.panel, fontFamily: FONT_FAMILY[spec.font] }}>
-      {spec.scenes.map((scene, i) => {
-        const from = offset;
-        offset += scene.frames;
-        return (
-          <Sequence key={i} from={from} durationInFrames={scene.frames} layout="none">
-            <SceneStage index={i} frames={scene.frames} exit={i < spec.scenes.length - 1}>
-              <SceneView
-                spec={spec}
-                scene={scene}
-                productImage={props.productImage}
-                portrait={portrait}
-                wide={wide}
-                brandLogo={props.brandLogo}
-                brandLogoKnockout={props.brandLogoKnockout}
-              />
-            </SceneStage>
-          </Sequence>
-        );
-      })}
+      {/* Reel-safe frame: on vertical formats every scene renders inside the safe
+          rectangle and the panel-coloured margin mats the rest, so copy never
+          lands under a platform's UI. Landscape/square get a zero inset (full
+          bleed), so this is inert for 16:9 and 1:1. */}
+      <div
+        style={{
+          position: "absolute",
+          top: ins.top * height,
+          bottom: ins.bottom * height,
+          left: ins.left * width,
+          right: ins.right * width,
+          overflow: "hidden",
+        }}
+      >
+        {spec.scenes.map((scene, i) => {
+          const from = offset;
+          offset += scene.frames;
+          return (
+            <Sequence key={i} from={from} durationInFrames={scene.frames} layout="none">
+              <SceneStage index={i} frames={scene.frames} exit={i < spec.scenes.length - 1}>
+                <SceneView
+                  spec={spec}
+                  scene={scene}
+                  productImage={props.productImage}
+                  portrait={portrait}
+                  wide={wide}
+                  brandLogo={props.brandLogo}
+                  brandLogoKnockout={props.brandLogoKnockout}
+                />
+              </SceneStage>
+            </Sequence>
+          );
+        })}
+      </div>
     </AbsoluteFill>
   );
 };

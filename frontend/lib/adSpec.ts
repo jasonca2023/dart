@@ -238,6 +238,15 @@ function clip(s: string, max: number): string {
   return cut.replace(/[\s([{,;:.–-]+$/, "") + "…";
 }
 
+// Hard word cap for the hook line. Short-form ad research is consistent that the
+// opener should be a handful of words, on screen by ~second one — so the hook is
+// capped by word count (then by chars as a backstop), not just characters.
+function clipWords(s: string, maxWords: number, maxChars: number): string {
+  const words = s.trim().split(/\s+/);
+  const capped = words.length > maxWords ? words.slice(0, maxWords).join(" ") : s;
+  return clip(capped, maxChars);
+}
+
 // Trim a noisy marketplace title down to the core product — its type and edition,
 // the way a human titles an ad. Drops a "(...)"/"[...]" variant block and a
 // trailing "- colour/size/material" (or " | " / " / "-style) segment. Deterministic
@@ -310,7 +319,7 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
   const frames = distribute(totalFrames, weights);
   const scenes: Scene[] = types.map((type, i) => {
     const base: Scene = { type, frames: frames[i], motion };
-    if (type === "hook") base.text = clip(hook, 42);
+    if (type === "hook") base.text = clipWords(hook, 8, 42);
     if (type === "hero") base.text = clip(display, 48);
     if (type === "feature") {
       base.label = clip(feature.label, 22);

@@ -62,6 +62,19 @@ function clip(s: string | undefined, max: number): string | undefined {
   return cut.replace(/[\s.,;:!?-]+$/, "") + "…";
 }
 
+// Hard word cap for the hook — short-form ad research is consistent that the
+// opener should be a handful of words, so cap by word count then by chars.
+function clipWords(
+  s: string | undefined,
+  maxWords: number,
+  maxChars: number,
+): string | undefined {
+  if (!s) return undefined;
+  const words = s.trim().split(/\s+/);
+  const capped = words.length > maxWords ? words.slice(0, maxWords).join(" ") : s;
+  return clip(capped, maxChars);
+}
+
 // Overlay LLM copy onto a template-built spec. Pure; only replaces the fields the
 // model actually returned, re-clipped to the renderer's safe lengths. `name` is the
 // model's trimmed core product name — validated server-side to be a slice of the
