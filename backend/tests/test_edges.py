@@ -21,6 +21,7 @@ def make_client(**overrides) -> TestClient:
         "video_provider": "mock",
         "supabase_url": None,
         "supabase_service_key": None,
+        "rate_limit_enabled": False,  # opt into it per-test where relevant
         "_env_file": None,  # hermetic: ignore any local .env
         **overrides,
     }
@@ -201,3 +202,71 @@ def test_export_destination_validated():
     job = client.post("/jobs", json={"product_url": "https://x.com/p"}).json()
     r = client.post(f"/jobs/{job['id']}/export", json={"destination": "myspace"})
     assert r.status_code == 422
+
+
+# --- rate limiting -------------------------------------------------------------
+
+
+def test_proxy_image_rate_limited_after_burst():
+    # Limit of 3/min: the first 3 (blocked hosts → 400) pass the limiter; the 4th
+    # is refused by the limiter before the handler runs.
+    client = make_client(rate_limit_enabled=True, rate_limit_proxy_per_min=3)
+    url = "http://127.0.0.1/x"
+    codes = [
+        client.get("/proxy-image", params={"url": url}).status_code for _ in range(4)
+    ]
+    assert codes[:3] == [400, 400, 400]
+    assert codes[3] == 429
+    body = client.get("/proxy-image", params={"url": url}).json()
+    assert body["error"]["code"] == "rate_limited"
+
+
+def test_rate_limit_disabled_lets_burst_through():
+    client = make_client(rate_limit_enabled=False)
+    codes = [
+        client.get("/proxy-image", params={"url": "http://127.0.0.1/x"}).status_code
+        for _ in range(6)
+    ]
+    assert all(c == 400 for c in codes)  # never a 429
+
+
+# --- legacy job store + auth ---------------------------------------------------
+
+
+def test_job_store_is_bounded():
+    from app.store import _MAX_JOBS, JobStore
+
+    store = JobStore()
+    first = store.create(
+        product_url="u0",
+        target_audience="a",
+        aspect_ratio="16:9",
+        duration_sec=10,
+        resolution="1080p",
+    )
+    for i in range(_MAX_JOBS + 50):
+        store.create(
+            product_url=f"u{i}",
+            target_audience="a",
+            aspect_ratio="16:9",
+            duration_sec=10,
+            resolution="1080p",
+        )
+    assert len(store.list()) == _MAX_JOBS  # capped
+    # The oldest job was evicted.
+    from app.errors import DartError
+
+    try:
+        store.get(first.id)
+        assert False, "expected the oldest job to be evicted"
+    except DartError as e:
+        assert e.status == 404
+
+
+def test_get_job_requires_auth_when_supabase_configured():
+    # With SUPABASE_URL set, an anonymous GET /jobs/{id} is rejected before any
+    # network call (no Bearer header → 401).
+    client = make_client(supabase_url="https://fake.supabase.co")
+    r = client.get("/jobs/whatever")
+    assert r.status_code == 401
+    assert r.json()["error"]["code"] == "unauthorized"

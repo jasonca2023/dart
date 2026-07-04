@@ -8,6 +8,11 @@ from .errors import NOT_FOUND, DartError
 from .models import Job, utcnow
 
 
+# The store is process-memory only (legacy pipeline). Cap it so a long-running
+# instance can't leak memory as jobs accumulate — evict the oldest past this.
+_MAX_JOBS = 500
+
+
 class JobStore:
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
@@ -32,6 +37,9 @@ class JobStore:
         )
         self._jobs[job.id] = job
         self._order.insert(0, job.id)
+        while len(self._order) > _MAX_JOBS:
+            evicted = self._order.pop()
+            self._jobs.pop(evicted, None)
         return job
 
     def get(self, job_id: str) -> Job:

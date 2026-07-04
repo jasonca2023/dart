@@ -17,6 +17,7 @@ def make_client() -> TestClient:
         script_provider="mock",
         video_provider="mock",
         supabase_url=None,  # auth disabled in tests
+        rate_limit_enabled=False,  # the limiter is shared across the suite
     )
     return TestClient(create_app(settings))
 

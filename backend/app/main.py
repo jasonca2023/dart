@@ -9,7 +9,7 @@ import logging
 
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, File, Form, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +28,7 @@ from .errors import (
 from .netguard import is_public_host, ssrf_safe_get
 from .pipeline import Orchestrator
 from .providers.factory import build_providers
+from .ratelimit import rate_limit
 from .store import JobStore
 
 # Back-compat aliases (the guard moved to netguard so the scraper shares it).
@@ -226,7 +227,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     media.mkdir(parents=True, exist_ok=True)
     app.mount("/media", StaticFiles(directory=str(media)), name="media")
 
-    @app.get("/proxy-image")
+    # Per-IP rate limits for the public endpoints — the open image/scrape proxies
+    # and the (authenticated) save path — so they can't be used to burn bandwidth
+    # or hammer Storage. Limits are configurable per settings.
+    proxy_rl = rate_limit(120, limit_attr="rate_limit_proxy_per_min")
+    store_rl = rate_limit(30, limit_attr="rate_limit_store_per_min")
+    save_rl = rate_limit(60, limit_attr="rate_limit_save_per_min")
+
+    @app.get("/proxy-image", dependencies=[Depends(proxy_rl)])
     async def proxy_image(url: str = Query(...)) -> Response:
         # Re-serves an external product image same-origin (with CORS) so the
         # browser can draw it into the Remotion canvas without tainting it.
@@ -253,7 +261,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
 
-    @app.get("/store-products")
+    @app.get("/store-products", dependencies=[Depends(store_rl)])
     async def store_products(url: str = Query(...)) -> dict:
         # Pull a store's PUBLIC Shopify products feed (`/products.json`) so a merchant
         # can batch-generate ads for their whole catalogue — no app, no OAuth, no key.
@@ -319,7 +327,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         logo = await _fetch_store_logo(f"https://{parsed.netloc}")
         return {"products": out, "logo": logo}
 
-    @app.post("/save-ad")
+    @app.post("/save-ad", dependencies=[Depends(save_rl)])
     async def save_ad(
         video: UploadFile = File(...),
         token: str = Form(...),

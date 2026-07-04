@@ -138,7 +138,11 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return Response.json({ copy: null });
   }
-  const title = (body.title || "").trim();
+  // Cap every field before it reaches the model — the route is public, so this
+  // bounds how large a prompt anyone can push through it.
+  const cap = (v: unknown, n: number) =>
+    typeof v === "string" ? v.trim().slice(0, n) : "";
+  const title = cap(body.title, 200);
   if (!title) return Response.json({ copy: null });
 
   let ai: WorkersAI | undefined;
@@ -151,9 +155,9 @@ export async function POST(req: Request): Promise<Response> {
 
   const user =
     `Product: "${title}"\n` +
-    `Audience: ${(body.audience || "general shoppers").trim()}\n` +
-    `Price: ${(body.price || "").trim() || "not given"}\n` +
-    `Tone: ${(body.tone || "energetic").trim()}\n\n` +
+    `Audience: ${cap(body.audience, 120) || "general shoppers"}\n` +
+    `Price: ${cap(body.price, 48) || "not given"}\n` +
+    `Tone: ${cap(body.tone, 40) || "energetic"}\n\n` +
     `Write the ad copy as JSON.`;
 
   // Try the chat (messages) shape first; fall back to a plain prompt so swapping

@@ -18,9 +18,13 @@ from ..models import (
     utcnow,
 )
 from ..pipeline import Orchestrator
+from ..ratelimit import rate_limit
 from ..store import JobStore
 
 router = APIRouter()
+
+# Per-IP limit for the legacy job routes (shared across every app instance).
+_jobs_rl = rate_limit(30, limit_attr="rate_limit_jobs_per_min")
 
 # Assisted handoff (v1): download returns the rendered asset itself; the platform
 # destinations open that platform's real ad/upload manager so the operator can
@@ -40,7 +44,12 @@ def _orchestrator(request: Request) -> Orchestrator:
     return request.app.state.orchestrator
 
 
-@router.post("/jobs", status_code=201, response_model=Job)
+@router.post(
+    "/jobs",
+    status_code=201,
+    response_model=Job,
+    dependencies=[Depends(_jobs_rl)],
+)
 async def create_job(
     body: CreateJobRequest, request: Request, user: str = Depends(require_user)
 ) -> Job:
@@ -63,11 +72,20 @@ async def list_jobs(request: Request, user: str = Depends(require_user)) -> JobL
 
 
 @router.get("/jobs/{job_id}", response_model=Job)
-async def get_job(job_id: str, request: Request) -> Job:
+async def get_job(
+    job_id: str, request: Request, user: str = Depends(require_user)
+) -> Job:
+    # Auth-gated like the other job routes — the in-memory store is global, so an
+    # anonymous caller shouldn't be able to read arbitrary jobs by id.
     return _store(request).get(job_id)
 
 
-@router.post("/jobs/{job_id}/regenerate", status_code=201, response_model=Job)
+@router.post(
+    "/jobs/{job_id}/regenerate",
+    status_code=201,
+    response_model=Job,
+    dependencies=[Depends(_jobs_rl)],
+)
 async def regenerate_job(
     job_id: str, request: Request, user: str = Depends(require_user)
 ) -> Job:
@@ -83,7 +101,11 @@ async def regenerate_job(
     return job
 
 
-@router.post("/jobs/{job_id}/export", response_model=ExportResponse)
+@router.post(
+    "/jobs/{job_id}/export",
+    response_model=ExportResponse,
+    dependencies=[Depends(_jobs_rl)],
+)
 async def export_job(
     job_id: str, body: ExportRequest, request: Request, user: str = Depends(require_user)
 ) -> ExportResponse:

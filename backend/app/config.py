@@ -23,6 +23,18 @@ class Settings(BaseSettings):
     backend_port: int = 8000
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # --- Rate limiting (per client IP, sliding window) ---
+    # Blunts abuse of the open proxy/scrape endpoints and the save path. Disable
+    # in tests / local dev with no proxy in front.
+    # Ceilings are generous so a real 100-product multi-format batch (which fires
+    # many proxy/save calls, but paced by slow in-browser renders) sails through,
+    # while a scripted abuser doing thousands/min is still cut off.
+    rate_limit_enabled: bool = True
+    rate_limit_proxy_per_min: int = 120
+    rate_limit_store_per_min: int = 30
+    rate_limit_save_per_min: int = 60
+    rate_limit_jobs_per_min: int = 30
+
     # --- Provider selection ---
     # scraper: "mock" | "jsonld"
     scraper_provider: str = "mock"
