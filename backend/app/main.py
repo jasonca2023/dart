@@ -5,7 +5,12 @@ Run: uvicorn app.main:app --reload  (from the backend/ directory)
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
+import shutil
+import subprocess
+import tempfile
 
 from urllib.parse import urlparse
 
@@ -191,6 +196,57 @@ async def _fetch_product_page(url: str) -> dict | None:
 
 
 VIDEO_BUCKET = "dart-videos"
+
+
+def _mp4_transfer_characteristic(data: bytes) -> int | None:
+    """Read the transfer tag from an mp4's `colr` (nclx) box, or None."""
+    i = data.find(b"colr")
+    if i < 4:
+        return None
+    box_start = i - 4
+    if data[box_start + 8 : box_start + 12] not in (b"nclx", b"nclc"):
+        return None
+    try:
+        return int.from_bytes(data[box_start + 14 : box_start + 16], "big")
+    except Exception:
+        return None
+
+
+def _retag_bt709(data: bytes) -> bytes:
+    """Safari's WebCodecs exports tag the video with sRGB transfer (13), which
+    many players render darker than Chrome's BT.709. Relabel it to BT.709
+    *losslessly* — a stream copy that only rewrites the colour tags (container +
+    H.264 SPS), no re-encode. Only touches mp4s that are actually tagged 13;
+    best-effort, so any problem (no ffmpeg, odd input) returns the original bytes.
+    """
+    if _mp4_transfer_characteristic(data) != 13:
+        return data
+    if not shutil.which("ffmpeg"):
+        return data
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            src = os.path.join(d, "in.mp4")
+            dst = os.path.join(d, "out.mp4")
+            with open(src, "wb") as f:
+                f.write(data)
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-i", src, "-c", "copy",
+                    "-bsf:v",
+                    "h264_metadata=transfer_characteristics=1:colour_primaries=1"
+                    ":matrix_coefficients=1:video_full_range_flag=1",
+                    "-color_primaries", "bt709", "-color_trc", "bt709",
+                    "-colorspace", "bt709", "-color_range", "pc",
+                    "-movflags", "+faststart", dst,
+                ],
+                check=True,
+                capture_output=True,
+                timeout=60,
+            )
+            out = open(dst, "rb").read()
+            return out or data
+    except Exception:
+        return data
 
 # Upload/proxy caps — a browser render tops out well under these; anything
 # bigger is hostile or a mistake, and the whole body is held in memory.
@@ -440,6 +496,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 raise DartError(SCRAPE_FAILED, "Video is too large.", status=413)
             vid_type = video.content_type or "video/mp4"
             vid_ext = "webm" if "webm" in vid_type else "mp4"
+            # Normalise Safari's darker sRGB-tagged colour to BT.709 (lossless).
+            # Off-thread so the ffmpeg stream-copy doesn't block the event loop.
+            if vid_ext == "mp4" and settings.video_retag_enabled:
+                vid_bytes = await asyncio.to_thread(_retag_bt709, vid_bytes)
             vid_path = f"{user_id}/{safe_id}.{vid_ext}"
             r = await client.post(
                 f"{base}/storage/v1/object/{VIDEO_BUCKET}/{vid_path}",

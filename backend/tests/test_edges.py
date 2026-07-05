@@ -270,3 +270,42 @@ def test_get_job_requires_auth_when_supabase_configured():
     r = client.get("/jobs/whatever")
     assert r.status_code == 401
     assert r.json()["error"]["code"] == "unauthorized"
+
+
+# --- Safari colour re-tag ------------------------------------------------------
+
+
+def _colr_box(transfer: int) -> bytes:
+    # [size4]['colr']['nclx'][primaries2][transfer2][matrix2][flags1]
+    return (
+        b"\x00\x00\x00\x13colrnclx"
+        + (1).to_bytes(2, "big")
+        + transfer.to_bytes(2, "big")
+        + (1).to_bytes(2, "big")
+        + b"\x80"
+    )
+
+
+def test_mp4_transfer_detection():
+    from app.main import _mp4_transfer_characteristic
+
+    assert _mp4_transfer_characteristic(b"ftyp" + _colr_box(13)) == 13
+    assert _mp4_transfer_characteristic(b"ftyp" + _colr_box(1)) == 1
+    assert _mp4_transfer_characteristic(b"no colr here") is None
+
+
+def test_retag_passes_through_non_safari():
+    from app.main import _retag_bt709
+
+    # transfer != 13 (Chrome) and no-colr both come back byte-identical, untouched.
+    chrome = b"ftyp" + _colr_box(1)
+    assert _retag_bt709(chrome) == chrome
+    assert _retag_bt709(b"not an mp4") == b"not an mp4"
+
+
+def test_retag_degrades_gracefully_on_bad_input():
+    from app.main import _retag_bt709
+
+    # Tagged 13 but not a real mp4 → ffmpeg fails (or is absent) → original bytes.
+    garbage13 = b"ftyp" + _colr_box(13) + b"\x00" * 32
+    assert _retag_bt709(garbage13) == garbage13
