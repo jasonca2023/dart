@@ -8,7 +8,7 @@ import type { PreparedLogo } from "@/lib/logo";
 import { buildAdSpec } from "@/lib/adSpec";
 import { generateCopy, applyCopy } from "@/lib/copy";
 import { removeProductBackground } from "@/lib/bgRemove";
-import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
+import { renderAdInBrowser, canRenderInBrowser, isLikelySafari } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { setBatch } from "@/lib/batch";
 import { downloadUrl, adFileName } from "@/lib/download";
@@ -60,6 +60,9 @@ export function StoreCampaign() {
   const [dlMsg, setDlMsg] = useState<string | null>(null);
 
   const total = useMemo(() => picked.size * formats.length, [picked, formats]);
+
+  const [safari, setSafari] = useState(false);
+  useEffect(() => setSafari(isLikelySafari()), []);
 
   // Pop each tile in as it scrolls into the picker's own scroll area. The tiles
   // live in an overflow container, so the observer's root is that container (not
@@ -139,7 +142,9 @@ export function StoreCampaign() {
     if (chosen.length === 0) return setError("Pick at least one product.");
     if (formats.length === 0) return setError("Pick at least one format.");
     if (!canRenderInBrowser())
-      return setError("In-browser rendering needs a recent Chrome or Edge.");
+      return setError(
+        "In-browser rendering needs a recent Chrome, Edge, Firefox, or Safari 26+.",
+      );
 
     setRunning(true);
     setError(null);
@@ -533,6 +538,12 @@ export function StoreCampaign() {
               </span>
             )}
           </div>
+          {safari && (
+            <p className="text-[12px] leading-relaxed text-driftwood">
+              For the most accurate colours, render in Chrome or Edge — Safari can
+              export a little darker.
+            </p>
+          )}
         </>
       )}
     </div>

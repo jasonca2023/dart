@@ -156,7 +156,13 @@ const ProductStage: React.FC<{
   onStage: string;
   accent: string;
   widthPct: string;
-}> = ({ src, motion, t, sceneFrames, stage, onStage, widthPct }) => {
+  /** Product box height as a % of the scene — smaller keeps a tall product off
+   * the bottom edge (where player chrome / platform UI sits). Defaults to 74%. */
+  heightPct?: string;
+  /** Horizontal placement. "right" pushes the product to the right side so it
+   * clears a left-side text/gradient lockup (the hook). Defaults to centered. */
+  alignX?: "center" | "right";
+}> = ({ src, motion, t, sceneFrames, stage, onStage, widthPct, heightPct, alignX }) => {
   const frame = useCurrentFrame();
   const tt = interpolate(frame, [0, sceneFrames], [0, 1], { extrapolateRight: "clamp" });
   const enter = useReveal(0, t);
@@ -176,8 +182,11 @@ const ProductStage: React.FC<{
   return (
     <AbsoluteFill
       style={{
-        alignItems: "center",
+        // AbsoluteFill is a flex COLUMN, so alignItems is the horizontal axis —
+        // that's what pushes the product right; justifyContent stays vertical-center.
+        alignItems: alignX === "right" ? "flex-end" : "center",
         justifyContent: "center",
+        paddingRight: alignX === "right" ? "4%" : 0,
         backgroundColor: stage,
         backgroundImage: `linear-gradient(176deg, ${onStage}08 0%, ${stage} 52%, ${onStage}10 100%)`,
         overflow: "hidden",
@@ -187,7 +196,7 @@ const ProductStage: React.FC<{
         style={{
           position: "relative",
           width: widthPct,
-          height: "74%",
+          height: heightPct ?? "74%",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -332,7 +341,7 @@ const HookScene: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }
   // product; the opposite end stays clear so the product is visible immediately.
   const scrim = portrait
     ? `linear-gradient(to top, ${panel} 4%, ${panel}e6 20%, ${panel}00 60%)`
-    : `linear-gradient(to right, ${panel} 2%, ${panel}e6 30%, ${panel}00 66%)`;
+    : `linear-gradient(to right, ${panel} 2%, ${panel}e6 26%, ${panel}00 50%)`;
   return (
     <AbsoluteFill style={{ backgroundColor: panel }}>
       <ProductStage
@@ -344,6 +353,8 @@ const HookScene: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }
         onStage={onStage}
         accent={accent}
         widthPct={portrait ? "84%" : "58%"}
+        heightPct={portrait ? "58%" : "66%"}
+        alignX={portrait ? "center" : "right"}
       />
       <AbsoluteFill style={{ backgroundImage: scrim }} />
       <AbsoluteFill

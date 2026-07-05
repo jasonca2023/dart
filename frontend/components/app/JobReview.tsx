@@ -453,8 +453,9 @@ export function JobReview({ id }: { id: string }) {
                 Couldn’t render here
               </h2>
               <p className="mt-2 max-w-md text-[14px] leading-relaxed text-driftwood">
-                In-browser rendering needs a recent Chrome or Edge. Open this
-                page there, or regenerate to try again.
+                In-browser rendering needs a recent Chrome, Edge, Firefox, or
+                Safari 26+. Open this page in one of those, or regenerate to try
+                again.
               </p>
               <div className="mt-6">
                 <JobActions jobId={job.id} failed />

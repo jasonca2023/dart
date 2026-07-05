@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { renderAdInBrowser, canRenderInBrowser } from "@/lib/render";
+import { renderAdInBrowser, canRenderInBrowser, isLikelySafari } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { buildAdSpec } from "@/lib/adSpec";
 import { removeProductBackground } from "@/lib/bgRemove";
@@ -123,9 +123,12 @@ export function LaunchForm() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [safari, setSafari] = useState(false);
+
   // Restore the saved brand kit on mount (sticky across sessions).
   useEffect(() => {
     setBrand(loadBrandKit());
+    setSafari(isLikelySafari());
   }, []);
 
   function updateBrand(patch: Partial<BrandKit>) {
@@ -246,7 +249,9 @@ export function LaunchForm() {
     if (!title.trim()) return setError("Add a product title.");
     if (formats.length === 0) return setError("Pick at least one format.");
     if (!canRenderInBrowser()) {
-      return setError("In-browser rendering needs a recent Chrome or Edge.");
+      return setError(
+        "In-browser rendering needs a recent Chrome, Edge, Firefox, or Safari 26+.",
+      );
     }
     setSubmitting(true);
     setError(null);
@@ -628,6 +633,12 @@ export function LaunchForm() {
             renders the final video(s) in your browser. Nothing leaves your
             control until you publish.
           </p>
+          {safari && (
+            <p className="mt-3 text-[12px] leading-relaxed text-driftwood">
+              For the most accurate colours, render in Chrome or Edge — Safari
+              can export a little darker.
+            </p>
+          )}
         </div>
       </aside>
     </form>

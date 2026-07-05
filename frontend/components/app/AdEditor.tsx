@@ -198,7 +198,9 @@ export function AdEditor({
   async function save(asCopy: boolean) {
     if (!cutoutUrl || !imageFile) return;
     if (!canRenderInBrowser()) {
-      return setError("In-browser rendering needs a recent Chrome or Edge.");
+      return setError(
+        "In-browser rendering needs a recent Chrome, Edge, Firefox, or Safari 26+.",
+      );
     }
     setSaving(asCopy ? "copy" : "save");
     setError(null);

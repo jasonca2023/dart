@@ -23,17 +23,36 @@ export async function renderComponentInBrowser(
   inputProps: Record<string, unknown>,
   opts: { aspectRatio: AspectRatio; durationInSeconds: number; id?: string },
 ): Promise<Blob> {
-  const { renderMediaOnWeb } = await import("@remotion/web-renderer");
+  const { renderMediaOnWeb, canRenderMediaOnWeb } = await import(
+    "@remotion/web-renderer"
+  );
+  const { width, height } = dimsFor(opts.aspectRatio);
+
+  // Dart's ads are silent, so check + render MUTED. That drops the audio-codec
+  // requirement, which is what let Chrome-only work before: browsers with
+  // video-only WebCodecs (Safari 16.4–18) and modern Firefox/Safari can encode
+  // the video, they just couldn't satisfy an audio track we never use.
+  const support = await canRenderMediaOnWeb({ width, height, muted: true });
+  if (!support.canRender) {
+    const err = support.issues.find((i) => i.severity === "error");
+    throw new Error(
+      (err ? `${err.message} ` : "") +
+        "In-browser rendering needs a recent Chrome, Edge, Firefox, or Safari 26+.",
+    );
+  }
+
   const { getBlob } = await renderMediaOnWeb({
     composition: {
       component,
       id: opts.id ?? "Ad",
       durationInFrames: Math.max(1, Math.round(opts.durationInSeconds * FPS)),
       fps: FPS,
-      ...dimsFor(opts.aspectRatio),
+      width,
+      height,
       calculateMetadata: null,
     },
     inputProps,
+    muted: true,
   });
   return getBlob();
 }
@@ -68,4 +87,13 @@ export async function renderAdInBrowser(props: ProductAdProps): Promise<Blob> {
 // Whether this browser can render client-side (needs WebCodecs).
 export function canRenderInBrowser(): boolean {
   return typeof window !== "undefined" && "VideoEncoder" in window;
+}
+
+// Safari's WebCodecs encoder tags colours differently (full-range sRGB), so its
+// exported video can look darker than Chrome's. Best-effort UA sniff — only used
+// to show a soft "render in Chrome for the most accurate colour" hint.
+export function isLikelySafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return /safari/i.test(ua) && !/chrome|chromium|crios|fxios|edg|android/i.test(ua);
 }
