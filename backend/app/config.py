@@ -31,12 +31,14 @@ class Settings(BaseSettings):
     # while a scripted abuser doing thousands/min is still cut off.
     rate_limit_enabled: bool = True
     rate_limit_proxy_per_min: int = 120
-    # Losslessly relabel Safari's sRGB-tagged videos to BT.709 on save so they
-    # don't play darker than Chrome's. Needs ffmpeg on the host; no-op without it.
-    video_retag_enabled: bool = True
     rate_limit_store_per_min: int = 30
     rate_limit_save_per_min: int = 60
     rate_limit_jobs_per_min: int = 30
+
+    # --- Video colour normalisation ---
+    # Losslessly relabel Safari's sRGB-tagged videos to BT.709 on save so they
+    # don't play darker than Chrome's. Needs ffmpeg on the host; no-op without it.
+    video_retag_enabled: bool = True
 
     # --- Provider selection ---
     # scraper: "mock" | "jsonld"
