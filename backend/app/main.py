@@ -547,6 +547,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {
             "status": "ok",
             "save_ad_ready": bool(settings.supabase_url and settings.supabase_service_key),
+            # Whether the Safari colour re-tag will actually run on saves: it needs
+            # ffmpeg on the host and the feature enabled.
+            "video_retag_ready": bool(
+                settings.video_retag_enabled and shutil.which("ffmpeg")
+            ),
             "providers": {
                 "scraper": type(scraper).__name__,
                 "script": type(scripter).__name__,
