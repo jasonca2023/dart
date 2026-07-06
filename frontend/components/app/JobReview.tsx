@@ -89,6 +89,12 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
   // CDN staleness from overwriting the same Storage object.
   const [editedVideo, setEditedVideo] = useState<string | null>(null);
   const [editedAspect, setEditedAspect] = useState<Job["aspect_ratio"] | null>(null);
+  // Release the edit's local blob URL when it's replaced or the view unmounts.
+  useEffect(() => {
+    return () => {
+      if (editedVideo) URL.revokeObjectURL(editedVideo);
+    };
+  }, [editedVideo]);
   const videoUrl = editedVideo ?? ad.video_url;
   const aspect = editedAspect ?? job.aspect_ratio;
   const canEdit = !!ad.product_image && !!ad.product_title;

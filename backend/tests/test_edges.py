@@ -39,6 +39,33 @@ def test_private_hosts_are_not_public(host):
     assert not is_public_host(host)
 
 
+class _FakeReq:
+    def __init__(self, xff=None, peer="9.9.9.9"):
+        self.headers = {"x-forwarded-for": xff} if xff else {}
+        self.client = type("C", (), {"host": peer})() if peer else None
+
+
+@pytest.mark.parametrize(
+    "xff,expected",
+    [
+        ("1.1.1.1, 8.8.8.8", "8.8.8.8"),  # attacker prepends a fake hop on the left
+        ("8.8.4.4, 8.8.8.8", "8.8.8.8"),  # spoofed public IP on the left can't win
+        ("8.8.8.8, 10.0.0.5", "8.8.8.8"),  # private infra hop on the right skipped
+        ("8.8.8.8", "8.8.8.8"),  # single real hop
+    ],
+)
+def test_client_ip_resists_xff_spoofing(xff, expected):
+    from app.ratelimit import client_ip
+
+    assert client_ip(_FakeReq(xff)) == expected
+
+
+def test_client_ip_falls_back_to_peer():
+    from app.ratelimit import client_ip
+
+    assert client_ip(_FakeReq(None, "9.9.9.9")) == "9.9.9.9"
+
+
 @pytest.mark.parametrize(
     "url",
     [

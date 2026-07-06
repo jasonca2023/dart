@@ -9,6 +9,7 @@ the forwarded client IP. A no-op when settings.rate_limit_enabled is False
 
 from __future__ import annotations
 
+import ipaddress
 import time
 from collections import defaultdict, deque
 
@@ -20,11 +21,23 @@ _PRUNE_AT = 20_000  # sweep idle IP buckets once the table grows past this
 
 
 def client_ip(request: Request) -> str:
-    # Behind Render/Cloudflare the caller is the first X-Forwarded-For hop;
-    # request.client.host would just be the proxy.
+    # X-Forwarded-For is spoofable on the LEFT — a client can prepend fake hops.
+    # A trusted proxy (Render) APPENDS the real peer on the right, so walk the
+    # chain right-to-left and take the first PUBLIC address, skipping any private
+    # infra hops. That's the actual client and can't be forged from the request;
+    # keying on the leftmost value would let an attacker mint a fresh rate-limit
+    # bucket per request just by rotating the header.
     xff = request.headers.get("x-forwarded-for")
     if xff:
-        return xff.split(",")[0].strip()
+        parts = [p.strip() for p in xff.split(",") if p.strip()]
+        for candidate in reversed(parts):
+            try:
+                if not ipaddress.ip_address(candidate).is_private:
+                    return candidate
+            except ValueError:
+                continue
+        if parts:
+            return parts[-1]
     return request.client.host if request.client else "unknown"
 
 

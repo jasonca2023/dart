@@ -59,21 +59,29 @@ def is_public_host(host: str | None) -> bool:
     return True
 
 
+# Default response-body cap. Every caller is bounded even if it passes nothing —
+# a public-but-hostile upstream that streams an unbounded body could otherwise
+# exhaust memory. Product pages/feeds and images sit comfortably under this.
+DEFAULT_MAX_BYTES = 15 * 1024 * 1024
+
+
 async def ssrf_safe_get(
     url: str,
     *,
     max_redirects: int = 5,
     timeout: float = 20.0,
     headers: dict[str, str] | None = None,
-    max_bytes: int | None = None,
+    max_bytes: int | None = DEFAULT_MAX_BYTES,
 ):
     """GET `url`, re-validating every redirect hop's host against private ranges.
 
-    Raises DartError on a disallowed host, a bad scheme, too many redirects, or
-    (when `max_bytes` is set) a response larger than the cap.
+    The body is streamed and capped at `max_bytes` *while downloading* (not after),
+    so an upstream with no Content-Length can't blow up memory. Raises DartError on
+    a disallowed host, a bad scheme, too many redirects, or an over-cap response.
     """
     import httpx
 
+    cap = max_bytes if max_bytes is not None else DEFAULT_MAX_BYTES
     async with httpx.AsyncClient(
         timeout=timeout,
         follow_redirects=False,
@@ -86,14 +94,19 @@ async def ssrf_safe_get(
                 raise DartError(INVALID_URL, "Bad url.", status=400)
             if not is_public_host(p.hostname):
                 raise DartError(INVALID_URL, "Host is not allowed.", status=400)
-            r = await client.get(current)
-            if r.is_redirect and "location" in r.headers:
-                current = str(httpx.URL(current).join(r.headers["location"]))
-                continue
-            if max_bytes is not None:
+            async with client.stream("GET", current) as r:
+                if r.is_redirect and "location" in r.headers:
+                    current = str(httpx.URL(current).join(r.headers["location"]))
+                    continue  # body not read; the context closes the stream
                 declared = r.headers.get("content-length")
-                too_big = declared is not None and declared.isdigit() and int(declared) > max_bytes
-                if too_big or len(r.content) > max_bytes:
+                if declared is not None and declared.isdigit() and int(declared) > cap:
                     raise DartError(SCRAPE_FAILED, "Response is too large.", status=502)
-            return r
+                buf = bytearray()
+                async for chunk in r.aiter_bytes():
+                    buf += chunk
+                    if len(buf) > cap:
+                        raise DartError(SCRAPE_FAILED, "Response is too large.", status=502)
+                # Populate .content so .text/.json() work after the stream closes.
+                r._content = bytes(buf)
+                return r
         raise DartError(SCRAPE_FAILED, "Too many redirects.", status=502)
