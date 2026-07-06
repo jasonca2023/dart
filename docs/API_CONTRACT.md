@@ -1,7 +1,7 @@
 # Dart — API Contract
 
 The HTTP surface between the browser app and the FastAPI backend. The ad is rendered in
-the browser; the backend persists the result and proxies images.
+the browser; the backend persists the result, proxies images, and imports store catalogues.
 
 Base URL (local dev): `http://localhost:8000`
 
@@ -10,15 +10,19 @@ Base URL (local dev): `http://localhost:8000`
 ## Conventions
 - IDs are UUID strings; timestamps are ISO-8601 UTC.
 - Errors use the [error model](#error-model) with an appropriate HTTP status.
-- Money is integer **cents** (`cost_cents`); for Dart it's always `0`.
+- Money is integer **cents**. `cost_cents` is always `0` (rendering is free); `price_cents`
+  carries the merchant's product price when set.
+- The public endpoints (`/proxy-image`, `/store-products`, `/save-ad`) are **per-IP rate
+  limited**; over the limit returns `429 rate_limited`.
 
 ---
 
 ## `POST /save-ad` — persist a browser-rendered ad
 
-`multipart/form-data`. Stores the rendered video + product image in Supabase Storage
-and writes the library row with the service-role key, scoped to the user the token
-identifies.
+`multipart/form-data`. Stores the rendered video + product image (+ optional logo) in
+Supabase Storage and writes the library row with the service-role key, scoped to the user
+the token identifies. Safari's sRGB-tagged mp4s are losslessly re-tagged to BT.709 on the
+way in (needs ffmpeg on the host; a no-op otherwise).
 
 **Form fields**
 
@@ -29,29 +33,52 @@ identifies.
 | `id` | string | client UUID; sanitised to `[A-Za-z0-9_-]` before use in any path |
 | `product_title` | string | optional |
 | `target_audience` | string | optional |
-| `aspect_ratio` | string | `16:9` \| `1:1` \| `4:5` \| `9:16` |
-| `duration_sec` | int | 3–20 |
+| `aspect_ratio` | string | `16:9` \| `1:1` \| `4:5` \| `9:16` (default `16:9`) |
+| `duration_sec` | int | 3–20 (default `10`) |
 | `resolution` | string | `1080p` |
 | `cost_cents` | int | `0` |
+| `price_cents` | int | product price in cents; `0` when none |
+| `brand_accent` | string | optional hex accent used for the ad |
+| `logo_knockout` | bool | whether the saved logo is a knockout-safe cutout |
 | `image` | file | optional product image |
+| `logo` | file | optional brand logo (best-effort; a failed logo never fails the save) |
 
 **Response `200`**
 ```json
 { "video_url": "https://<project>.supabase.co/storage/v1/object/public/dart-videos/<uid>/<id>.mp4",
   "image_url": "https://.../img-<id>.png" }
 ```
-`401` invalid/expired token · `500` server missing Supabase config · `502` upload failed.
+`401` invalid/expired token · `403` the id belongs to another user · `413` upload too
+large · `429` rate limited · `500` server missing Supabase config · `502` upload failed.
 
 ---
 
 ## `GET /proxy-image?url=` — same-origin image proxy
 
 Re-serves an external product image so the browser can draw it onto the render canvas
-without tainting it. SSRF-guarded: scheme + host are validated, and redirects are
-followed manually with every hop re-checked against private/loopback/link-local ranges.
+without tainting it. SSRF-guarded: scheme + host are validated, and redirects are followed
+manually with every hop re-checked against private/loopback/link-local ranges. The body is
+streamed and capped (25 MB). The response is served `nosniff` with a locked-down CSP.
 
 **Response `200`** — the image bytes (`Content-Type: image/*`).
-`400` bad/disallowed URL or non-image · `502` fetch failed.
+`400` bad/disallowed URL or non-image · `429` rate limited · `502` fetch failed / too large.
+
+---
+
+## `GET /store-products?url=` — import a store catalogue
+
+Pulls a merchant's **public** Shopify products feed (`/products.json`) so the app can
+batch-generate an ad per product — no OAuth, no key. A product-page link (`/products/<handle>`)
+imports just that product; a bare store URL imports the catalogue (up to 100). Falls back to
+reading a single product page's JSON-LD / OpenGraph when it isn't a Shopify feed. SSRF-guarded
+and rate limited like the image proxy.
+
+**Response `200`**
+```json
+{ "products": [ { "title": "…", "image": "https://…", "price": "$45.00" } ],
+  "logo": "https://…/apple-touch-icon.png" }
+```
+`400` missing/invalid store URL · `429` rate limited · `502` couldn't read the link.
 
 ---
 
@@ -60,17 +87,20 @@ followed manually with every hop re-checked against private/loopback/link-local 
 ```json
 { "status": "ok",
   "save_ad_ready": true,
+  "video_retag_ready": true,
   "providers": { "scraper": "...", "script": "...", "video": "..." } }
 ```
+`video_retag_ready` is true only when ffmpeg is present **and** the re-tag is enabled.
 
 ---
 
 ## Error model
 
 ```json
-{ "error": { "code": "invalid_url", "message": "Image host is not allowed.", "retryable": false } }
+{ "error": { "code": "invalid_url", "message": "Host is not allowed.", "retryable": false } }
 ```
-Codes in use: `invalid_url`, `scrape_failed`, `unauthorized`, `not_found`, `internal`.
+Codes in use: `invalid_url`, `scrape_failed`, `unauthorized`, `rate_limited`, `not_found`,
+`internal`.
 
 ---
 
@@ -80,5 +110,5 @@ An earlier server-side pipeline (`POST /jobs`, `GET /jobs/{id}`, `GET /jobs`,
 `POST /jobs/{id}/regenerate`, `POST /jobs/{id}/export`, `GET/POST /settings*`) still
 exists behind the same app and is covered by tests with all-mock providers, but the
 shipped product does not call it — generation and rendering happen in the browser, and
-persistence goes through `/save-ad`. Those write routes require a Supabase login when
-`SUPABASE_URL` is set.
+persistence goes through `/save-ad`. These routes require a Supabase login when
+`SUPABASE_URL` is set, and are rate limited.

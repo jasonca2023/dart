@@ -141,6 +141,10 @@ dart_ads (Postgres, row-level secured to auth.uid())
   resolution      text          # "1080p"
   status          text          # "ready"
   cost_cents      int           # 0 — rendering is free
+  price_cents     int           # product price in cents (nullable)
+  brand_accent    text          # accent hex used for the ad (nullable)
+  logo_url        text          # saved brand-logo Storage URL (nullable)
+  logo_knockout   bool          # logo is a knockout-safe cutout (nullable)
   created_at      timestamptz
 ```
 
@@ -165,9 +169,11 @@ The brand kit (accent + logo) lives in browser `localStorage`, not the database.
 - **Cost:** $0 per ad — render and copy are client-side / free-tier; `cost_cents` is 0.
 - **Privacy:** nothing leaves the browser until the user publishes; the photo is
   processed and rendered locally.
-- **Compatibility:** rendering needs WebCodecs (recent Chrome / Edge).
-- **Security:** service-role key server-side only; `/proxy-image` is SSRF-guarded
-  (per-redirect host validation); `/save-ad` sanitises the client `id`.
+- **Compatibility:** rendering needs WebCodecs (recent Chrome / Edge / Firefox 130+ /
+  Safari 26+). Safari's sRGB colour tag is normalised to BT.709 on save.
+- **Security:** service-role key server-side only; the public endpoints are SSRF-guarded
+  (per-redirect host validation, streamed size caps) and per-IP rate limited; `/save-ad`
+  sanitises the client `id` and scopes each write to the token's user.
 - **Accessibility:** `:focus-visible` rings; motion gated behind
   `prefers-reduced-motion`.
 

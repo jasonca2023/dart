@@ -11,7 +11,7 @@ for the ad-mood orbs.
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000  (needs a recent Chrome/Edge to render)
+npm run dev      # http://localhost:3000  (rendering needs a recent Chrome/Edge/Firefox/Safari)
 npm run build    # production build
 npm run deploy   # OpenNext build + deploy to Cloudflare
 ```
@@ -52,10 +52,11 @@ Storage, row-level secured) via the backend's `/save-ad`.
 
 | Path | Screen |
 |---|---|
-| `/` | Signed-out: marketing landing. Signed-in: the generate form + saved-ads library. |
-| `/dashboard` | The generate form (photo · title · audience · price · formats · duration) + your library. |
-| `/jobs/[id]` | Review a saved ad: player, download, hand off to TikTok / Meta / YouTube. |
+| `/` | Signed-out: marketing landing. Signed-in: the generate form (photo · title · audience · price · formats · duration). |
+| `/ads` | Your saved-ads library. |
+| `/jobs/[id]` | Review a saved ad: player, download, edit, hand off to TikTok / Meta / YouTube. |
 | `/auth` | Sign in / sign up — Supabase email + password. |
+| `/dashboard` | Legacy path — redirects to `/`. |
 | `/api/copy` | Worker route: Cloudflare Workers AI writes the ad copy. |
 
 ## Layout

@@ -63,7 +63,7 @@ Or via the Cloudflare git integration: Workers → Create → connect the repo �
 `NEXT_PUBLIC_*` vars as **build** environment variables.
 
 Note the Worker URL (e.g. `https://dart-frontend.YOURNAME.workers.dev`).
-Rendering needs WebCodecs, so visitors use a recent Chrome or Edge.
+Rendering needs WebCodecs, so visitors use a recent Chrome, Edge, Firefox, or Safari.
 
 ---
 

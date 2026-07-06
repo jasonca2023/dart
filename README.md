@@ -17,7 +17,7 @@ video still can't reliably do.
 
 > Frontend on Cloudflare, backend on Render, auth + saved ads on Supabase, ad copy
 > on Cloudflare Workers AI. Rendering happens **client-side (WebCodecs)**, so it needs
-> a recent Chrome or Edge. The backend free tier sleeps when idle, so the first save
+> a recent Chrome, Edge, Firefox, or Safari. The backend free tier sleeps when idle, so the first save
 > after a while takes ~50s to wake.
 
 ```
@@ -102,8 +102,8 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:3000 in a recent **Chrome or Edge** (in-browser rendering
-needs WebCodecs).
+Then open http://localhost:3000 in a recent **Chrome, Edge, Firefox, or Safari**
+(in-browser rendering needs WebCodecs).
 
 > With **zero config** the frontend runs without a backend (a local mock drives every
 > screen) and without Workers AI (copy falls back to rule-based templates). To save real
