@@ -145,13 +145,38 @@ const TONE_STRUCTURE: Record<Tone, ToneStructure> = {
   playful: { layout: "editorial", feature: true, weights: { hook: 1.3, hero: 2.1, feature: 1.3, price: 1.2, outro: 1.1 } },
 };
 
-const TONE_MOTION: Record<Tone, Motion> = {
-  luxe: "kenburns-in",
-  energetic: "rise",
-  playful: "pop",
-  calm: "drift",
-  techy: "rise",
-  bold: "pop",
+// Per-product variety pools. For a single ad the seed picks one coherent,
+// mood-appropriate combo; across a batch (many products, one audience → one tone)
+// the seed spreads products over these so a catalogue doesn't collapse to a few
+// identical looks. Each pool leads with the mood's canonical choice, so nothing
+// regresses. Font stays fixed per tone — it's core to the mood's identity.
+const TONE_ACCENT_POOL: Record<Tone, string[]> = {
+  luxe: ["#c8a24c", "#bd9a55", "#9c6b52", "#b0894a", "#caa661"],
+  energetic: ["#ff5a1f", "#1f6bff", "#15c06a", "#ff2d55", "#0aa4ff"],
+  playful: ["#ff5da2", "#ffb020", "#00c2b8", "#7c5cff", "#ff6b6b"],
+  calm: ["#3f9d86", "#6f8fd0", "#c08457", "#5b9aa0", "#9a8f7a"],
+  techy: ["#22e3d3", "#8b5cff", "#2bd96b", "#00c2ff", "#c77dff"],
+  bold: ["#ff3b1d", "#ffd400", "#2b59ff", "#ff2079", "#00d68f"],
+};
+
+// Layouts each mood can wear. Wide (16:9) renders the distinct hero layouts;
+// portrait falls back to banded, so this mainly diversifies landscape.
+const TONE_LAYOUT_POOL: Record<Tone, LayoutVariant[]> = {
+  luxe: ["editorial", "banded", "statement"],
+  energetic: ["split", "banded", "editorial"],
+  playful: ["editorial", "split", "banded"],
+  calm: ["banded", "editorial"],
+  techy: ["banded", "split"],
+  bold: ["statement", "banded"],
+};
+
+const TONE_MOTION_POOL: Record<Tone, Motion[]> = {
+  luxe: ["kenburns-in", "drift"],
+  energetic: ["rise", "kenburns-in", "pop"],
+  playful: ["pop", "rise", "kenburns-in"],
+  calm: ["drift", "kenburns-in"],
+  techy: ["rise", "kenburns-out", "kenburns-in"],
+  bold: ["pop", "rise"],
 };
 
 // Copy templates keyed on tone (the LLM brain replaces these in v2).
@@ -278,11 +303,15 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
   const tone = toneFor(audience, title);
   const seed = hash(`${title}|${audience}|${input.variant ?? 0}`);
 
-  const palette = pick(PALETTES[tone], seed);
+  // Coherent mood, varied per product: base palette + accent, layout, and motion
+  // each drawn from the tone's pool on independent seed shifts — so a batch of
+  // many products doesn't collapse to a handful of identical looks.
+  const base = pick(PALETTES[tone], seed);
+  const palette: Palette = { ...base, accent: pick(TONE_ACCENT_POOL[tone], seed >> 13) };
   const font = TONE_FONT[tone];
   const structure = TONE_STRUCTURE[tone];
-  const layout = structure.layout;
-  const motion = TONE_MOTION[tone];
+  const layout = pick(TONE_LAYOUT_POOL[tone], seed >> 15);
+  const motion = pick(TONE_MOTION_POOL[tone], seed >> 17);
 
   const hook = pick(HOOKS[tone], seed >> 5);
   const subhead = pick(SUBHEADS[tone], seed >> 7);
