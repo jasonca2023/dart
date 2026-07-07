@@ -340,23 +340,33 @@ export function LaunchForm() {
             tone: baseSpec.tone,
           });
           const fmt = formats[0];
+          // Three visually distinct looks, anchored at the previewed variant so
+          // take 1 matches the preview the user shuffled to. Nearby seeds can
+          // collide on the same accent/layout combo, so probe forward and keep
+          // only unique looks (bounded scan; tiny pools just repeat the last).
+          const takeSpecs: (typeof baseSpec)[] = [];
+          const seenLooks = new Set<string>();
+          for (let v = variant; takeSpecs.length < 3 && v < variant + 16; v++) {
+            const s = buildAdSpec({
+              title: title.trim(),
+              audience: audience.trim(),
+              price: formatPrice(price),
+              durationSec: dur,
+              variant: v,
+            });
+            const hookText = s.scenes.find((x) => x.type === "hook")?.text ?? "";
+            const sig = `${s.palette.accent}|${s.layout}|${hookText}`;
+            if (seenLooks.has(sig)) continue;
+            seenLooks.add(sig);
+            takeSpecs.push(s);
+          }
+          while (takeSpecs.length < 3)
+            takeSpecs.push(takeSpecs[takeSpecs.length - 1]);
           labels = [];
           for (let i = 0; i < variants.length; i++) {
             const { label, copy } = variants[i];
             setStatus(`Rendering take ${i + 1}/${variants.length} · ${label}…`);
-            const takeSpec = applyBrand(
-              applyCopy(
-                buildAdSpec({
-                  title: title.trim(),
-                  audience: audience.trim(),
-                  price: formatPrice(price),
-                  durationSec: dur,
-                  variant: i,
-                }),
-                copy,
-              ),
-              brand,
-            );
+            const takeSpec = applyBrand(applyCopy(takeSpecs[i], copy), brand);
             ids.push(await renderAndSave(takeSpec, fmt));
             labels.push(label);
           }
