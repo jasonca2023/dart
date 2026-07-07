@@ -9,6 +9,8 @@
     "lint": "next lint",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
@@ -33,7 +35,9 @@
     "@types/react": "19.1.2",
     "@types/react-dom": "19.1.2",
     "@types/three": "^0.171.0",
+    "jsdom": "^29.1.1",
     "tailwindcss": "4.1.4",
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "vitest": "^4.1.10"
   }
 }
