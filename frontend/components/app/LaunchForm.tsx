@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { renderAdInBrowser, canRenderInBrowser, isLikelySafari } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
-import { buildAdSpec } from "@/lib/adSpec";
+import { buildAdSpec, TONE_ACCENTS } from "@/lib/adSpec";
 import { removeProductBackground } from "@/lib/bgRemove";
 import { generateCopy, generateVariants, applyCopy, useAiCopy } from "@/lib/copy";
 import { applyBrand, loadBrandKit, saveBrandKit, type BrandKit } from "@/lib/brand";
@@ -671,7 +671,7 @@ export function LaunchForm() {
             </>
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 rounded-[14px] bg-white py-10 shadow-[var(--shadow-inset-warm)]">
-              <Orb accent={moodSpec.palette.accent} className="size-24" />
+              <Orb accent={TONE_ACCENTS[moodSpec.tone]} className="size-24" />
               <p className="text-[13px] text-fog">Add a product image to preview</p>
             </div>
           )}
@@ -679,8 +679,8 @@ export function LaunchForm() {
             <div className="flex justify-between">
               <dt className="text-driftwood">Mood</dt>
               <dd className="flex items-center gap-2 font-mono capitalize text-ink">
-                {/* small mood ball — tinted to the mood's accent */}
-                <Orb accent={moodSpec.palette.accent} className="size-5 shrink-0" float={false} />
+                {/* small mood ball — the mood's own colour (matches the landing page), not the brand accent */}
+                <Orb accent={TONE_ACCENTS[moodSpec.tone]} className="size-5 shrink-0" float={false} />
                 {moodSpec.tone} · {moodSpec.layout}
               </dd>
             </div>
