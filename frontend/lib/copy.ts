@@ -21,13 +21,41 @@ export interface CopyInput {
   tone: string;
 }
 
-const cache = new Map<string, AdCopy>();
-const keyOf = (i: CopyInput) =>
-  `${i.title}|${i.audience}|${i.price}|${i.tone}`.toLowerCase();
+// Distinct sales *angles* for A/B "takes" — the same product pitched three ways.
+// Each `hint` steers the AI copy; the `label` names the take in the UI.
+export interface CopyAngle {
+  key: string;
+  label: string;
+  hint: string;
+}
+export const COPY_ANGLES: CopyAngle[] = [
+  {
+    key: "benefit",
+    label: "Benefit",
+    hint: "Lead with the concrete benefit or outcome the buyer gets — make them feel the result.",
+  },
+  {
+    key: "value",
+    label: "Value",
+    hint: "Lead with value — frame it as a smart, worth-it buy; reference the price if one is given.",
+  },
+  {
+    key: "bold",
+    label: "Bold",
+    hint: "Bold and punchy — a confident, high-energy, scroll-stopping hook. Short and daring.",
+  },
+];
 
-export async function generateCopy(input: CopyInput): Promise<AdCopy | null> {
+const cache = new Map<string, AdCopy>();
+const keyOf = (i: CopyInput, angle?: string) =>
+  `${i.title}|${i.audience}|${i.price}|${i.tone}|${angle ?? ""}`.toLowerCase();
+
+export async function generateCopy(
+  input: CopyInput,
+  angle?: string,
+): Promise<AdCopy | null> {
   if (!input.title.trim()) return null;
-  const key = keyOf(input);
+  const key = keyOf(input, angle);
   const hit = cache.get(key);
   if (hit) return hit;
 
@@ -37,7 +65,7 @@ export async function generateCopy(input: CopyInput): Promise<AdCopy | null> {
     const res = await fetch("/api/copy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      body: JSON.stringify(angle ? { ...input, angle } : input),
       signal: ctrl.signal,
     });
     if (!res.ok) return null;
@@ -49,6 +77,22 @@ export async function generateCopy(input: CopyInput): Promise<AdCopy | null> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Generate several distinct copy angles in parallel for A/B "takes". Each entry
+// resolves independently (a failed angle → null copy, so it falls back to the
+// rule-based templates for that take).
+export async function generateVariants(
+  input: CopyInput,
+  angles: CopyAngle[] = COPY_ANGLES,
+): Promise<{ key: string; label: string; copy: AdCopy | null }[]> {
+  return Promise.all(
+    angles.map(async (a) => ({
+      key: a.key,
+      label: a.label,
+      copy: await generateCopy(input, a.hint),
+    })),
+  );
 }
 
 function clip(s: string | undefined, max: number): string | undefined {

@@ -132,7 +132,13 @@ function parseCopy(raw: string, title: string): AdCopy | null {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  let body: { title?: string; audience?: string; price?: string; tone?: string };
+  let body: {
+    title?: string;
+    audience?: string;
+    price?: string;
+    tone?: string;
+    angle?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -144,6 +150,7 @@ export async function POST(req: Request): Promise<Response> {
     typeof v === "string" ? v.trim().slice(0, n) : "";
   const title = cap(body.title, 200);
   if (!title) return Response.json({ copy: null });
+  const angle = cap(body.angle, 200);
 
   let ai: WorkersAI | undefined;
   try {
@@ -157,8 +164,9 @@ export async function POST(req: Request): Promise<Response> {
     `Product: "${title}"\n` +
     `Audience: ${cap(body.audience, 120) || "general shoppers"}\n` +
     `Price: ${cap(body.price, 48) || "not given"}\n` +
-    `Tone: ${cap(body.tone, 40) || "energetic"}\n\n` +
-    `Write the ad copy as JSON.`;
+    `Tone: ${cap(body.tone, 40) || "energetic"}\n` +
+    (angle ? `Angle for THIS take: ${angle} Make the copy clearly reflect this angle.\n` : "") +
+    `\nWrite the ad copy as JSON.`;
 
   // Try the chat (messages) shape first; fall back to a plain prompt so swapping
   // MODEL to one that only accepts `prompt` keeps working.

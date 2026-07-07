@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getBatch } from "@/lib/batch";
+import { getBatch, getBatchLabel } from "@/lib/batch";
 import { ArrowRight } from "../icons";
 
 function PagerButton({ href, dir }: { href: string | null; dir: "prev" | "next" }) {
@@ -31,7 +31,11 @@ function PagerButton({ href, dir }: { href: string | null; dir: "prev" | "next" 
 
 export function AdPager({ currentId }: { currentId: string }) {
   const [ids, setIds] = useState<string[] | null>(null);
-  useEffect(() => setIds(getBatch()), []);
+  const [label, setLabel] = useState<string | null>(null);
+  useEffect(() => {
+    setIds(getBatch());
+    setLabel(getBatchLabel(currentId));
+  }, [currentId]);
 
   if (!ids) return null;
   const i = ids.indexOf(currentId);
@@ -43,6 +47,7 @@ export function AdPager({ currentId }: { currentId: string }) {
     <div className="flex items-center gap-2">
       <PagerButton href={prev ? `/jobs/${prev}` : null} dir="prev" />
       <span className="font-mono text-[12px] tabular-nums text-driftwood">
+        {label && <span className="text-ink">{label} · </span>}
         {i + 1} / {ids.length}
       </span>
       <PagerButton href={next ? `/jobs/${next}` : null} dir="next" />

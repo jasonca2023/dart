@@ -7,13 +7,14 @@ import { renderAdInBrowser, canRenderInBrowser, isLikelySafari } from "@/lib/ren
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { buildAdSpec } from "@/lib/adSpec";
 import { removeProductBackground } from "@/lib/bgRemove";
-import { generateCopy, applyCopy, useAiCopy } from "@/lib/copy";
+import { generateCopy, generateVariants, applyCopy, useAiCopy } from "@/lib/copy";
 import { applyBrand, loadBrandKit, saveBrandKit, type BrandKit } from "@/lib/brand";
 import { prepareLogo } from "@/lib/logo";
 import { setBatch } from "@/lib/batch";
 import { useDebounced } from "@/lib/hooks";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
+import { Segmented } from "../ui/Segmented";
 import { Button } from "../ui/Button";
 import { Orb } from "../ui/Orb";
 import { Alert, ArrowRight, Refresh } from "../icons";
@@ -118,6 +119,7 @@ export function LaunchForm() {
   const [formats, setFormats] = useState<AspectRatio[]>(["16:9"]);
   const [duration, setDuration] = useState<Duration>(10);
   const [variant, setVariant] = useState(0);
+  const [takes, setTakes] = useState<1 | 3>(1);
   const [brand, setBrand] = useState<BrandKit>({});
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -268,77 +270,116 @@ export function LaunchForm() {
         durationSec: dur,
         variant,
       });
-      setStatus("Writing the copy…");
-      const copy = await generateCopy({
-        title: title.trim(),
-        audience: audience.trim(),
-        price: formatPrice(price),
-        tone: baseSpec.tone,
-      });
-      const spec = applyBrand(applyCopy(baseSpec, copy), brand);
 
-      // Background removal runs once; the cutout is reused across every format.
+      // Background removal runs once; the cutout is reused across every render.
       const cleaned = await removeProductBackground(imageFile, setStatus);
-      const renderFile: Blob = cleaned ?? imageFile;
-      const objectUrl = URL.createObjectURL(renderFile);
+      const objectUrl = URL.createObjectURL(cleaned ?? imageFile);
+
+      // Render one ad from a finished spec, save it, and return its id.
+      const renderAndSave = async (
+        spec: typeof baseSpec,
+        fmt: AspectRatio,
+      ): Promise<string> => {
+        const id = crypto.randomUUID();
+        const blob = await renderAdInBrowser({
+          productTitle: title.trim(),
+          productImage: objectUrl,
+          price: formatPrice(price),
+          audience: audience.trim() || "everyone",
+          durationInSeconds: dur,
+          aspectRatio: fmt,
+          accent: spec.palette.accent,
+          brandLogo: brand.logo,
+          brandLogoKnockout: brand.logoTransparent,
+          spec,
+        });
+        const job: Job = {
+          id,
+          status: "ready",
+          product_url: "",
+          target_audience: audience.trim(),
+          aspect_ratio: fmt,
+          duration_sec: dur,
+          resolution: "1080p",
+          product: {
+            title: title.trim(),
+            price: priceToCents(price),
+            currency: "USD",
+            images: [],
+            specs: {},
+            source: "upload",
+          },
+          script: null,
+          video_url: null,
+          error: null,
+          cost_cents: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        await saveRenderedAdViaBackend(job, blob, imageFile, {
+          accent: spec.palette.accent,
+          logo: brand.logo,
+          logoKnockout: brand.logoTransparent,
+        });
+        return id;
+      };
 
       const ids: string[] = [];
+      let labels: (string | null)[] | undefined;
       try {
-        for (let i = 0; i < formats.length; i++) {
-          const fmt = formats[i];
-          const id = crypto.randomUUID();
-          ids.push(id);
-          setStatus(
-            formats.length > 1
-              ? `Rendering ${fmt} (${i + 1}/${formats.length})…`
-              : "Rendering the video…",
-          );
-          const blob = await renderAdInBrowser({
-            productTitle: title.trim(),
-            productImage: objectUrl,
+        if (takes === 3) {
+          // A/B takes: 3 distinct copy angles + distinct looks (variant seed),
+          // rendered in the first chosen format for a clean side-by-side set.
+          setStatus("Writing 3 angles…");
+          const variants = await generateVariants({
+            title: title.trim(),
+            audience: audience.trim(),
             price: formatPrice(price),
-            audience: audience.trim() || "everyone",
-            durationInSeconds: dur,
-            aspectRatio: fmt,
-            accent: spec.palette.accent,
-            brandLogo: brand.logo,
-            brandLogoKnockout: brand.logoTransparent,
-            spec,
+            tone: baseSpec.tone,
           });
-          setStatus(`Saving ${fmt}…`);
-          const job: Job = {
-            id,
-            status: "ready",
-            product_url: "",
-            target_audience: audience.trim(),
-            aspect_ratio: fmt,
-            duration_sec: dur,
-            resolution: "1080p",
-            product: {
-              title: title.trim(),
-              price: priceToCents(price),
-              currency: "USD",
-              images: [],
-              specs: {},
-              source: "upload",
-            },
-            script: null,
-            video_url: null,
-            error: null,
-            cost_cents: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          await saveRenderedAdViaBackend(job, blob, imageFile, {
-            accent: spec.palette.accent,
-            logo: brand.logo,
-            logoKnockout: brand.logoTransparent,
+          const fmt = formats[0];
+          labels = [];
+          for (let i = 0; i < variants.length; i++) {
+            const { label, copy } = variants[i];
+            setStatus(`Rendering take ${i + 1}/${variants.length} · ${label}…`);
+            const takeSpec = applyBrand(
+              applyCopy(
+                buildAdSpec({
+                  title: title.trim(),
+                  audience: audience.trim(),
+                  price: formatPrice(price),
+                  durationSec: dur,
+                  variant: i,
+                }),
+                copy,
+              ),
+              brand,
+            );
+            ids.push(await renderAndSave(takeSpec, fmt));
+            labels.push(label);
+          }
+        } else {
+          setStatus("Writing the copy…");
+          const copy = await generateCopy({
+            title: title.trim(),
+            audience: audience.trim(),
+            price: formatPrice(price),
+            tone: baseSpec.tone,
           });
+          const spec = applyBrand(applyCopy(baseSpec, copy), brand);
+          for (let i = 0; i < formats.length; i++) {
+            setStatus(
+              formats.length > 1
+                ? `Rendering ${formats[i]} (${i + 1}/${formats.length})…`
+                : "Rendering the video…",
+            );
+            ids.push(await renderAndSave(spec, formats[i]));
+          }
         }
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
-      setBatch(ids);
+      setBatch(ids, labels);
       router.push(`/jobs/${ids[0]}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not render the ad.");
@@ -533,6 +574,25 @@ export function LaunchForm() {
           )}
         </Field>
 
+        <Field
+          label="Output"
+          hint={
+            takes === 3
+              ? `Three distinct angles of your ad in ${formats[0] ?? "16:9"} — pick the winner or run them all to A/B test.`
+              : "One ad per format you picked."
+          }
+        >
+          <Segmented
+            ariaLabel="How many takes"
+            value={takes}
+            options={[
+              { value: 1, label: "One ad" },
+              { value: 3, label: "3 takes · A/B" },
+            ]}
+            onChange={(v) => setTakes(v as 1 | 3)}
+          />
+        </Field>
+
         {error && (
           <p role="alert" className="flex items-center gap-2 text-[14px] text-ink">
             <Alert className="text-[18px] text-driftwood" />
@@ -544,9 +604,11 @@ export function LaunchForm() {
           <Button type="submit" size="lg" loading={submitting}>
             {submitting
               ? status ?? "Rendering…"
-              : formats.length > 1
-                ? `Generate ${formats.length} ads`
-                : "Generate ad"}
+              : takes === 3
+                ? "Generate 3 takes"
+                : formats.length > 1
+                  ? `Generate ${formats.length} ads`
+                  : "Generate ad"}
             {!submitting && <ArrowRight className="text-[18px]" />}
           </Button>
         </div>
