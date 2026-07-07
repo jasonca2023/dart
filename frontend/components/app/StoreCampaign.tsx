@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, warmBackend } from "@/lib/api";
 import { fetchStoreProducts, prepareStoreLogo, type StoreProduct } from "@/lib/store";
 import type { PreparedLogo } from "@/lib/logo";
 import { buildAdSpec } from "@/lib/adSpec";
@@ -146,6 +146,7 @@ export function StoreCampaign() {
         "In-browser rendering needs a recent Chrome, Edge, Firefox, or Safari 26+.",
       );
 
+    warmBackend(); // wake the backend before the first render finishes
     setRunning(true);
     setError(null);
     const made: MadeAd[] = [];

@@ -15,6 +15,19 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "";
 export const API_BASE = BASE;
 export const USING_MOCK = !BASE;
 
+// Wake the (free-tier) backend early, so the first save doesn't wait ~50s for a
+// cold start. Fire-and-forget on real user intent (reaching the generator, then
+// again on generate), throttled so repeated calls don't spam /health. No-op in
+// mock mode. By the time a user has filled the form + rendered, it's warm.
+let lastWarm = 0;
+export function warmBackend(): void {
+  if (!API_BASE) return;
+  const now = Date.now();
+  if (now - lastWarm < 120_000) return; // at most once per 2 min
+  lastWarm = now;
+  fetch(`${API_BASE}/health`, { cache: "no-store" }).catch(() => {});
+}
+
 // A small artificial latency on the mock so loading states are exercised.
 const tick = () => new Promise<void>((r) => setTimeout(r, 280));
 

@@ -11,6 +11,7 @@ import { generateCopy, generateVariants, applyCopy, useAiCopy } from "@/lib/copy
 import { applyBrand, loadBrandKit, saveBrandKit, type BrandKit } from "@/lib/brand";
 import { prepareLogo } from "@/lib/logo";
 import { setBatch } from "@/lib/batch";
+import { warmBackend } from "@/lib/api";
 import { useDebounced } from "@/lib/hooks";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
@@ -255,6 +256,7 @@ export function LaunchForm() {
         "In-browser rendering needs a recent Chrome, Edge, Firefox, or Safari 26+.",
       );
     }
+    warmBackend(); // re-nudge the backend awake before the render finishes
     setSubmitting(true);
     setError(null);
     setStatus("Designing your ad…");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { warmBackend } from "@/lib/api";
 import { LaunchForm } from "./LaunchForm";
 import { StoreCampaign } from "./StoreCampaign";
 
@@ -8,6 +9,10 @@ import { StoreCampaign } from "./StoreCampaign";
 // (import the catalogue and render an ad for every product).
 export function Generate() {
   const [mode, setMode] = useState<"one" | "store">("one");
+
+  // Reaching the generator is strong intent to save an ad soon — wake the backend
+  // now so the first save isn't stuck behind a ~50s cold start.
+  useEffect(() => warmBackend(), []);
   const groupRef = useRef<HTMLDivElement | null>(null);
   const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null);
 
