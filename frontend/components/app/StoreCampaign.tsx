@@ -174,6 +174,7 @@ export function StoreCampaign() {
           continue; // a product whose image won't load shouldn't kill the batch
         }
 
+        let anyMade = false;
         try {
           const baseSpec = buildAdSpec({
             title: product.title,
@@ -190,55 +191,65 @@ export function StoreCampaign() {
           const spec = applyCopy(baseSpec, copy);
 
           for (const fmt of formats) {
-            const id = crypto.randomUUID();
-            setStatus(`Rendering ${product.title} · ${fmt} ${at}…`);
-            const blob = await renderAdInBrowser({
-              productTitle: product.title,
-              productImage: objectUrl,
-              price: product.price,
-              audience: audience.trim() || "everyone",
-              durationInSeconds: duration,
-              aspectRatio: fmt,
-              accent: spec.palette.accent,
-              brandLogo: storeLogo?.cutout,
-              brandLogoKnockout: storeLogo?.transparent,
-              spec,
-            });
-            const job: Job = {
-              id,
-              status: "ready",
-              product_url: "",
-              target_audience: audience.trim(),
-              aspect_ratio: fmt,
-              duration_sec: duration,
-              resolution: "1080p",
-              product: {
-                title: product.title,
-                price: priceToCents(product.price),
-                currency: "USD",
-                images: [],
-                specs: {},
-                source: "shopify",
-              },
-              script: null,
-              video_url: null,
-              error: null,
-              cost_cents: 0,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            const videoUrl = await saveRenderedAdViaBackend(job, blob, imageFile, {
-              accent: spec.palette.accent,
-              logo: storeLogo?.cutout,
-              logoKnockout: storeLogo?.transparent,
-            });
-            made.push({ id, title: product.title, fmt, image: product.image, video: videoUrl });
+            // Render + save each format independently, so one failing format
+            // (e.g. a transient save error) doesn't drop the product's others.
+            try {
+              const id = crypto.randomUUID();
+              setStatus(`Rendering ${product.title} · ${fmt} ${at}…`);
+              const blob = await renderAdInBrowser({
+                productTitle: product.title,
+                productImage: objectUrl,
+                price: product.price,
+                audience: audience.trim() || "everyone",
+                durationInSeconds: duration,
+                aspectRatio: fmt,
+                accent: spec.palette.accent,
+                brandLogo: storeLogo?.cutout,
+                brandLogoKnockout: storeLogo?.transparent,
+                spec,
+              });
+              const job: Job = {
+                id,
+                status: "ready",
+                product_url: "",
+                target_audience: audience.trim(),
+                aspect_ratio: fmt,
+                duration_sec: duration,
+                resolution: "1080p",
+                product: {
+                  title: product.title,
+                  price: priceToCents(product.price),
+                  currency: "USD",
+                  images: [],
+                  specs: {},
+                  source: "shopify",
+                },
+                script: null,
+                video_url: null,
+                error: null,
+                cost_cents: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              };
+              const videoUrl = await saveRenderedAdViaBackend(job, blob, imageFile, {
+                accent: spec.palette.accent,
+                logo: storeLogo?.cutout,
+                logoKnockout: storeLogo?.transparent,
+              });
+              made.push({ id, title: product.title, fmt, image: product.image, video: videoUrl });
+              anyMade = true;
+            } catch {
+              /* this format failed — keep trying the product's other formats */
+            }
           }
         } catch {
-          skipped.push(product.title);
+          /* spec/copy setup failed for this product */
         } finally {
           URL.revokeObjectURL(objectUrl);
         }
+        // Only report "skipped" when the product produced no ad at all — a product
+        // with at least one saved format is a success, not a skip (no double-listing).
+        if (!anyMade) skipped.push(product.title);
       }
 
       if (made.length === 0) {
@@ -321,7 +332,7 @@ export function StoreCampaign() {
         {result.skipped.length > 0 && (
           <p className="flex items-start gap-2 text-[13px] text-driftwood">
             <Alert className="mt-0.5 shrink-0 text-[16px]" />
-            <span>Skipped (image or render failed): {result.skipped.join(", ")}</span>
+            <span>Skipped — couldn’t generate: {result.skipped.join(", ")}</span>
           </p>
         )}
 
