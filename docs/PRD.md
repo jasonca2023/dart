@@ -160,7 +160,7 @@ The brand kit (accent + logo) lives in browser `localStorage`, not the database.
 | Render | Remotion `@remotion/web-renderer` (WebCodecs), in-browser |
 | AI copy | Cloudflare Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) |
 | Backend | FastAPI on Render |
-| Auth / DB / Storage | Supabase (passwordless email OTP codes, Postgres `dart_ads`, `dart-videos` bucket) |
+| Auth / DB / Storage | Supabase (email+password; signups verified by a 6-digit email code; Postgres `dart_ads`, `dart-videos` bucket) |
 
 ---
 
