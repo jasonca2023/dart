@@ -28,8 +28,8 @@ export function SiteNav() {
         </ul>
         <div className="ml-auto flex items-center gap-2">
           <AccountMenu />
-          <ButtonLink href="/auth" variant="primary" size="sm">
-            Sign in
+          <ButtonLink href="/auth?mode=signup" variant="primary" size="sm">
+            Sign up
           </ButtonLink>
         </div>
       </nav>

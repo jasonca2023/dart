@@ -8,7 +8,14 @@ export const metadata = {
   title: "Sign in · Dart",
 };
 
-export default function AuthPage() {
+// /auth = log in · /auth?mode=signup = create an account. The two entries get
+// clearly distinct headings and copy inside AuthForm.
+export default async function AuthPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const { mode } = await searchParams;
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Brand panel */}
@@ -37,13 +44,7 @@ export default function AuthPage() {
           <div className="mb-8 lg:hidden">
             <Logo />
           </div>
-          <h1 className="t-heading">Sign in to Dart</h1>
-          <p className="mt-2 text-[15px] text-driftwood">
-            New here? Continuing makes your workspace.
-          </p>
-          <div className="mt-8">
-            <AuthForm />
-          </div>
+          <AuthForm initialMode={mode === "signup" ? "signup" : "signin"} />
           <p className="mt-8 text-center text-[13px] text-driftwood">
             <Link
               href="/"

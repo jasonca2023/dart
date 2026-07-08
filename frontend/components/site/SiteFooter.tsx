@@ -14,7 +14,7 @@ const GROUPS = [
     heading: "Account",
     links: [
       { href: "/auth", label: "Log in" },
-      { href: "/auth", label: "Sign up" },
+      { href: "/auth?mode=signup", label: "Sign up" },
     ],
   },
 ];

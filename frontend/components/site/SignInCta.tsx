@@ -2,10 +2,10 @@ import { ButtonLink } from "../ui/Button";
 import { ArrowRight } from "../icons";
 
 // Replaces the generate widget on the logged-out landing — generation lives
-// behind sign-in now.
-export function SignInCta({ label = "Sign in to start" }: { label?: string }) {
+// behind an account now, so the landing CTAs open the create-account door.
+export function SignInCta({ label = "Get started free" }: { label?: string }) {
   return (
-    <ButtonLink href="/auth" size="lg">
+    <ButtonLink href="/auth?mode=signup" size="lg">
       {label}
       <ArrowRight className="text-[18px]" />
     </ButtonLink>

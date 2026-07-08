@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { API_BASE } from "@/lib/api";
 import { Field, Input } from "../ui/Field";
 import { Button } from "../ui/Button";
+import { Segmented } from "../ui/Segmented";
 import { Alert, ArrowRight } from "../icons";
 
 // Signup codes are emailed by Dart's own backend (Brevo), not Supabase — the
@@ -63,9 +64,9 @@ function friendly(message: string): string {
 // Email + password auth, with one twist: a new account must type the 6-digit
 // code we email before it works — proof the address is really theirs. Returning
 // users sign in with just their password, no code.
-export function AuthForm() {
+export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [step, setStep] = useState<"form" | "confirm">("form");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -183,12 +184,15 @@ export function AuthForm() {
   if (step === "confirm") {
     return (
       <div className="flex flex-col gap-5">
-        <form onSubmit={verify} className="flex flex-col gap-4">
-          <p className="text-[14px] leading-relaxed text-driftwood">
+        <div>
+          <h1 className="t-heading">Check your email</h1>
+          <p className="mt-2 text-[15px] leading-relaxed text-driftwood">
             We emailed a 6-digit code to{" "}
             <span className="font-medium text-ink">{email}</span> to confirm
             it’s yours. It may take a minute — check spam too.
           </p>
+        </div>
+        <form onSubmit={verify} className="flex flex-col gap-4">
           <Field label="Code" htmlFor="otp">
             <Input
               id="otp"
@@ -214,7 +218,7 @@ export function AuthForm() {
           )}
 
           <Button type="submit" size="lg" loading={busy} className="w-full">
-            Confirm &amp; sign in
+            Confirm &amp; create account
             {!busy && <ArrowRight className="text-[18px]" />}
           </Button>
         </form>
@@ -251,6 +255,30 @@ export function AuthForm() {
 
   return (
     <div className="flex flex-col gap-5">
+      {/* Distinct modes: the tab, heading and copy all say which door you're at. */}
+      <Segmented
+        ariaLabel="Log in or create an account"
+        value={mode}
+        options={[
+          { value: "signin", label: "Log in" },
+          { value: "signup", label: "Create account" },
+        ]}
+        onChange={(m) => {
+          setMode(m as Mode);
+          setError(null);
+          setNotice(null);
+        }}
+      />
+      <div>
+        <h1 className="t-heading">
+          {mode === "signup" ? "Create your account" : "Welcome back"}
+        </h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-driftwood">
+          {mode === "signup"
+            ? "We’ll email a 6-digit code to confirm it’s you — then your first ad is one photo away."
+            : "Log in to your library and pick up where you left off."}
+        </p>
+      </div>
       <form onSubmit={submit} className="flex flex-col gap-4">
         <Field label="Email" htmlFor="email">
           <Input
@@ -292,30 +320,15 @@ export function AuthForm() {
         )}
 
         <Button type="submit" size="lg" loading={busy} className="w-full">
-          {mode === "signup" ? "Create account" : "Sign in"}
+          {mode === "signup" ? "Send my code" : "Log in"}
           {!busy && <ArrowRight className="text-[18px]" />}
         </Button>
       </form>
 
-      <p className="text-center text-[13px] text-driftwood">
-        {mode === "signin" ? "New to Dart?" : "Already have an account?"}{" "}
-        <button
-          type="button"
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError(null);
-            setNotice(null);
-          }}
-          className="font-medium text-ink underline-offset-2 hover:underline"
-        >
-          {mode === "signin" ? "Create one" : "Sign in"}
-        </button>
-      </p>
-
       <p className="text-center text-[12px] leading-relaxed text-fog">
         {mode === "signup"
-          ? "We’ll email a 6-digit code to confirm the address is yours."
-          : "Sign in to save every ad you generate to your library."}
+          ? "No account exists until you enter the code — nothing to clean up if you stop."
+          : "Every ad you generate saves to your library."}
       </p>
     </div>
   );
