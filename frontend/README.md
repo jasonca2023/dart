@@ -55,7 +55,7 @@ Storage, row-level secured) via the backend's `/save-ad`.
 | `/` | Signed-out: marketing landing. Signed-in: the generate form (photo · title · audience · price · formats · duration). |
 | `/ads` | Your saved-ads library. |
 | `/jobs/[id]` | Review a saved ad: player, download, edit, hand off to TikTok / Meta / YouTube. |
-| `/auth` | Sign in / sign up — Supabase email + password. |
+| `/auth` | Sign in / sign up — a 6-digit emailed code (Supabase OTP, passwordless). |
 | `/dashboard` | Legacy path — redirects to `/`. |
 | `/api/copy` | Worker route: Cloudflare Workers AI writes the ad copy. |
 

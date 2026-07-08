@@ -79,7 +79,7 @@ keeping rendering free, deterministic and entirely in the browser.
   (Storage rejects user JWTs directly). Also proxies product images behind an SSRF
   guard. *(A legacy mock/LTX provider pipeline + `/jobs` API is retained but unused by
   the shipped app.)*
-- **Auth + storage** — Supabase email/password auth; per-user saved ads (Postgres +
+- **Auth + storage** — Supabase passwordless email-code (OTP) auth; per-user saved ads (Postgres +
   Storage, row-level secured). The backend derives the user from their Supabase token to
   scope each save.
 
