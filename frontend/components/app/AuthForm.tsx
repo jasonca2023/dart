@@ -264,7 +264,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       <h1 className="t-heading">{signup ? "Create your account" : "Welcome back"}</h1>
       <p className="mt-3 max-w-[36ch] text-[15px] leading-relaxed text-driftwood">
         {signup
-          ? "Your details now, a 6-digit email code next — then your first ad is one photo away."
+          ? "Your first ad is one photo away."
           : "Log in to your library and pick up where you left off."}
       </p>
 
@@ -324,14 +324,14 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
           onClick={() => switchMode(signup ? "signin" : "signup")}
           className="font-medium text-ink underline-offset-2 transition-colors duration-150 ease-out hover:underline"
         >
-          {signup ? "Log in →" : "Create an account →"}
+          {signup ? "Log in" : "Create an account"}
         </button>
       </div>
-      <p className="mt-3 text-[12px] leading-relaxed text-fog">
-        {signup
-          ? "No account exists until you enter the code — stop anytime, nothing to clean up."
-          : "Every ad you generate saves to your library."}
-      </p>
+      {!signup && (
+        <p className="mt-3 text-[12px] leading-relaxed text-fog">
+          Every ad you generate saves to your library.
+        </p>
+      )}
     </div>
   );
 }
