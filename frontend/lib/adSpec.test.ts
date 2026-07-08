@@ -108,6 +108,34 @@ describe("clampSpec", () => {
   });
 });
 
+describe("tone mapping — widened playful/bold triggers", () => {
+  const tone = (title: string, audience: string) =>
+    buildAdSpec({ title, audience, price: "", durationSec: 10 }).tone;
+
+  it("maps the widened playful signals", () => {
+    expect(tone("Plush Bear", "college students")).toBe("playful");
+    expect(tone("Board Game Night Set", "friends")).toBe("playful");
+    expect(tone("Squeaky Toy", "dog owners")).toBe("playful");
+    expect(tone("Rainbow Sticker Pack", "everyone")).toBe("playful");
+    expect(tone("Birthday Candles", "")).toBe("playful");
+  });
+
+  it("maps the widened bold signals", () => {
+    expect(tone("Graphic Tee", "urban sneakerheads")).toBe("bold");
+    expect(tone("Skate Deck", "")).toBe("bold");
+    expect(tone("Chunky Sneaker", "y2k fans")).toBe("bold");
+    expect(tone("Hoodie", "hip hop heads")).toBe("bold");
+    expect(tone("Fierce Lash Kit", "")).toBe("bold");
+  });
+
+  it("keeps earlier tones winning their niches", () => {
+    expect(tone("RGB Keyboard", "gamers")).toBe("techy"); // techy before playful's "game"
+    expect(tone("Silk Scarf", "luxury gift shoppers")).toBe("luxe");
+    expect(tone("Trail Shoe", "runners")).toBe("energetic");
+    expect(tone("Widget", "no keywords here")).toBe("energetic"); // fallback
+  });
+});
+
 describe("coreName", () => {
   it("drops variant noise but keeps the core product name", () => {
     expect(coreName("Men's Strider - Natural Black (Natural Black Sole)")).toBe("Men's Strider");

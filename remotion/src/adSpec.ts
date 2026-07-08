@@ -61,8 +61,28 @@ const TONE_KEYWORDS: { tone: Tone; words: string[] }[] = [
   { tone: "techy", words: ["tech", "gen z", "gamer", "gaming", "developer", "startup", "geek", "smart"] },
   { tone: "calm", words: ["parent", "family", "busy", "mom", "dad", "home", "wellness", "sleep", "calm"] },
   { tone: "energetic", words: ["outdoor", "adventure", "athlete", "fitness", "sport", "runner", "active", "travel"] },
-  { tone: "playful", words: ["kid", "fun", "teen", "creator", "party", "color", "playful", "quirky"] },
-  { tone: "bold", words: ["bold", "statement", "streetwear", "fashion", "hype", "trendsetter", "edgy", "influencer", "disruptor", "standout"] },
+  // Playful/bold cast wider nets than the tones above (which match first and
+  // own their niches). Words are substring-matched, so avoid short strings that
+  // hide inside common words ("cat"→catalog, "pet"→carpet, "rap"→wrap).
+  {
+    tone: "playful",
+    words: [
+      "kid", "fun", "teen", "creator", "party", "color", "playful", "quirky",
+      "toy", "game", "student", "college", "puppy", "kitten", "dog", "candy",
+      "snack", "birthday", "festive", "cute", "young", "youth", "rainbow",
+      "vibrant", "cheerful", "whimsical", "silly", "plush", "puzzle", "craft",
+    ],
+  },
+  {
+    tone: "bold",
+    words: [
+      "bold", "statement", "street", "fashion", "hype", "trendsetter", "edgy",
+      "influencer", "disruptor", "standout", "sneaker", "urban", "punk",
+      "skate", "rebel", "daring", "fearless", "fierce", "grunge", "graphic",
+      "hip hop", "hip-hop", "swag", "exclusive", "y2k", "attitude",
+      "maximalist", "viral",
+    ],
+  },
 ];
 
 // Stages stay light so a product photo (often white-bg) blends; the tone lives in
