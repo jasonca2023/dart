@@ -21,6 +21,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .api.jobs import router as jobs_router
 from .api.settings import router as settings_router
+from .api.signup import router as signup_router
+from .authcodes import email_ready as authcodes_email_ready
 from .auth import verify_token
 from .config import Settings, get_settings, media_root
 from .errors import (
@@ -277,6 +279,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(DartError, dart_error_handler)
     app.include_router(jobs_router)
     app.include_router(settings_router)
+    app.include_router(signup_router)
 
     # Serve generated videos (LTX writes mp4s here) at /media/<file>.mp4.
     media = media_root()
@@ -552,6 +555,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "video_retag_ready": bool(
                 settings.video_retag_enabled and shutil.which("ffmpeg")
             ),
+            # Whether signup codes can actually be emailed (Brevo configured).
+            "signup_email_ready": authcodes_email_ready(settings),
             "providers": {
                 "scraper": type(scraper).__name__,
                 "script": type(scripter).__name__,

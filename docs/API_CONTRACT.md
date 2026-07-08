@@ -82,15 +82,36 @@ and rate limited like the image proxy.
 
 ---
 
+## `POST /auth/signup/code` + `POST /auth/signup/verify` — signup with an emailed code
+
+Dart emails the 6-digit signup code itself (Brevo) and creates the Supabase account
+(admin API, pre-confirmed) **only after the code verifies** — an unverified signup never
+exists as an account. Sign-in is plain Supabase email+password and never needs a code.
+
+**`/code`** `{ "email": "you@x.com" }` → `{ "sent": true }`
+`400 invalid_input` bad email · `409 conflict` email already has an account ·
+`429 rate_limited` per-IP limit or 60s per-address cooldown · `502` email send failed ·
+`503` Brevo not configured.
+
+**`/verify`** `{ "email": "...", "code": "482917", "password": "..." }` → `{ "created": true }`
+`400 invalid_input` bad shape · `400 invalid_code` wrong/expired (5 attempts max) ·
+`409 conflict` already exists · `429 rate_limited`.
+
+Codes are stored hashed (peppered) in `auth_codes` with a 10-minute TTL.
+
+---
+
 ## `GET /health`
 
 ```json
 { "status": "ok",
   "save_ad_ready": true,
   "video_retag_ready": true,
+  "signup_email_ready": true,
   "providers": { "scraper": "...", "script": "...", "video": "..." } }
 ```
-`video_retag_ready` is true only when ffmpeg is present **and** the re-tag is enabled.
+`video_retag_ready` is true only when ffmpeg is present **and** the re-tag is enabled;
+`signup_email_ready` when Brevo is configured (`BREVO_API_KEY` + `AUTH_EMAIL_FROM`).
 
 ---
 
@@ -99,7 +120,8 @@ and rate limited like the image proxy.
 ```json
 { "error": { "code": "invalid_url", "message": "Host is not allowed.", "retryable": false } }
 ```
-Codes in use: `invalid_url`, `scrape_failed`, `unauthorized`, `rate_limited`, `not_found`,
+Codes in use: `invalid_url`, `invalid_input`, `invalid_code`, `conflict`, `scrape_failed`,
+`unauthorized`, `rate_limited`, `not_found`,
 `internal`.
 
 ---

@@ -336,3 +336,127 @@ def test_retag_degrades_gracefully_on_bad_input():
     # Tagged 13 but not a real mp4 → ffmpeg fails (or is absent) → original bytes.
     garbage13 = b"ftyp" + _colr_box(13) + b"\x00" * 32
     assert _retag_bt709(garbage13) == garbage13
+
+
+# --- Signup email codes -------------------------------------------------------
+
+
+def test_signup_code_rejects_bad_email():
+    c = make_client()
+    r = c.post("/auth/signup/code", json={"email": "not-an-email"})
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_input"
+
+
+def test_signup_endpoints_unconfigured_are_500():
+    c = make_client()
+    assert c.post("/auth/signup/code", json={"email": "a@b.com"}).status_code == 500
+    r = c.post(
+        "/auth/signup/verify",
+        json={"email": "a@b.com", "code": "123456", "password": "Passw0rd!"},
+    )
+    assert r.status_code == 500
+
+
+def test_signup_verify_validates_shape():
+    c = make_client()
+    r = c.post(
+        "/auth/signup/verify",
+        json={"email": "a@b.com", "code": "12", "password": "Passw0rd!"},
+    )
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_input"
+    r = c.post(
+        "/auth/signup/verify",
+        json={"email": "a@b.com", "code": "123456", "password": "short"},
+    )
+    assert r.status_code == 400
+
+
+def test_code_hash_deterministic_case_insensitive_peppered():
+    from app.authcodes import gen_code, hash_code
+
+    s1 = Settings(supabase_service_key="k1", _env_file=None)
+    s2 = Settings(supabase_service_key="k2", _env_file=None)
+    assert hash_code(s1, "a@b.com", "123456") == hash_code(s1, "A@B.com", "123456")
+    assert hash_code(s1, "a@b.com", "123456") != hash_code(s2, "a@b.com", "123456")
+    for _ in range(50):
+        code = gen_code()
+        assert len(code) == 6 and code.isdigit()
+
+
+def test_signup_flow_with_fakes(monkeypatch):
+    """Full flow against in-memory fakes: send → cooldown → wrong code → right
+    code creates the account → existing email is refused at the send step."""
+    from datetime import datetime, timedelta, timezone
+
+    from app import authcodes
+
+    store: dict[str, dict] = {}
+    sent: dict[str, str] = {}
+
+    async def fake_user_exists(s, email):
+        return email == "taken@x.com"
+
+    async def fake_get(s, email):
+        return store.get(email)
+
+    async def fake_store(s, email, code_hash):
+        now = datetime.now(timezone.utc)
+        store[email] = {
+            "email": email,
+            "code_hash": code_hash,
+            "attempts": 0,
+            "expires_at": (now + timedelta(minutes=10)).isoformat(),
+            "created_at": now.isoformat(),
+        }
+
+    async def fake_bump(s, email, n):
+        store[email]["attempts"] = n
+
+    async def fake_delete(s, email):
+        store.pop(email, None)
+
+    async def fake_send(s, to, code):
+        sent[to] = code
+
+    async def fake_create(s, email, pw):
+        return "ok"
+
+    monkeypatch.setattr(authcodes, "user_exists", fake_user_exists)
+    monkeypatch.setattr(authcodes, "get_code_row", fake_get)
+    monkeypatch.setattr(authcodes, "store_code", fake_store)
+    monkeypatch.setattr(authcodes, "bump_attempts", fake_bump)
+    monkeypatch.setattr(authcodes, "delete_code", fake_delete)
+    monkeypatch.setattr(authcodes, "send_code_email", fake_send)
+    monkeypatch.setattr(authcodes, "create_confirmed_user", fake_create)
+
+    c = make_client(
+        supabase_url="https://x.supabase.co",
+        supabase_service_key="svc",
+        brevo_api_key="brevo",
+        auth_email_from="codes@dart.test",
+    )
+
+    # send a code
+    assert c.post("/auth/signup/code", json={"email": "new@x.com"}).status_code == 200
+    assert len(sent["new@x.com"]) == 6
+    # immediate resend hits the per-address cooldown
+    assert c.post("/auth/signup/code", json={"email": "new@x.com"}).status_code == 429
+    # wrong code is rejected and counted
+    wrong = "000000" if sent["new@x.com"] != "000000" else "000001"
+    r = c.post(
+        "/auth/signup/verify",
+        json={"email": "new@x.com", "code": wrong, "password": "Passw0rd!"},
+    )
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
+    assert store["new@x.com"]["attempts"] == 1
+    # the right code creates the account and consumes the row
+    r = c.post(
+        "/auth/signup/verify",
+        json={"email": "new@x.com", "code": sent["new@x.com"], "password": "Passw0rd!"},
+    )
+    assert r.status_code == 200 and r.json()["created"] is True
+    assert "new@x.com" not in store
+    # an email that already has an account is refused at the send step
+    assert c.post("/auth/signup/code", json={"email": "taken@x.com"}).status_code == 409

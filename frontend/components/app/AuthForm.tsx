@@ -3,9 +3,30 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { API_BASE } from "@/lib/api";
 import { Field, Input } from "../ui/Field";
 import { Button } from "../ui/Button";
 import { Alert, ArrowRight } from "../icons";
+
+// Signup codes are emailed by Dart's own backend (Brevo), not Supabase — the
+// account is only created once the code verifies, so it can't be bypassed.
+async function postJson(path: string, body: unknown): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let message = "Something went wrong.";
+    try {
+      const data = (await res.json()) as { error?: { message?: string } };
+      if (data.error?.message) message = data.error.message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(message);
+  }
+}
 
 type Mode = "signin" | "signup";
 
@@ -91,21 +112,12 @@ export function AuthForm() {
     setNotice(null);
     try {
       if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({ email: addr, password });
-        if (error) throw error;
-        // With confirmation on, Supabase obfuscates existing accounts as a
-        // user with no identities — route those to sign-in instead.
-        if (data.user && data.user.identities?.length === 0) {
-          setMode("signin");
-          setError("That email already has an account — sign in instead.");
+        if (!API_BASE) {
+          setError("Signup isn’t configured (missing backend URL).");
           return;
         }
-        if (data.session) {
-          // Email confirmation is disabled server-side; nothing to verify.
-          router.push("/");
-          router.refresh();
-          return;
-        }
+        // Dart's backend emails the code; no account exists yet.
+        await postJson("/auth/signup/code", { email: addr });
         setEmail(addr);
         toConfirmStep(null);
       } else {
@@ -113,24 +125,15 @@ export function AuthForm() {
           email: addr,
           password,
         });
-        if (error) {
-          // Account exists but the email was never verified — send a fresh
-          // code and finish the confirmation instead of dead-ending.
-          if (error.message.toLowerCase().includes("not confirmed")) {
-            await supabase.auth
-              .resend({ type: "signup", email: addr })
-              .catch(() => {});
-            setEmail(addr);
-            toConfirmStep("This email was never confirmed — we just sent a fresh code.");
-            return;
-          }
-          throw error;
-        }
+        if (error) throw error;
         router.push("/");
         router.refresh();
       }
     } catch (err) {
-      setError(err instanceof Error ? friendly(err.message) : "Something went wrong.");
+      const msg = err instanceof Error ? friendly(err.message) : "Something went wrong.";
+      // An email that already has an account belongs on the sign-in form.
+      if (msg.includes("already has an account")) setMode("signin");
+      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -147,23 +150,29 @@ export function AuthForm() {
     setBusy(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+      // Verifying the code is what creates the account (backend, admin API).
+      await postJson("/auth/signup/verify", { email, code: token, password });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // Verified — the session is live; keep the button loading while we go.
+      // Created and signed in — keep the button loading while we navigate.
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? friendly(err.message) : "Couldn’t verify the code.");
+      const msg = err instanceof Error ? friendly(err.message) : "Couldn’t verify the code.";
+      if (msg.includes("already has an account")) {
+        setStep("form");
+        setMode("signin");
+      }
+      setError(msg);
       setBusy(false);
     }
   }
 
   async function resend() {
-    if (!supabase || cooldown > 0) return;
+    if (cooldown > 0) return;
     setError(null);
     try {
-      const { error } = await supabase.auth.resend({ type: "signup", email });
-      if (error) throw error;
+      await postJson("/auth/signup/code", { email });
       setNotice("Sent a new code.");
       setCooldown(RESEND_COOLDOWN_SEC);
     } catch (err) {

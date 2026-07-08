@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     rate_limit_store_per_min: int = 30
     rate_limit_save_per_min: int = 60
     rate_limit_jobs_per_min: int = 30
+    rate_limit_auth_per_min: int = 10
+
+    # --- Signup email codes (Brevo) ---
+    # Dart emails the 6-digit signup code itself (not Supabase), and only creates
+    # the account once the code verifies — an unverified signup never exists.
+    brevo_api_key: str = ""
+    auth_email_from: str = ""  # a Brevo-verified sender address
+    auth_email_from_name: str = "Dart"
+    auth_code_ttl_sec: int = 600
 
     # --- Video colour normalisation ---
     # Losslessly relabel Safari's sRGB-tagged videos to BT.709 on save so they
