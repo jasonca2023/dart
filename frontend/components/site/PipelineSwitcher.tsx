@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Orb } from "../ui/Orb";
 import { TONE_ACCENTS } from "@/lib/adSpec";
 
@@ -130,6 +130,25 @@ export function PipelineSwitcher() {
   const [active, setActive] = useState(0);
   const stage = STAGES[active];
 
+  // The white pill is one element that slides to the active tab (instead of
+  // each tab toggling its own background). Measured off the real buttons so it
+  // survives wrapping and resizes.
+  const listRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    const measure = () => {
+      const el = tabRefs.current[active];
+      if (!el) return;
+      setPill({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (listRef.current) ro.observe(listRef.current);
+    return () => ro.disconnect();
+  }, [active]);
+
   return (
     <section
       id="pipeline"
@@ -141,26 +160,39 @@ export function PipelineSwitcher() {
       </div>
 
       <div className="rounded-card-lg bg-sand p-3 sm:p-4">
-        {/* Tabs */}
+        {/* Tabs — one sliding pill, buttons stay transparent above it */}
         <div
+          ref={listRef}
           role="tablist"
           aria-label="Pipeline stages"
-          className="flex flex-wrap gap-1"
+          className="relative flex flex-wrap gap-1"
         >
+          {pill && (
+            <span
+              aria-hidden
+              className="absolute left-0 top-0 rounded-badge bg-white shadow-[var(--shadow-inset)] transition-[transform,width,height] duration-[260ms] ease-out motion-reduce:transition-none"
+              style={{
+                transform: `translate(${pill.x}px, ${pill.y}px)`,
+                width: pill.w,
+                height: pill.h,
+              }}
+            />
+          )}
           {STAGES.map((s, i) => {
             const on = i === active;
             return (
               <button
                 key={s.key}
+                ref={(el) => {
+                  tabRefs.current[i] = el;
+                }}
                 role="tab"
                 aria-selected={on}
                 onClick={() => setActive(i)}
                 className={
-                  "rounded-badge px-3.5 py-2 text-[14px] font-medium transition-[background-color,color,box-shadow,transform] " +
+                  "relative z-[1] rounded-badge px-3.5 py-2 text-[14px] font-medium transition-[color,transform] " +
                   "duration-[180ms] ease-out active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink " +
-                  (on
-                    ? "bg-white text-ink shadow-[var(--shadow-inset)]"
-                    : "text-driftwood hover:text-ink")
+                  (on ? "text-ink" : "text-driftwood hover:text-ink")
                 }
               >
                 <span className="mr-1.5 font-mono text-[11px] text-fog">
