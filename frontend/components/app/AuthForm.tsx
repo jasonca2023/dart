@@ -75,8 +75,15 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const codeRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
 
   const pwErr = mode === "signup" ? passwordError(password) : null;
+
+  // Land the cursor in the email box — on arrival, on mode switch, and when
+  // coming back from the code step. (The code step focuses its own input.)
+  useEffect(() => {
+    if (step === "form") emailRef.current?.focus();
+  }, [mode, step]);
 
   // Tick the resend cooldown down once a second.
   useEffect(() => {
@@ -272,6 +279,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
         <Field label="Email" htmlFor="email">
           <Input
             id="email"
+            ref={emailRef}
             type="email"
             required
             value={email}
