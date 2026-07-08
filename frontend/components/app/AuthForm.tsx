@@ -6,28 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { API_BASE } from "@/lib/api";
 import { Field, Input } from "../ui/Field";
 import { Button } from "../ui/Button";
-import { Segmented } from "../ui/Segmented";
 import { Alert, ArrowRight } from "../icons";
-
-// Signup codes are emailed by Dart's own backend (Brevo), not Supabase — the
-// account is only created once the code verifies, so it can't be bypassed.
-async function postJson(path: string, body: unknown): Promise<void> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    let message = "Something went wrong.";
-    try {
-      const data = (await res.json()) as { error?: { message?: string } };
-      if (data.error?.message) message = data.error.message;
-    } catch {
-      /* non-JSON error body */
-    }
-    throw new Error(message);
-  }
-}
 
 type Mode = "signin" | "signup";
 
@@ -53,7 +32,7 @@ function friendly(message: string): string {
   const m = message.toLowerCase();
   if (m.includes("invalid login credentials")) return "Wrong email or password.";
   if (m.includes("already registered"))
-    return "That email already has an account — sign in instead.";
+    return "That email already has an account — log in instead.";
   if (m.includes("security purposes") || m.includes("rate limit"))
     return "Please wait a minute between emails, then try again.";
   if (m.includes("expired") || m.includes("invalid"))
@@ -61,9 +40,29 @@ function friendly(message: string): string {
   return message;
 }
 
+// Signup codes are emailed by Dart's own backend (Brevo), not Supabase — the
+// account is only created once the code verifies, so it can't be bypassed.
+async function postJson(path: string, body: unknown): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let message = "Something went wrong.";
+    try {
+      const data = (await res.json()) as { error?: { message?: string } };
+      if (data.error?.message) message = data.error.message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(message);
+  }
+}
+
 // Email + password auth, with one twist: a new account must type the 6-digit
-// code we email before it works — proof the address is really theirs. Returning
-// users sign in with just their password, no code.
+// code we email before it exists — proof the address is really theirs.
+// Returning users log in with just their password, no code.
 export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -85,6 +84,12 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [cooldown]);
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError(null);
+    setNotice(null);
+  }
 
   function toConfirmStep(msg: string | null) {
     setStep("confirm");
@@ -132,7 +137,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       }
     } catch (err) {
       const msg = err instanceof Error ? friendly(err.message) : "Something went wrong.";
-      // An email that already has an account belongs on the sign-in form.
+      // An email that already has an account belongs on the log-in form.
       if (msg.includes("already has an account")) setMode("signin");
       setError(msg);
     } finally {
@@ -181,35 +186,35 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     }
   }
 
+  // --- Step 2 of signup: type the emailed code -----------------------------
   if (step === "confirm") {
     return (
-      <div className="flex flex-col gap-5">
-        <div>
-          <h1 className="t-heading">Check your email</h1>
-          <p className="mt-2 text-[15px] leading-relaxed text-driftwood">
-            We emailed a 6-digit code to{" "}
-            <span className="font-medium text-ink">{email}</span> to confirm
-            it’s yours. It may take a minute — check spam too.
-          </p>
-        </div>
-        <form onSubmit={verify} className="flex flex-col gap-4">
-          <Field label="Code" htmlFor="otp">
+      <div>
+        <h1 className="t-heading">Check your email</h1>
+        <p className="mt-3 text-[15px] leading-relaxed text-driftwood">
+          We sent a 6-digit code to{" "}
+          <span className="font-medium text-ink">{email}</span>. Enter it below
+          — that’s what creates your account.
+        </p>
+
+        <form onSubmit={verify} className="mt-8 flex flex-col gap-5">
+          <Field label="Code" htmlFor="otp" hint="It can take a minute — check spam too.">
             <Input
               id="otp"
               ref={codeRef}
               inputMode="numeric"
               autoComplete="one-time-code"
-              placeholder="••••••"
+              placeholder="000000"
               maxLength={6}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="text-center font-mono text-[22px] tracking-[0.45em]"
+              className="text-center font-mono text-[24px] tracking-[0.5em] placeholder:text-mist"
             />
           </Field>
 
           {error && (
             <p role="alert" className="flex items-center gap-2 text-[14px] text-ink">
-              <Alert className="text-[18px] text-driftwood" />
+              <Alert className="shrink-0 text-[18px] text-driftwood" />
               {error}
             </p>
           )}
@@ -223,19 +228,18 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
           </Button>
         </form>
 
-        <p className="text-center text-[13px] text-driftwood">
+        <div className="mt-8 flex items-baseline justify-between border-t border-ash pt-4 text-[13px] text-driftwood">
           {cooldown > 0 ? (
-            <>Resend available in {cooldown}s</>
+            <span className="font-mono tabular-nums">Resend in {cooldown}s</span>
           ) : (
             <button
               type="button"
               onClick={resend}
-              className="font-medium text-ink underline-offset-2 hover:underline"
+              className="font-medium text-ink underline-offset-2 transition-colors duration-150 ease-out hover:underline"
             >
               Resend code
             </button>
           )}
-          {" · "}
           <button
             type="button"
             onClick={() => {
@@ -244,42 +248,27 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
               setError(null);
               setNotice(null);
             }}
-            className="font-medium text-ink underline-offset-2 hover:underline"
+            className="transition-colors duration-150 ease-out hover:text-ink"
           >
-            Back
+            ← Different email
           </button>
-        </p>
+        </div>
       </div>
     );
   }
 
+  // --- Log in / create account ---------------------------------------------
+  const signup = mode === "signup";
   return (
-    <div className="flex flex-col gap-5">
-      {/* Distinct modes: the tab, heading and copy all say which door you're at. */}
-      <Segmented
-        ariaLabel="Log in or create an account"
-        value={mode}
-        options={[
-          { value: "signin", label: "Log in" },
-          { value: "signup", label: "Create account" },
-        ]}
-        onChange={(m) => {
-          setMode(m as Mode);
-          setError(null);
-          setNotice(null);
-        }}
-      />
-      <div>
-        <h1 className="t-heading">
-          {mode === "signup" ? "Create your account" : "Welcome back"}
-        </h1>
-        <p className="mt-2 text-[15px] leading-relaxed text-driftwood">
-          {mode === "signup"
-            ? "We’ll email a 6-digit code to confirm it’s you — then your first ad is one photo away."
-            : "Log in to your library and pick up where you left off."}
-        </p>
-      </div>
-      <form onSubmit={submit} className="flex flex-col gap-4">
+    <div>
+      <h1 className="t-heading">{signup ? "Create your account" : "Welcome back"}</h1>
+      <p className="mt-3 max-w-[36ch] text-[15px] leading-relaxed text-driftwood">
+        {signup
+          ? "Your details now, a 6-digit email code next — then your first ad is one photo away."
+          : "Log in to your library and pick up where you left off."}
+      </p>
+
+      <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
         <Field label="Email" htmlFor="email">
           <Input
             id="email"
@@ -290,28 +279,30 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
             autoComplete="email"
           />
         </Field>
-        <Field label="Password" htmlFor="password">
+        <Field
+          label="Password"
+          htmlFor="password"
+          hint={signup && !password ? PASSWORD_REQ : undefined}
+        >
           <Input
             id="password"
             type="password"
             required
-            minLength={mode === "signup" ? 8 : undefined}
+            minLength={signup ? 8 : undefined}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            autoComplete={signup ? "new-password" : "current-password"}
           />
-          {mode === "signup" && (
-            <p
-              className={`text-[12px] ${password && pwErr ? "text-ember" : "text-driftwood"}`}
-            >
-              {password ? (pwErr ?? "Strong password.") : PASSWORD_REQ}
+          {signup && password && (
+            <p className={`text-[12px] ${pwErr ? "text-ink" : "text-driftwood"}`}>
+              {pwErr ?? "Strong password."}
             </p>
           )}
         </Field>
 
         {error && (
           <p role="alert" className="flex items-center gap-2 text-[14px] text-ink">
-            <Alert className="text-[18px] text-driftwood" />
+            <Alert className="shrink-0 text-[18px] text-driftwood" />
             {error}
           </p>
         )}
@@ -320,14 +311,25 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
         )}
 
         <Button type="submit" size="lg" loading={busy} className="w-full">
-          {mode === "signup" ? "Send my code" : "Log in"}
+          {signup ? "Send my code" : "Log in"}
           {!busy && <ArrowRight className="text-[18px]" />}
         </Button>
       </form>
 
-      <p className="text-center text-[12px] leading-relaxed text-fog">
-        {mode === "signup"
-          ? "No account exists until you enter the code — nothing to clean up if you stop."
+      {/* The other door — quiet, behind a hairline, clearly labelled. */}
+      <div className="mt-8 flex items-baseline justify-between border-t border-ash pt-4 text-[13px] text-driftwood">
+        <span>{signup ? "Already have an account?" : "New to Dart?"}</span>
+        <button
+          type="button"
+          onClick={() => switchMode(signup ? "signin" : "signup")}
+          className="font-medium text-ink underline-offset-2 transition-colors duration-150 ease-out hover:underline"
+        >
+          {signup ? "Log in →" : "Create an account →"}
+        </button>
+      </div>
+      <p className="mt-3 text-[12px] leading-relaxed text-fog">
+        {signup
+          ? "No account exists until you enter the code — stop anytime, nothing to clean up."
           : "Every ad you generate saves to your library."}
       </p>
     </div>
