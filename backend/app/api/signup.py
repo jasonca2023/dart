@@ -11,7 +11,9 @@ pre-confirmed), so an unverified signup never exists as an account — there is
 nothing to sign in to until the code is entered. Password reset mirrors the
 flow for accounts that do exist. Sign-in itself stays plain email + password
 and never needs a code. Codes are purpose-scoped: a signup code can never
-verify as a reset code, or vice versa.
+verify as a reset code, or vice versa. /code returns an opaque request token;
+guesses without it are rejected before the attempt counter, so third parties
+can't burn the owner's cap.
 """
 
 from __future__ import annotations
@@ -49,12 +51,14 @@ class SendCodeIn(BaseModel):
 class CheckIn(BaseModel):
     email: str
     code: str
+    request: str = ""
 
 
 class VerifyIn(BaseModel):
     email: str
     code: str
     password: str
+    request: str = ""
 
 
 def _clean_email(raw: str) -> str:
@@ -90,8 +94,10 @@ def _parse_ts(value: str) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-async def _issue_code(settings: Settings, email: str, purpose: str) -> None:
-    """Cooldown-check, generate, store and email a code for `purpose`."""
+async def _issue_code(settings: Settings, email: str, purpose: str) -> str:
+    """Cooldown-check, generate, store and email a code for `purpose`.
+
+    Returns the request token the browser must echo back on check/verify."""
     # Per-address cooldown on top of the per-IP rate limit.
     row = await authcodes.get_code_row(settings, email)
     if row:
@@ -105,8 +111,12 @@ async def _issue_code(settings: Settings, email: str, purpose: str) -> None:
             )
 
     code = authcodes.gen_code()
+    request = authcodes.gen_request()
     await authcodes.store_code(
-        settings, email, authcodes.hash_code(settings, email, code, purpose)
+        settings,
+        email,
+        authcodes.hash_code(settings, email, code, purpose),
+        authcodes.hash_request(settings, email, request),
     )
     try:
         await authcodes.send_code_email(settings, email, code, purpose)
@@ -114,12 +124,22 @@ async def _issue_code(settings: Settings, email: str, purpose: str) -> None:
         raise DartError(
             INTERNAL, "Couldn’t send the code email — try again shortly.", status=502
         ) from e
+    return request
 
 
-async def _check_code(settings: Settings, email: str, code: str, purpose: str) -> None:
+async def _check_code(
+    settings: Settings, email: str, code: str, purpose: str, request: str
+) -> None:
     """Validate a submitted code for `purpose`; raises unless it matches."""
     row = await authcodes.get_code_row(settings, email)
     if not row:
+        raise DartError(
+            INVALID_CODE, "No code is pending for this email — request one.", status=400
+        )
+    # The request token proves this browser asked for the code. Without it the
+    # guess is rejected before it can touch the attempt counter, so third
+    # parties can't burn the owner's cap.
+    if authcodes.hash_request(settings, email, request) != row["request_hash"]:
         raise DartError(
             INVALID_CODE, "No code is pending for this email — request one.", status=400
         )
@@ -156,8 +176,8 @@ async def send_signup_code(body: SendCodeIn, request: Request) -> dict:
         raise DartError(
             CONFLICT, "That email already has an account — sign in instead.", status=409
         )
-    await _issue_code(settings, email, "signup")
-    return {"sent": True}
+    request = await _issue_code(settings, email, "signup")
+    return {"sent": True, "request": request}
 
 
 @router.post("/auth/signup/verify", dependencies=[Depends(_auth_rl)])
@@ -168,7 +188,7 @@ async def verify_signup_code(body: VerifyIn, request: Request) -> dict:
     _check_password_shape(body.password)
     _require_configured(settings)
 
-    await _check_code(settings, email, code, "signup")
+    await _check_code(settings, email, code, "signup", body.request)
     # If GoTrue rejects the password (policy), this raises 400 and the code row
     # survives, so the user can retry with a better password on the same code.
     result = await authcodes.create_confirmed_user(settings, email, body.password)
@@ -192,8 +212,8 @@ async def send_reset_code(body: SendCodeIn, request: Request) -> dict:
         raise DartError(
             NOT_FOUND, "No account with this email — create one instead.", status=404
         )
-    await _issue_code(settings, email, "reset")
-    return {"sent": True}
+    request = await _issue_code(settings, email, "reset")
+    return {"sent": True, "request": request}
 
 
 @router.post("/auth/reset/check", dependencies=[Depends(_auth_rl)])
@@ -206,7 +226,7 @@ async def check_reset_code(body: CheckIn, request: Request) -> dict:
     code = _clean_code(body.code)
     _require_configured(settings)
 
-    await _check_code(settings, email, code, "reset")
+    await _check_code(settings, email, code, "reset", body.request)
     return {"valid": True}
 
 
@@ -218,7 +238,7 @@ async def verify_reset_code(body: VerifyIn, request: Request) -> dict:
     _check_password_shape(body.password)
     _require_configured(settings)
 
-    await _check_code(settings, email, code, "reset")
+    await _check_code(settings, email, code, "reset", body.request)
     user_id = await authcodes.user_id_by_email(settings, email)
     if not user_id:
         # Account deleted between code and verify.

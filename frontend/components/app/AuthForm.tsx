@@ -42,7 +42,7 @@ function friendly(message: string): string {
 
 // Signup codes are emailed by Dart's own backend (Brevo), not Supabase — the
 // account is only created once the code verifies, so it can't be bypassed.
-async function postJson(path: string, body: unknown): Promise<void> {
+async function postJson<T = unknown>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -58,6 +58,7 @@ async function postJson(path: string, body: unknown): Promise<void> {
     }
     throw new Error(message);
   }
+  return (await res.json()) as T;
 }
 
 // Email + password auth, with one twist: a new account must type the 6-digit
@@ -78,6 +79,9 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
   // Reset only: the code must check out server-side before the new-password
   // field appears.
   const [codeOk, setCodeOk] = useState(false);
+  // Returned by /code and echoed on check/verify: proves this browser asked
+  // for the code, so strangers' guesses can't burn the attempt cap.
+  const [reqToken, setReqToken] = useState("");
   const codeRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const pwRef = useRef<HTMLInputElement>(null);
@@ -135,14 +139,19 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     try {
       if (mode === "signup" || mode === "reset") {
         if (!API_BASE) {
-          setError("Signup isn’t configured (missing backend URL).");
+          setError(
+            (mode === "reset" ? "Password reset" : "Signup") +
+              " isn’t configured (missing backend URL).",
+          );
           return;
         }
         // Dart's backend emails the code (signup: no account exists yet;
         // reset: proves the address before the password changes).
-        await postJson(`/auth/${mode === "reset" ? "reset" : "signup"}/code`, {
-          email: addr,
-        });
+        const data = await postJson<{ request?: string }>(
+          `/auth/${mode === "reset" ? "reset" : "signup"}/code`,
+          { email: addr },
+        );
+        setReqToken(data.request ?? "");
         setEmail(addr);
         toConfirmStep(null);
       } else {
@@ -180,7 +189,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       setBusy(true);
       setError(null);
       try {
-        await postJson("/auth/reset/check", { email, code: token });
+        await postJson("/auth/reset/check", { email, code: token, request: reqToken });
         setCodeOk(true);
         setNotice(null);
         setTimeout(() => pwRef.current?.focus(), 0);
@@ -203,16 +212,11 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     setError(null);
     try {
       // Verifying the code is what creates the account / sets the password
-      // (backend, admin API), then we sign straight in.
+      // (backend, admin API).
       await postJson(
         mode === "reset" ? "/auth/reset/verify" : "/auth/signup/verify",
-        { email, code: token, password },
+        { email, code: token, password, request: reqToken },
       );
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      // Done and signed in — keep the button loading while we navigate.
-      router.push("/");
-      router.refresh();
     } catch (err) {
       const msg = err instanceof Error ? friendly(err.message) : "Couldn’t verify the code.";
       if (msg.includes("already has an account")) {
@@ -228,6 +232,29 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       if (mode === "reset" && msg.toLowerCase().includes("code")) setCodeOk(false);
       setError(msg);
       setBusy(false);
+      return;
+    }
+    // The account exists / the password is set — the code is spent. If the
+    // automatic sign-in hiccups now, land on the log-in form (password still
+    // filled in) instead of stranding the user on a consumed code.
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      // Done and signed in — keep the button loading while we navigate.
+      router.push("/");
+      router.refresh();
+    } catch {
+      setStep("form");
+      setCode("");
+      setCodeOk(false);
+      setError(null);
+      setNotice(
+        mode === "reset"
+          ? "Password updated — log in with it below."
+          : "Account created — log in below.",
+      );
+      setMode("signin");
+      setBusy(false);
     }
   }
 
@@ -239,7 +266,11 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     setError(null);
     setNotice(null);
     try {
-      await postJson(`/auth/${mode === "reset" ? "reset" : "signup"}/code`, { email });
+      const data = await postJson<{ request?: string }>(
+        `/auth/${mode === "reset" ? "reset" : "signup"}/code`,
+        { email },
+      );
+      setReqToken(data.request ?? "");
       setNotice("Sent a new code.");
       setCode("");
       setCodeOk(false);

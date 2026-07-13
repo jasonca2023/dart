@@ -33,6 +33,17 @@ def gen_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
+def gen_request() -> str:
+    # Opaque token returned to the browser that asked for the code. Guesses
+    # must present it, so third parties can't burn the owner's attempt cap.
+    return secrets.token_hex(16)
+
+
+def hash_request(settings: Settings, email: str, request: str) -> str:
+    pepper = settings.supabase_service_key or ""
+    return hashlib.sha256(f"{email.lower()}|{request}|{pepper}|request".encode()).hexdigest()
+
+
 def hash_code(settings: Settings, email: str, code: str, purpose: str = "signup") -> str:
     # Peppered with the service key so a leaked table row can't be reversed to
     # a code offline. Codes are 6 digits with a 5-attempt cap and short TTL.
@@ -83,13 +94,16 @@ async def get_code_row(settings: Settings, email: str) -> dict | None:
         return rows[0] if rows else None
 
 
-async def store_code(settings: Settings, email: str, code_hash: str) -> None:
+async def store_code(
+    settings: Settings, email: str, code_hash: str, request_hash: str
+) -> None:
     base, auth = _sb(settings)
     now = datetime.now(timezone.utc)
     expires = now.timestamp() + settings.auth_code_ttl_sec
     row = {
         "email": email,
         "code_hash": code_hash,
+        "request_hash": request_hash,
         "attempts": 0,
         "expires_at": datetime.fromtimestamp(expires, tz=timezone.utc).isoformat(),
         "created_at": now.isoformat(),
@@ -217,7 +231,9 @@ __all__ = [
     "RESEND_COOLDOWN_SEC",
     "email_ready",
     "gen_code",
+    "gen_request",
     "hash_code",
+    "hash_request",
     "user_exists",
     "user_id_by_email",
     "get_code_row",

@@ -449,11 +449,12 @@ def test_signup_flow_with_fakes(monkeypatch):
     async def fake_get(s, email):
         return store.get(email)
 
-    async def fake_store(s, email, code_hash):
+    async def fake_store(s, email, code_hash, request_hash):
         now = datetime.now(timezone.utc)
         store[email] = {
             "email": email,
             "code_hash": code_hash,
+            "request_hash": request_hash,
             "attempts": 0,
             "expires_at": (now + timedelta(minutes=10)).isoformat(),
             "created_at": now.isoformat(),
@@ -489,15 +490,30 @@ def test_signup_flow_with_fakes(monkeypatch):
     )
 
     # send a code
-    assert c.post("/auth/signup/code", json={"email": "new@x.com"}).status_code == 200
+    r = c.post("/auth/signup/code", json={"email": "new@x.com"})
+    assert r.status_code == 200
+    req = r.json()["request"]
     assert len(sent["new@x.com"]) == 6
     # immediate resend hits the per-address cooldown
     assert c.post("/auth/signup/code", json={"email": "new@x.com"}).status_code == 429
+    # a guess without the request token is rejected without burning attempts —
+    # even with the right code
+    r = c.post(
+        "/auth/signup/verify",
+        json={
+            "email": "new@x.com",
+            "code": sent["new@x.com"],
+            "password": "Passw0rd!",
+            "request": "not-the-token",
+        },
+    )
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
+    assert store["new@x.com"]["attempts"] == 0
     # wrong code is rejected and counted
     wrong = "000000" if sent["new@x.com"] != "000000" else "000001"
     r = c.post(
         "/auth/signup/verify",
-        json={"email": "new@x.com", "code": wrong, "password": "Passw0rd!"},
+        json={"email": "new@x.com", "code": wrong, "password": "Passw0rd!", "request": req},
     )
     assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
     assert store["new@x.com"]["attempts"] == 1
@@ -509,6 +525,7 @@ def test_signup_flow_with_fakes(monkeypatch):
             "email": "new@x.com",
             "code": sent["new@x.com"],
             "password": "Policy-reject1!",
+            "request": req,
         },
     )
     assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_input"
@@ -516,7 +533,12 @@ def test_signup_flow_with_fakes(monkeypatch):
     # the right code creates the account and consumes the row
     r = c.post(
         "/auth/signup/verify",
-        json={"email": "new@x.com", "code": sent["new@x.com"], "password": "Passw0rd!"},
+        json={
+            "email": "new@x.com",
+            "code": sent["new@x.com"],
+            "password": "Passw0rd!",
+            "request": req,
+        },
     )
     assert r.status_code == 200 and r.json()["created"] is True
     assert "new@x.com" not in store
@@ -544,11 +566,12 @@ def test_reset_flow_with_fakes(monkeypatch):
     async def fake_get(s, email):
         return store.get(email)
 
-    async def fake_store(s, email, code_hash):
+    async def fake_store(s, email, code_hash, request_hash):
         now = datetime.now(timezone.utc)
         store[email] = {
             "email": email,
             "code_hash": code_hash,
+            "request_hash": request_hash,
             "attempts": 0,
             "expires_at": (now + timedelta(minutes=10)).isoformat(),
             "created_at": now.isoformat(),
@@ -586,16 +609,29 @@ def test_reset_flow_with_fakes(monkeypatch):
     r = c.post("/auth/reset/code", json={"email": "nobody@x.com"})
     assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
     # a known email gets a code
-    assert c.post("/auth/reset/code", json={"email": "user@x.com"}).status_code == 200
+    r = c.post("/auth/reset/code", json={"email": "user@x.com"})
+    assert r.status_code == 200
+    req = r.json()["request"]
     real_code = sent["user@x.com"]
     assert len(real_code) == 6
+    # the right code with the wrong request token is rejected, attempts untouched
+    r = c.post(
+        "/auth/reset/check",
+        json={"email": "user@x.com", "code": real_code, "request": "not-the-token"},
+    )
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
+    assert store["user@x.com"]["attempts"] == 0
     # /check: a wrong code is rejected and counted…
     wrong = "000000" if real_code != "000000" else "000001"
-    r = c.post("/auth/reset/check", json={"email": "user@x.com", "code": wrong})
+    r = c.post(
+        "/auth/reset/check", json={"email": "user@x.com", "code": wrong, "request": req}
+    )
     assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
     assert store["user@x.com"]["attempts"] == 1
     # …the right code checks out without consuming the row
-    r = c.post("/auth/reset/check", json={"email": "user@x.com", "code": real_code})
+    r = c.post(
+        "/auth/reset/check", json={"email": "user@x.com", "code": real_code, "request": req}
+    )
     assert r.status_code == 200 and r.json()["valid"] is True
     assert "user@x.com" in store and store["user@x.com"]["attempts"] == 1
     # a signup-purpose hash for the same code must not verify as a reset code
@@ -604,7 +640,12 @@ def test_reset_flow_with_fakes(monkeypatch):
     )
     r = c.post(
         "/auth/reset/verify",
-        json={"email": "user@x.com", "code": real_code, "password": "NewPassw0rd!"},
+        json={
+            "email": "user@x.com",
+            "code": real_code,
+            "password": "NewPassw0rd!",
+            "request": req,
+        },
     )
     assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
     assert store["user@x.com"]["attempts"] == 2
@@ -619,6 +660,7 @@ def test_reset_flow_with_fakes(monkeypatch):
             "email": "user@x.com",
             "code": real_code,
             "password": "NewPassw0rd!",
+            "request": req,
         },
     )
     assert r.status_code == 200 and r.json()["reset"] is True
