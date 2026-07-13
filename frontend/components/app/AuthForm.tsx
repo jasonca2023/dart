@@ -27,17 +27,30 @@ function passwordError(pw: string): string | null {
   return null;
 }
 
-// Friendlier wording for the Supabase errors people actually hit.
+// Errors from Dart's backend carry a stable machine-readable code — the UI
+// branches on that, never on the message wording.
+class ApiError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+// Friendlier wording for the Supabase sign-in errors people actually hit.
+// (Backend errors are written for humans already and shown as-is.)
 function friendly(message: string): string {
   const m = message.toLowerCase();
   if (m.includes("invalid login credentials")) return "Wrong email or password.";
-  if (m.includes("already registered"))
-    return "That email already has an account — log in instead.";
   if (m.includes("security purposes") || m.includes("rate limit"))
     return "Please wait a minute between emails, then try again.";
-  if (m.includes("expired") || m.includes("invalid"))
-    return "That code didn’t match — check for typos, or resend a fresh one.";
   return message;
+}
+
+function errMsg(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) return err.message;
+  return err instanceof Error ? friendly(err.message) : fallback;
 }
 
 // Signup codes are emailed by Dart's own backend (Brevo), not Supabase — the
@@ -49,14 +62,18 @@ async function postJson<T = unknown>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
+    let code = "internal";
     let message = "Something went wrong.";
     try {
-      const data = (await res.json()) as { error?: { message?: string } };
+      const data = (await res.json()) as {
+        error?: { code?: string; message?: string };
+      };
+      if (data.error?.code) code = data.error.code;
       if (data.error?.message) message = data.error.message;
     } catch {
       /* non-JSON error body */
     }
-    throw new Error(message);
+    throw new ApiError(code, message);
   }
   return (await res.json()) as T;
 }
@@ -164,12 +181,11 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
         router.refresh();
       }
     } catch (err) {
-      const msg = err instanceof Error ? friendly(err.message) : "Something went wrong.";
       // An email that already has an account belongs on the log-in form; an
       // email without one belongs on signup.
-      if (msg.includes("already has an account")) setMode("signin");
-      if (msg.includes("create one")) setMode("signup");
-      setError(msg);
+      if (err instanceof ApiError && err.code === "conflict") setMode("signin");
+      if (err instanceof ApiError && err.code === "not_found") setMode("signup");
+      setError(errMsg(err, "Something went wrong."));
     } finally {
       setBusy(false);
     }
@@ -194,7 +210,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
         setNotice(null);
         setTimeout(() => pwRef.current?.focus(), 0);
       } catch (err) {
-        setError(err instanceof Error ? friendly(err.message) : "Couldn’t check the code.");
+        setError(errMsg(err, "Couldn’t check the code."));
       } finally {
         setBusy(false);
       }
@@ -218,19 +234,20 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
         { email, code: token, password, request: reqToken },
       );
     } catch (err) {
-      const msg = err instanceof Error ? friendly(err.message) : "Couldn’t verify the code.";
-      if (msg.includes("already has an account")) {
+      if (err instanceof ApiError && err.code === "conflict") {
         setStep("form");
         setMode("signin");
       }
-      if (msg.includes("create one")) {
+      if (err instanceof ApiError && err.code === "not_found") {
         setStep("form");
         setMode("signup");
       }
-      // A code that stopped verifying (expired, consumed) sends reset back to
-      // the code stage; a password complaint keeps the password field up.
-      if (mode === "reset" && msg.toLowerCase().includes("code")) setCodeOk(false);
-      setError(msg);
+      // A code that stopped verifying (expired, consumed, replaced) sends
+      // reset back to the code stage; a password complaint (invalid_input)
+      // keeps the password field up.
+      if (mode === "reset" && err instanceof ApiError && err.code === "invalid_code")
+        setCodeOk(false);
+      setError(errMsg(err, "Couldn’t verify the code."));
       setBusy(false);
       return;
     }
@@ -277,7 +294,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       codeRef.current?.focus();
     } catch (err) {
       setCooldown(0);
-      setError(err instanceof Error ? friendly(err.message) : "Couldn’t resend the code.");
+      setError(errMsg(err, "Couldn’t resend the code."));
     }
   }
 
