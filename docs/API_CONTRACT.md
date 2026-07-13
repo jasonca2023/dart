@@ -122,9 +122,13 @@ can't verify as a reset code) in `auth_codes` with a 10-minute TTL.
 Both take the session `token` in the body and **re-confirm the password** (GoTrue
 password grant), so an unattended open tab can't silently change or destroy an account.
 
-**`/auth/password`** `{ "token", "current_password", "new_password" }` → `{ "updated": true }`
+**`/auth/password/code`** `{ "token", "current_password" }` → `{ "sent": true, "request": "…" }`
+Password + session check out → a 6-digit code goes to the **account** email, so a
+leaked password + stolen session still can't change the password.
+
+**`/auth/password`** `{ "token", "current_password", "new_password", "code", "request" }` → `{ "updated": true }`
 `400 invalid_input` wrong current password / bad shape / Supabase policy ·
-`401 unauthorized` bad session · `429 rate_limited`.
+`400 invalid_code` wrong/expired code · `401 unauthorized` bad session · `429 rate_limited`.
 
 **`/auth/delete-account`** `{ "token", "password" }` → `{ "deleted": true }`
 Deletes the library rows and stored files first, then the account (a failure partway

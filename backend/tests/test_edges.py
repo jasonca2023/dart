@@ -672,19 +672,52 @@ def test_account_endpoints_unconfigured_are_500():
     c = make_client()
     r = c.post(
         "/auth/password",
-        json={"token": "t", "current_password": "OldPass1!", "new_password": "NewPass1!"},
+        json={
+            "token": "t",
+            "current_password": "OldPass1!",
+            "new_password": "NewPass1!",
+            "code": "123456",
+        },
     )
     assert r.status_code == 500
     assert c.post("/auth/delete-account", json={"token": "t", "password": "x"}).status_code == 500
 
 
 def test_account_flow_with_fakes(monkeypatch):
-    """Change password and delete account: bad token → 401, wrong password →
-    400, success calls the admin APIs; deletion removes data before the user."""
+    """Change password (code to the account email) and delete account: bad
+    token → 401, wrong password → 400, success calls the admin APIs; deletion
+    removes data before the user."""
+    from datetime import datetime, timedelta, timezone
+
     from app import authcodes
 
     passwords: dict[str, str] = {}
     calls: list[str] = []
+    store: dict[str, dict] = {}
+    sent: dict[str, str] = {}
+
+    async def fake_get(s, email):
+        return store.get(email)
+
+    async def fake_store(s, email, code_hash, request_hash):
+        now = datetime.now(timezone.utc)
+        store[email] = {
+            "email": email,
+            "code_hash": code_hash,
+            "request_hash": request_hash,
+            "attempts": 0,
+            "expires_at": (now + timedelta(minutes=10)).isoformat(),
+            "created_at": now.isoformat(),
+        }
+
+    async def fake_bump(s, email, n):
+        store[email]["attempts"] = n
+
+    async def fake_delete_code(s, email):
+        store.pop(email, None)
+
+    async def fake_send(s, to, code, purpose="signup"):
+        sent[to] = code
 
     async def fake_get_token_user(s, token):
         return ("uid-1", "user@x.com") if token == "good-token" else None
@@ -710,9 +743,17 @@ def test_account_flow_with_fakes(monkeypatch):
     monkeypatch.setattr(authcodes, "delete_user_data", fake_delete_data)
     monkeypatch.setattr(authcodes, "delete_user", fake_delete_user)
     monkeypatch.setattr(authcodes, "storage_usage", fake_storage_usage)
+    monkeypatch.setattr(authcodes, "get_code_row", fake_get)
+    monkeypatch.setattr(authcodes, "store_code", fake_store)
+    monkeypatch.setattr(authcodes, "bump_attempts", fake_bump)
+    monkeypatch.setattr(authcodes, "delete_code", fake_delete_code)
+    monkeypatch.setattr(authcodes, "send_code_email", fake_send)
 
     c = make_client(
-        supabase_url="https://x.supabase.co", supabase_service_key="svc"
+        supabase_url="https://x.supabase.co",
+        supabase_service_key="svc",
+        brevo_api_key="brevo",
+        auth_email_from="codes@dart.test",
     )
 
     # overview: bad token → 401, good token → stats
@@ -720,31 +761,64 @@ def test_account_flow_with_fakes(monkeypatch):
     r = c.post("/auth/overview", json={"token": "good-token"})
     assert r.status_code == 200 and r.json()["storage_bytes"] == 123_456
 
-    # bad session token
+    # bad session token (both steps)
     r = c.post(
-        "/auth/password",
-        json={"token": "bad", "current_password": "RightPass1!", "new_password": "NewPass1!"},
+        "/auth/password/code", json={"token": "bad", "current_password": "RightPass1!"}
     )
     assert r.status_code == 401 and r.json()["error"]["code"] == "unauthorized"
-    # wrong current password
+    # wrong current password can't even request a code
     r = c.post(
-        "/auth/password",
-        json={"token": "good-token", "current_password": "nope", "new_password": "NewPass1!"},
+        "/auth/password/code", json={"token": "good-token", "current_password": "nope"}
     )
     assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_input"
+    # the code goes to the ACCOUNT email
+    r = c.post(
+        "/auth/password/code",
+        json={"token": "good-token", "current_password": "RightPass1!"},
+    )
+    assert r.status_code == 200
+    req = r.json()["request"]
+    assert len(sent["user@x.com"]) == 6
     # new password shape enforced
     r = c.post(
         "/auth/password",
-        json={"token": "good-token", "current_password": "RightPass1!", "new_password": "short"},
+        json={
+            "token": "good-token",
+            "current_password": "RightPass1!",
+            "new_password": "short",
+            "code": sent["user@x.com"],
+            "request": req,
+        },
     )
     assert r.status_code == 400
-    # success
+    # wrong code is refused and counted
+    wrong = "000000" if sent["user@x.com"] != "000000" else "000001"
     r = c.post(
         "/auth/password",
-        json={"token": "good-token", "current_password": "RightPass1!", "new_password": "NewPass1!"},
+        json={
+            "token": "good-token",
+            "current_password": "RightPass1!",
+            "new_password": "NewPass1!",
+            "code": wrong,
+            "request": req,
+        },
+    )
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
+    assert store["user@x.com"]["attempts"] == 1
+    # success consumes the code
+    r = c.post(
+        "/auth/password",
+        json={
+            "token": "good-token",
+            "current_password": "RightPass1!",
+            "new_password": "NewPass1!",
+            "code": sent["user@x.com"],
+            "request": req,
+        },
     )
     assert r.status_code == 200 and r.json()["updated"] is True
     assert passwords["uid-1"] == "NewPass1!"
+    assert "user@x.com" not in store
 
     # delete: wrong password refused, then success removes data before the user
     r = c.post("/auth/delete-account", json={"token": "good-token", "password": "nope"})

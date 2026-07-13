@@ -1,17 +1,19 @@
 """Signed-in account management.
 
-POST /auth/overview        {token}                                 → account stats
-POST /auth/password        {token, current_password, new_password} → change password
-POST /auth/email/code      {token, password, new_email}            → code to the new email
-POST /auth/email/verify    {token, new_email, code, request}       → switch the email
-POST /auth/delete-account  {token, password}                       → delete account + data
+POST /auth/overview        {token}                                     → account stats
+POST /auth/password/code   {token, current_password}                   → code to account email
+POST /auth/password        {token, current_password, new_password,
+                            code, request}                             → change password
+POST /auth/email/code      {token, password, new_email}                → code to the new email
+POST /auth/email/verify    {token, new_email, code, request}           → switch the email
+POST /auth/delete-account  {token, password}                           → delete account + data
 
 The mutating flows require the session token AND a fresh password confirmation
-(GoTrue password grant), so an unattended open tab can't silently change or
-destroy an account. Email change additionally proves the NEW address with an
-emailed 6-digit code (same machinery as signup/reset). Deletion removes the
-library rows and stored files first, then the account itself — a failure
-partway leaves the account intact and retryable.
+(GoTrue password grant) AND a 6-digit emailed code — password change proves
+the account email, email change proves the NEW address (same code machinery
+as signup/reset). Deletion removes the library rows and stored files first,
+then the account itself — a failure partway leaves the account intact and
+retryable.
 """
 
 from __future__ import annotations
@@ -43,10 +45,17 @@ class TokenIn(BaseModel):
     token: str
 
 
+class PasswordCodeIn(BaseModel):
+    token: str
+    current_password: str
+
+
 class PasswordIn(BaseModel):
     token: str
     current_password: str
     new_password: str
+    code: str = ""
+    request: str = ""
 
 
 class DeleteIn(BaseModel):
@@ -98,16 +107,30 @@ async def account_overview(body: TokenIn, request: Request) -> dict:
     return {"storage_bytes": await authcodes.storage_usage(settings, uid)}
 
 
+@router.post("/auth/password/code", dependencies=[Depends(_account_rl)])
+async def send_password_change_code(body: PasswordCodeIn, request: Request) -> dict:
+    """Password + session check out → email a code to the ACCOUNT address, so
+    a leaked password + stolen session still can't change the password."""
+    settings: Settings = request.app.state.settings
+    _require_email_ready(settings)
+    _, email = await _confirmed_user(settings, body.token, body.current_password)
+    req = await _issue_code(settings, email, "password")
+    return {"sent": True, "request": req}
+
+
 @router.post("/auth/password", dependencies=[Depends(_account_rl)])
 async def change_password(body: PasswordIn, request: Request) -> dict:
     settings: Settings = request.app.state.settings
     if len(body.new_password) < 8 or len(body.new_password) > 128:
         raise DartError(INVALID_INPUT, "Password must be 8–128 characters.", status=400)
+    code = _clean_code(body.code)
     _require_configured(settings)
 
-    uid, _ = await _confirmed_user(settings, body.token, body.current_password)
+    uid, email = await _confirmed_user(settings, body.token, body.current_password)
+    await _check_code(settings, email, code, "password", body.request)
     # A policy-rejected password surfaces as 400 with GoTrue's message.
     await authcodes.set_user_password(settings, uid, body.new_password)
+    await _consume_code(settings, email)
     return {"updated": True}
 
 

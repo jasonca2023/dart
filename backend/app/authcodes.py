@@ -152,6 +152,10 @@ async def send_code_email(
         subject = "Your Dart email change code"
         action = "Enter this code to make this address your new Dart login email."
         unasked = "you can ignore this email and nothing will change."
+    elif purpose == "password":
+        subject = "Your Dart password change code"
+        action = "Enter this code to confirm changing your password."
+        unasked = "you can ignore this email and your password stays the same."
     else:
         subject = "Your Dart signup code"
         action = "Enter this code to finish creating your account."

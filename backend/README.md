@@ -25,11 +25,12 @@ images. It does no video generation.
   exists; reset verifies a code the same way, then sets the new password via the admin
   API. Codes are stored hashed (purpose-scoped) with a 10-minute TTL and a 5-attempt
   cap; sign-in stays plain email+password.
-- **`POST /auth/password`, `/auth/email/*`, `/auth/delete-account`** — signed-in account
-  management (change password; change email, verified by a code sent to the **new**
-  address; delete the account plus its library rows and stored files). All require the
-  session token **and** a fresh password confirmation. `POST /auth/overview` reports
-  storage usage for the account page (token only).
+- **`POST /auth/password/*`, `/auth/email/*`, `/auth/delete-account`** — signed-in account
+  management (change password, confirmed by a code sent to the **account** email; change
+  email, verified by a code sent to the **new** address; delete the account plus its
+  library rows and stored files). All require the session token **and** a fresh password
+  confirmation. `POST /auth/overview` reports storage usage for the account page (token
+  only).
 - **`GET /health`** — liveness, which providers are wired, whether `/save-ad` is configured,
   whether the Safari colour re-tag is ready (`video_retag_ready`), and whether signup code
   emails are configured (`signup_email_ready`).
