@@ -549,7 +549,7 @@ export function AccountSettings() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="t-heading">Account settings</h1>
+      <h1 className="t-heading">Account Settings</h1>
 
       {/* -- Who you are, at a glance ----------------------------------------- */}
       <Card className="mt-6 flex items-center gap-5 p-6">
