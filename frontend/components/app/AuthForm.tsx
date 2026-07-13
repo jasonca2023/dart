@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, ApiError, postJson } from "@/lib/api";
+import { PASSWORD_REQ, passwordError } from "@/lib/password";
 import { Field, Input } from "../ui/Field";
 import { Button } from "../ui/Button";
 import { Alert, ArrowRight } from "../icons";
@@ -12,31 +13,6 @@ type Mode = "signin" | "signup" | "reset";
 
 // Supabase sends at most one email per address per minute.
 const RESEND_COOLDOWN_SEC = 60;
-
-const PASSWORD_REQ =
-  "8+ characters with a capital letter and a special character (or 12+ characters).";
-
-// Policy: a capital letter always; 8+ chars when a special character is present,
-// otherwise 12+ chars. Returns an error string, or null when the password is OK.
-function passwordError(pw: string): string | null {
-  if (!/[A-Z]/.test(pw)) return "Add a capital letter.";
-  const hasSpecial = /[^A-Za-z0-9]/.test(pw);
-  if (hasSpecial && pw.length < 8) return "At least 8 characters.";
-  if (!hasSpecial && pw.length < 12)
-    return "Add a special character, or use 12+ characters.";
-  return null;
-}
-
-// Errors from Dart's backend carry a stable machine-readable code — the UI
-// branches on that, never on the message wording.
-class ApiError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-  ) {
-    super(message);
-  }
-}
 
 // Friendlier wording for the Supabase sign-in errors people actually hit.
 // (Backend errors are written for humans already and shown as-is.)
@@ -51,31 +27,6 @@ function friendly(message: string): string {
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.message;
   return err instanceof Error ? friendly(err.message) : fallback;
-}
-
-// Signup codes are emailed by Dart's own backend (Brevo), not Supabase — the
-// account is only created once the code verifies, so it can't be bypassed.
-async function postJson<T = unknown>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    let code = "internal";
-    let message = "Something went wrong.";
-    try {
-      const data = (await res.json()) as {
-        error?: { code?: string; message?: string };
-      };
-      if (data.error?.code) code = data.error.code;
-      if (data.error?.message) message = data.error.message;
-    } catch {
-      /* non-JSON error body */
-    }
-    throw new ApiError(code, message);
-  }
-  return (await res.json()) as T;
 }
 
 // Email + password auth, with one twist: a new account must type the 6-digit

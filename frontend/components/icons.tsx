@@ -18,6 +18,16 @@ function Svg({ children, ...p }: IconProps) {
   );
 }
 
+export function ChevronDown(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <g {...stroke}>
+        <path d="m7 10 5 5 5-5" />
+      </g>
+    </Svg>
+  );
+}
+
 export function ArrowRight(p: IconProps) {
   return (
     <Svg {...p}>

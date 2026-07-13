@@ -23,6 +23,7 @@ RESEND_COOLDOWN_SEC = 60
 _TIMEOUT = 15.0
 
 BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
+VIDEO_BUCKET = "dart-videos"  # matches main.VIDEO_BUCKET (import would be circular)
 
 
 def email_ready(settings: Settings) -> bool:
@@ -209,6 +210,72 @@ async def create_confirmed_user(settings: Settings, email: str, password: str) -
     return "ok"  # unreachable; keeps type-checkers happy
 
 
+async def get_token_user(settings: Settings, token: str) -> tuple[str, str] | None:
+    """Resolve an access token to (user_id, email) via GoTrue, or None."""
+    if not token:
+        return None
+    base, _ = _sb(settings)
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.get(
+            f"{base}/auth/v1/user",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "apikey": settings.supabase_service_key or "",
+            },
+        )
+    if r.status_code != 200:
+        return None
+    data = r.json()
+    uid, email = data.get("id"), data.get("email")
+    return (str(uid), str(email)) if uid and email else None
+
+
+async def check_password(settings: Settings, email: str, password: str) -> bool:
+    """True when email+password signs in (GoTrue password grant)."""
+    base, _ = _sb(settings)
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{base}/auth/v1/token?grant_type=password",
+            headers={"apikey": settings.supabase_service_key or ""},
+            json={"email": email, "password": password},
+        )
+    return r.status_code == 200
+
+
+async def delete_user_data(settings: Settings, user_id: str) -> None:
+    """Remove the user's library rows and stored files. Runs before the account
+    itself is deleted, so a failure leaves the account intact and retryable."""
+    base, auth = _sb(settings)
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.delete(
+            f"{base}/rest/v1/dart_ads", headers=auth, params={"user_id": f"eq.{user_id}"}
+        )
+        r.raise_for_status()
+        r = await client.post(
+            f"{base}/storage/v1/object/list/{VIDEO_BUCKET}",
+            headers=auth,
+            json={"prefix": f"{user_id}/", "limit": 1000},
+        )
+        r.raise_for_status()
+        names = [f"{user_id}/{o['name']}" for o in r.json() if o.get("name")]
+        if names:
+            r = await client.request(
+                "DELETE",
+                f"{base}/storage/v1/object/{VIDEO_BUCKET}",
+                headers=auth,
+                json={"prefixes": names},
+            )
+            r.raise_for_status()
+
+
+async def delete_user(settings: Settings, user_id: str) -> None:
+    """Delete the account via the GoTrue admin API."""
+    base, auth = _sb(settings)
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.delete(f"{base}/auth/v1/admin/users/{user_id}", headers=auth)
+    r.raise_for_status()
+
+
 async def set_user_password(settings: Settings, user_id: str, password: str) -> None:
     """Set an existing user's password via the GoTrue admin API."""
     base, auth = _sb(settings)
@@ -243,4 +310,8 @@ __all__ = [
     "send_code_email",
     "create_confirmed_user",
     "set_user_password",
+    "get_token_user",
+    "check_password",
+    "delete_user_data",
+    "delete_user",
 ]

@@ -31,12 +31,52 @@ export function warmBackend(): void {
 // A small artificial latency on the mock so loading states are exercised.
 const tick = () => new Promise<void>((r) => setTimeout(r, 280));
 
+// Errors from the backend carry a stable machine-readable code (see
+// docs/API_CONTRACT.md) — UIs branch on that, never on the message wording.
+export class ApiError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+// JSON POST against the backend; throws ApiError on a contract error.
+export async function postJson<T = unknown>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let code = "internal";
+    let message = "Something went wrong.";
+    try {
+      const data = (await res.json()) as {
+        error?: { code?: string; message?: string };
+      };
+      if (data.error?.code) code = data.error.code;
+      if (data.error?.message) message = data.error.message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(code, message);
+  }
+  return (await res.json()) as T;
+}
+
+// The logged-in user's access token — for endpoints that take it in the body.
+export async function getAccessToken(): Promise<string> {
+  if (!supabase) return "";
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? "";
+}
+
 // The logged-in user's Supabase access token, so the backend can authorize
 // write calls. Empty when signed out / Supabase not configured.
 async function authHeader(): Promise<Record<string, string>> {
-  if (!supabase) return {};
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const token = await getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

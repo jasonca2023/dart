@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .api.jobs import router as jobs_router
 from .api.settings import router as settings_router
+from .api.account import router as account_router
 from .api.signup import router as signup_router
 from .authcodes import email_ready as authcodes_email_ready
 from .auth import verify_token
@@ -280,6 +281,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(jobs_router)
     app.include_router(settings_router)
     app.include_router(signup_router)
+    app.include_router(account_router)
 
     # Serve generated videos (LTX writes mp4s here) at /media/<file>.mp4.
     media = media_root()

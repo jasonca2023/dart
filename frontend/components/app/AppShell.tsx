@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Logo } from "../ui/Logo";
-import { ButtonLink } from "../ui/Button";
 import { AccountMenu } from "./AccountMenu";
 import { AppNav } from "./AppNav";
 import { AuthGate } from "./AuthGate";
@@ -27,9 +26,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
             )}
             <AccountMenu />
-            <ButtonLink href="/" variant="primary" size="sm">
-              New ad
-            </ButtonLink>
           </div>
         </div>
       </header>

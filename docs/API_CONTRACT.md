@@ -117,6 +117,21 @@ can't verify as a reset code) in `auth_codes` with a 10-minute TTL.
 
 ---
 
+## `POST /auth/password` + `POST /auth/delete-account` — signed-in account management
+
+Both take the session `token` in the body and **re-confirm the password** (GoTrue
+password grant), so an unattended open tab can't silently change or destroy an account.
+
+**`/auth/password`** `{ "token", "current_password", "new_password" }` → `{ "updated": true }`
+`400 invalid_input` wrong current password / bad shape / Supabase policy ·
+`401 unauthorized` bad session · `429 rate_limited`.
+
+**`/auth/delete-account`** `{ "token", "password" }` → `{ "deleted": true }`
+Deletes the library rows and stored files first, then the account (a failure partway
+leaves the account intact and retryable). Same errors as `/auth/password`.
+
+---
+
 ## `GET /health`
 
 ```json

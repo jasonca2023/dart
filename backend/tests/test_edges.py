@@ -666,3 +666,82 @@ def test_reset_flow_with_fakes(monkeypatch):
     assert r.status_code == 200 and r.json()["reset"] is True
     assert passwords["uid-1"] == "NewPassw0rd!"
     assert "user@x.com" not in store
+
+
+def test_account_endpoints_unconfigured_are_500():
+    c = make_client()
+    r = c.post(
+        "/auth/password",
+        json={"token": "t", "current_password": "OldPass1!", "new_password": "NewPass1!"},
+    )
+    assert r.status_code == 500
+    assert c.post("/auth/delete-account", json={"token": "t", "password": "x"}).status_code == 500
+
+
+def test_account_flow_with_fakes(monkeypatch):
+    """Change password and delete account: bad token → 401, wrong password →
+    400, success calls the admin APIs; deletion removes data before the user."""
+    from app import authcodes
+
+    passwords: dict[str, str] = {}
+    calls: list[str] = []
+
+    async def fake_get_token_user(s, token):
+        return ("uid-1", "user@x.com") if token == "good-token" else None
+
+    async def fake_check_password(s, email, pw):
+        return pw == "RightPass1!"
+
+    async def fake_set_password(s, uid, pw):
+        passwords[uid] = pw
+
+    async def fake_delete_data(s, uid):
+        calls.append(f"data:{uid}")
+
+    async def fake_delete_user(s, uid):
+        calls.append(f"user:{uid}")
+
+    monkeypatch.setattr(authcodes, "get_token_user", fake_get_token_user)
+    monkeypatch.setattr(authcodes, "check_password", fake_check_password)
+    monkeypatch.setattr(authcodes, "set_user_password", fake_set_password)
+    monkeypatch.setattr(authcodes, "delete_user_data", fake_delete_data)
+    monkeypatch.setattr(authcodes, "delete_user", fake_delete_user)
+
+    c = make_client(
+        supabase_url="https://x.supabase.co", supabase_service_key="svc"
+    )
+
+    # bad session token
+    r = c.post(
+        "/auth/password",
+        json={"token": "bad", "current_password": "RightPass1!", "new_password": "NewPass1!"},
+    )
+    assert r.status_code == 401 and r.json()["error"]["code"] == "unauthorized"
+    # wrong current password
+    r = c.post(
+        "/auth/password",
+        json={"token": "good-token", "current_password": "nope", "new_password": "NewPass1!"},
+    )
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_input"
+    # new password shape enforced
+    r = c.post(
+        "/auth/password",
+        json={"token": "good-token", "current_password": "RightPass1!", "new_password": "short"},
+    )
+    assert r.status_code == 400
+    # success
+    r = c.post(
+        "/auth/password",
+        json={"token": "good-token", "current_password": "RightPass1!", "new_password": "NewPass1!"},
+    )
+    assert r.status_code == 200 and r.json()["updated"] is True
+    assert passwords["uid-1"] == "NewPass1!"
+
+    # delete: wrong password refused, then success removes data before the user
+    r = c.post("/auth/delete-account", json={"token": "good-token", "password": "nope"})
+    assert r.status_code == 400
+    r = c.post(
+        "/auth/delete-account", json={"token": "good-token", "password": "RightPass1!"}
+    )
+    assert r.status_code == 200 and r.json()["deleted"] is True
+    assert calls == ["data:uid-1", "user:uid-1"]

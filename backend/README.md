@@ -25,6 +25,9 @@ images. It does no video generation.
   exists; reset verifies a code the same way, then sets the new password via the admin
   API. Codes are stored hashed (purpose-scoped) with a 10-minute TTL and a 5-attempt
   cap; sign-in stays plain email+password.
+- **`POST /auth/password` + `POST /auth/delete-account`** — signed-in account management
+  (change password; delete the account plus its library rows and stored files). Both
+  require the session token **and** a fresh password confirmation.
 - **`GET /health`** — liveness, which providers are wired, whether `/save-ad` is configured,
   whether the Safari colour re-tag is ready (`video_retag_ready`), and whether signup code
   emails are configured (`signup_email_ready`).
@@ -45,6 +48,7 @@ app/
   auth.py            # verify_token via Supabase /auth/v1/user; require_user dependency
   authcodes.py       # auth email codes: Brevo sender, hashed code store, admin user create/update
   api/signup.py      # /auth/signup/* + /auth/reset/* (emailed-code flows)
+  api/account.py     # /auth/password + /auth/delete-account (signed-in account management)
   config.py          # env-driven settings (pydantic-settings)
   errors.py          # DartError + contract error envelope
   netguard.py        # shared SSRF guard — streamed, size-capped fetch
