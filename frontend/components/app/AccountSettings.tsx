@@ -15,6 +15,8 @@ import { Orb } from "../ui/Orb";
 import { Alert, Download } from "../icons";
 
 function errMsg(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.code === "unauthorized")
+    return "Your session expired. Log in again.";
   return err instanceof Error ? err.message : fallback;
 }
 
@@ -25,9 +27,222 @@ function fmtBytes(n: number): string {
   return "0 KB";
 }
 
-// Overview + change password + sign out everywhere + export + delete. The
-// password-touching actions re-confirm the current password on the backend,
-// so a stolen open tab can't quietly do either.
+// Two-step email change: password + new address, then the 6-digit code that
+// was emailed to the NEW address. Same code machinery as signup and reset.
+function ChangeEmailCard({ className }: { className?: string }) {
+  const [step, setStep] = useState<"form" | "confirm">("form");
+  const [newEmail, setNewEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [reqToken, setReqToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  async function sendCode(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const addr = newEmail.trim().toLowerCase();
+    try {
+      const token = await getAccessToken();
+      const d = await postJson<{ request?: string }>("/auth/email/code", {
+        token,
+        password,
+        new_email: addr,
+      });
+      setReqToken(d.request ?? "");
+      setNewEmail(addr);
+      setStep("confirm");
+      setCode("");
+      setCooldown(60);
+    } catch (err) {
+      setError(errMsg(err, "Couldn’t send the code."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirm(e: React.FormEvent) {
+    e.preventDefault();
+    const token6 = code.replace(/\D/g, "");
+    if (token6.length < 6) {
+      setError("Enter the 6-digit code from the email.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const token = await getAccessToken();
+      await postJson("/auth/email/verify", {
+        token,
+        new_email: newEmail,
+        code: token6,
+        request: reqToken,
+      });
+      // Pick up the new email everywhere (header, identity card).
+      await supabase?.auth.refreshSession();
+      setStep("form");
+      setNewEmail("");
+      setPassword("");
+      setCode("");
+      setNotice("Email updated.");
+    } catch (err) {
+      setError(errMsg(err, "Couldn’t confirm the code."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    if (cooldown > 0) return;
+    setCooldown(60);
+    setError(null);
+    setNotice(null);
+    try {
+      const token = await getAccessToken();
+      const d = await postJson<{ request?: string }>("/auth/email/code", {
+        token,
+        password,
+        new_email: newEmail,
+      });
+      setReqToken(d.request ?? "");
+      setCode("");
+      setNotice("Sent a new code.");
+    } catch (err) {
+      setCooldown(0);
+      setError(errMsg(err, "Couldn’t resend the code."));
+    }
+  }
+
+  return (
+    <Card className={`p-6 ${className ?? ""}`}>
+      <p className="t-caption text-driftwood">Change email</p>
+
+      {step === "form" ? (
+        <>
+          <p className="mt-3 max-w-[44ch] text-[14px] leading-relaxed text-driftwood">
+            We send a 6-digit code to the new address to prove it’s yours.
+            Nothing changes until you enter it.
+          </p>
+          <form onSubmit={sendCode} className="mt-5 flex flex-col gap-5">
+            <Field label="New email" htmlFor="new-email">
+              <Input
+                id="new-email"
+                type="email"
+                required
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </Field>
+            <Field label="Confirm with your password" htmlFor="email-password">
+              <Input
+                id="email-password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </Field>
+
+            {error && (
+              <p role="alert" className="flex items-center gap-2 text-[14px] text-ink">
+                <Alert className="shrink-0 text-[18px] text-driftwood" />
+                {error}
+              </p>
+            )}
+            {notice && !error && (
+              <p className="text-[14px] leading-relaxed text-driftwood">{notice}</p>
+            )}
+
+            <div>
+              <Button type="submit" loading={busy}>
+                Send code
+              </Button>
+            </div>
+          </form>
+        </>
+      ) : (
+        <>
+          <p className="mt-3 max-w-[44ch] text-[14px] leading-relaxed text-driftwood">
+            Enter the code we sent to{" "}
+            <span className="font-medium text-ink">{newEmail}</span>.
+          </p>
+          <form onSubmit={confirm} className="mt-5 flex flex-col gap-5">
+            <Field label="Code" htmlFor="email-otp" hint="It can take a minute. Check spam too.">
+              <Input
+                id="email-otp"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="000000"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="text-center font-mono text-[24px] tracking-[0.5em] placeholder:text-mist"
+              />
+            </Field>
+
+            {error && (
+              <p role="alert" className="flex items-center gap-2 text-[14px] text-ink">
+                <Alert className="shrink-0 text-[18px] text-driftwood" />
+                {error}
+              </p>
+            )}
+            {notice && !error && (
+              <p className="text-[14px] leading-relaxed text-driftwood">{notice}</p>
+            )}
+
+            <div>
+              <Button type="submit" loading={busy}>
+                Confirm new email
+              </Button>
+            </div>
+          </form>
+
+          <div className="mt-5 flex items-baseline justify-between border-t border-ash pt-4 text-[13px] text-driftwood">
+            {cooldown > 0 ? (
+              <span className="font-mono tabular-nums">Resend in {cooldown}s</span>
+            ) : (
+              <button
+                type="button"
+                onClick={resend}
+                className="font-medium text-ink underline-offset-2 transition-colors duration-150 ease-out hover:underline"
+              >
+                Resend code
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setStep("form");
+                setCode("");
+                setError(null);
+                setNotice(null);
+              }}
+              className="transition-colors duration-150 ease-out hover:text-ink"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
+// Overview + change password + change email + sign out everywhere + export +
+// delete. The mutating actions re-confirm the current password on the backend,
+// so a stolen open tab can't quietly do any of them.
 export function AccountSettings() {
   const { user, signOut } = useAuth();
   const router = useRouter();
@@ -98,11 +313,7 @@ export function AccountSettings() {
       setCurrent("");
       setNext("");
     } catch (err) {
-      if (err instanceof ApiError && err.code === "unauthorized") {
-        setPwError("Your session expired — log in again.");
-      } else {
-        setPwError(errMsg(err, "Couldn’t update the password."));
-      }
+      setPwError(errMsg(err, "Couldn’t update the password."));
     } finally {
       setPwBusy(false);
     }
@@ -182,7 +393,8 @@ export function AccountSettings() {
         </div>
       </Card>
 
-      <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-6">
         {/* -- Change password ------------------------------------------------ */}
         <Card className="p-6">
           <p className="t-caption text-driftwood">Change password</p>
@@ -236,13 +448,17 @@ export function AccountSettings() {
           </form>
         </Card>
 
+        {/* -- Change email --------------------------------------------------- */}
+        <ChangeEmailCard className="flex-1" />
+        </div>
+
         <div className="flex flex-col gap-6">
           {/* -- Sessions ------------------------------------------------------ */}
           <Card className="p-6">
             <p className="t-caption text-driftwood">Sessions</p>
             <p className="mt-3 max-w-[44ch] text-[14px] leading-relaxed text-driftwood">
               Left yourself logged in somewhere? This signs you out on every
-              device — including this one.
+              device, including this one.
             </p>
             <div className="mt-4">
               <Button variant="ghost" loading={soBusy} onClick={signOutEverywhere}>
@@ -255,8 +471,8 @@ export function AccountSettings() {
           <Card className="p-6">
             <p className="t-caption text-driftwood">Your data</p>
             <p className="mt-3 max-w-[44ch] text-[14px] leading-relaxed text-driftwood">
-              Everything Dart keeps about you — account details plus every ad’s
-              metadata and video links — as one JSON file.
+              Your account details plus every ad’s metadata and video links,
+              bundled into one JSON file.
             </p>
             <div className="mt-4">
               <Button variant="ghost" onClick={exportData} disabled={ads === null}>
@@ -267,7 +483,7 @@ export function AccountSettings() {
           </Card>
 
           {/* -- Delete account ------------------------------------------------ */}
-          <div className="rounded-card border border-ash p-6">
+          <div className="flex-1 rounded-card border border-ash p-6">
             <p className="t-caption text-driftwood">Delete account</p>
             <p className="mt-3 max-w-[44ch] text-[14px] leading-relaxed text-driftwood">
               Deletes your account and every ad in your library, permanently.

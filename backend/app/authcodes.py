@@ -148,6 +148,10 @@ async def send_code_email(
         subject = "Your Dart password reset code"
         action = "Enter this code to set a new password."
         unasked = "you can ignore this email — your password is unchanged."
+    elif purpose == "email":
+        subject = "Your Dart email change code"
+        action = "Enter this code to make this address your new Dart login email."
+        unasked = "you can ignore this email and nothing will change."
     else:
         subject = "Your Dart signup code"
         action = "Enter this code to finish creating your account."
@@ -294,6 +298,27 @@ async def delete_user(settings: Settings, user_id: str) -> None:
     r.raise_for_status()
 
 
+async def set_user_email(settings: Settings, user_id: str, email: str) -> str:
+    """Point the account at a new (already code-verified) email via the admin
+    API. Returns "ok", or "exists" when the address belongs to another account."""
+    base, auth = _sb(settings)
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.put(
+            f"{base}/auth/v1/admin/users/{user_id}",
+            headers=auth,
+            json={"email": email, "email_confirm": True},
+        )
+    if r.status_code == 200:
+        return "ok"
+    body = r.text.lower()
+    if "already" in body or "email_exists" in body:
+        return "exists"
+    if r.status_code in (400, 422):
+        raise DartError(INVALID_INPUT, _gotrue_msg(r), status=400)
+    r.raise_for_status()
+    return "ok"  # unreachable; keeps type-checkers happy
+
+
 async def set_user_password(settings: Settings, user_id: str, password: str) -> None:
     """Set an existing user's password via the GoTrue admin API."""
     base, auth = _sb(settings)
@@ -328,6 +353,7 @@ __all__ = [
     "send_code_email",
     "create_confirmed_user",
     "set_user_password",
+    "set_user_email",
     "get_token_user",
     "check_password",
     "storage_usage",

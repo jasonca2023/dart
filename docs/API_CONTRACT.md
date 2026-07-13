@@ -130,6 +130,14 @@ password grant), so an unattended open tab can't silently change or destroy an a
 Deletes the library rows and stored files first, then the account (a failure partway
 leaves the account intact and retryable). Same errors as `/auth/password`.
 
+**`/auth/email/code`** `{ "token", "password", "new_email" }` → `{ "sent": true, "request": "…" }`
+Emails a 6-digit code **to the new address** (purpose-scoped, same machinery as signup).
+`400` wrong password / already your email · `409 conflict` address taken · `429` cooldown.
+
+**`/auth/email/verify`** `{ "token", "new_email", "code", "request" }` → `{ "updated": true }`
+Switches the account's login email once the code verifies (admin API, pre-confirmed).
+Same code errors as the signup/reset verifies.
+
 **`/auth/overview`** `{ "token" }` → `{ "storage_bytes": 12345678 }`
 Read-only stats for the account page (no password confirmation needed).
 `401 unauthorized` bad session · `429 rate_limited`.

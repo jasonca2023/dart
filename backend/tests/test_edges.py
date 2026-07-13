@@ -754,3 +754,95 @@ def test_account_flow_with_fakes(monkeypatch):
     )
     assert r.status_code == 200 and r.json()["deleted"] is True
     assert calls == ["data:uid-1", "user:uid-1"]
+
+
+def test_email_change_flow_with_fakes(monkeypatch):
+    """Change email: wrong password → 400; taken address → 409; the code goes
+    to the NEW address and verifying it switches the account's email."""
+    from datetime import datetime, timedelta, timezone
+
+    from app import authcodes
+
+    store: dict[str, dict] = {}
+    sent: dict[str, str] = {}
+    emails: dict[str, str] = {}
+
+    async def fake_get_token_user(s, token):
+        return ("uid-1", "old@x.com") if token == "good-token" else None
+
+    async def fake_check_password(s, email, pw):
+        return pw == "RightPass1!"
+
+    async def fake_user_exists(s, email):
+        return email == "taken@x.com"
+
+    async def fake_get(s, email):
+        return store.get(email)
+
+    async def fake_store(s, email, code_hash, request_hash):
+        now = datetime.now(timezone.utc)
+        store[email] = {
+            "email": email,
+            "code_hash": code_hash,
+            "request_hash": request_hash,
+            "attempts": 0,
+            "expires_at": (now + timedelta(minutes=10)).isoformat(),
+            "created_at": now.isoformat(),
+        }
+
+    async def fake_bump(s, email, n):
+        store[email]["attempts"] = n
+
+    async def fake_delete(s, email):
+        store.pop(email, None)
+
+    async def fake_send(s, to, code, purpose="signup"):
+        sent[to] = code
+
+    async def fake_set_email(s, uid, email):
+        emails[uid] = email
+        return "ok"
+
+    monkeypatch.setattr(authcodes, "get_token_user", fake_get_token_user)
+    monkeypatch.setattr(authcodes, "check_password", fake_check_password)
+    monkeypatch.setattr(authcodes, "user_exists", fake_user_exists)
+    monkeypatch.setattr(authcodes, "get_code_row", fake_get)
+    monkeypatch.setattr(authcodes, "store_code", fake_store)
+    monkeypatch.setattr(authcodes, "bump_attempts", fake_bump)
+    monkeypatch.setattr(authcodes, "delete_code", fake_delete)
+    monkeypatch.setattr(authcodes, "send_code_email", fake_send)
+    monkeypatch.setattr(authcodes, "set_user_email", fake_set_email)
+
+    c = make_client(
+        supabase_url="https://x.supabase.co",
+        supabase_service_key="svc",
+        brevo_api_key="brevo",
+        auth_email_from="codes@dart.test",
+    )
+
+    base = {"token": "good-token", "password": "RightPass1!"}
+    # wrong password / same email / taken email are refused
+    r = c.post("/auth/email/code", json={**base, "password": "nope", "new_email": "new@x.com"})
+    assert r.status_code == 400
+    r = c.post("/auth/email/code", json={**base, "new_email": "old@x.com"})
+    assert r.status_code == 400
+    r = c.post("/auth/email/code", json={**base, "new_email": "taken@x.com"})
+    assert r.status_code == 409
+    # the code goes to the new address
+    r = c.post("/auth/email/code", json={**base, "new_email": "new@x.com"})
+    assert r.status_code == 200
+    req = r.json()["request"]
+    assert len(sent["new@x.com"]) == 6
+    # verifying it switches the email and consumes the row
+    r = c.post(
+        "/auth/email/verify",
+        json={
+            "token": "good-token",
+            "new_email": "new@x.com",
+            "code": sent["new@x.com"],
+            "request": req,
+        },
+    )
+    assert r.status_code == 200 and r.json()["updated"] is True
+    assert emails["uid-1"] == "new@x.com"
+    assert "new@x.com" not in store

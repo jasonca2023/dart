@@ -56,7 +56,7 @@ Storage, row-level secured) via the backend's `/save-ad`.
 | `/ads` | Your saved-ads library. |
 | `/jobs/[id]` | Review a saved ad: player, download, edit, hand off to TikTok / Meta / YouTube. |
 | `/auth` | Email + password sign-in; new accounts and password resets confirm with a 6-digit emailed code. |
-| `/account` | Account settings: overview stats, change password, sign out everywhere, data export, delete account. |
+| `/account` | Account settings: overview stats, change password, change email (code-verified), sign out everywhere, data export, delete account. |
 | `/dashboard` | Legacy path — redirects to `/`. |
 | `/api/copy` | Worker route: Cloudflare Workers AI writes the ad copy. |
 
