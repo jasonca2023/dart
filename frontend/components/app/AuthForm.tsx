@@ -75,8 +75,12 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  // Reset only: the code must check out server-side before the new-password
+  // field appears.
+  const [codeOk, setCodeOk] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
+  const pwRef = useRef<HTMLInputElement>(null);
 
   const pwErr = mode === "signin" ? null : passwordError(password);
 
@@ -105,6 +109,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
   function toConfirmStep(msg: string | null) {
     setStep("confirm");
     setCode("");
+    setCodeOk(false);
     setNotice(msg);
     setCooldown(RESEND_COOLDOWN_SEC);
     setTimeout(() => codeRef.current?.focus(), 0);
@@ -169,7 +174,24 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       setError("Enter the 6-digit code from the email.");
       return;
     }
-    // Reset collects the new password on this step, so validate it here.
+    // Reset, stage 1: check the code server-side; only a valid code reveals
+    // the new-password field. Wrong guesses still count against the cap.
+    if (mode === "reset" && !codeOk) {
+      setBusy(true);
+      setError(null);
+      try {
+        await postJson("/auth/reset/check", { email, code: token });
+        setCodeOk(true);
+        setNotice(null);
+        setTimeout(() => pwRef.current?.focus(), 0);
+      } catch (err) {
+        setError(err instanceof Error ? friendly(err.message) : "Couldn’t check the code.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    // Reset, stage 2: the code checked out — now the new password.
     if (mode === "reset") {
       const pe = passwordError(password);
       if (pe) {
@@ -201,6 +223,9 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
         setStep("form");
         setMode("signup");
       }
+      // A code that stopped verifying (expired, consumed) sends reset back to
+      // the code stage; a password complaint keeps the password field up.
+      if (mode === "reset" && msg.toLowerCase().includes("code")) setCodeOk(false);
       setError(msg);
       setBusy(false);
     }
@@ -216,6 +241,9 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     try {
       await postJson(`/auth/${mode === "reset" ? "reset" : "signup"}/code`, { email });
       setNotice("Sent a new code.");
+      setCode("");
+      setCodeOk(false);
+      codeRef.current?.focus();
     } catch (err) {
       setCooldown(0);
       setError(err instanceof Error ? friendly(err.message) : "Couldn’t resend the code.");
@@ -232,7 +260,9 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
           We sent a 6-digit code to{" "}
           <span className="font-medium text-ink">{email}</span>.{" "}
           {reset
-            ? "Enter it with your new password."
+            ? codeOk
+              ? "Code confirmed — now choose your new password."
+              : "Enter it below to continue."
             : "Enter it below — that’s what creates your account."}
         </p>
 
@@ -247,11 +277,12 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
               maxLength={6}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="text-center font-mono text-[24px] tracking-[0.5em] placeholder:text-mist"
+              disabled={reset && codeOk}
+              className="text-center font-mono text-[24px] tracking-[0.5em] placeholder:text-mist disabled:text-driftwood"
             />
           </Field>
 
-          {reset && (
+          {reset && codeOk && (
             <Field
               label="New password"
               htmlFor="new-password"
@@ -259,6 +290,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
             >
               <Input
                 id="new-password"
+                ref={pwRef}
                 type="password"
                 required
                 minLength={8}
@@ -285,13 +317,19 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
           )}
 
           <Button type="submit" size="lg" loading={busy} className="w-full">
-            {reset ? "Set new password" : "Confirm & create account"}
+            {reset
+              ? codeOk
+                ? "Set new password"
+                : "Confirm code"
+              : "Confirm & create account"}
             {!busy && <ArrowRight className="text-[18px]" />}
           </Button>
         </form>
 
         <div className="mt-8 flex items-baseline justify-between border-t border-ash pt-4 text-[13px] text-driftwood">
-          {cooldown > 0 ? (
+          {reset && codeOk ? (
+            <span>Code confirmed.</span>
+          ) : cooldown > 0 ? (
             <span className="font-mono tabular-nums">Resend in {cooldown}s</span>
           ) : (
             <button
@@ -307,6 +345,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
             onClick={() => {
               setStep("form");
               setCode("");
+              setCodeOk(false);
               setError(null);
               setNotice(null);
             }}

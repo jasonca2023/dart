@@ -589,6 +589,15 @@ def test_reset_flow_with_fakes(monkeypatch):
     assert c.post("/auth/reset/code", json={"email": "user@x.com"}).status_code == 200
     real_code = sent["user@x.com"]
     assert len(real_code) == 6
+    # /check: a wrong code is rejected and counted…
+    wrong = "000000" if real_code != "000000" else "000001"
+    r = c.post("/auth/reset/check", json={"email": "user@x.com", "code": wrong})
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
+    assert store["user@x.com"]["attempts"] == 1
+    # …the right code checks out without consuming the row
+    r = c.post("/auth/reset/check", json={"email": "user@x.com", "code": real_code})
+    assert r.status_code == 200 and r.json()["valid"] is True
+    assert "user@x.com" in store and store["user@x.com"]["attempts"] == 1
     # a signup-purpose hash for the same code must not verify as a reset code
     store["user@x.com"]["code_hash"] = authcodes.hash_code(
         c.app.state.settings, "user@x.com", real_code, "signup"
@@ -598,11 +607,12 @@ def test_reset_flow_with_fakes(monkeypatch):
         json={"email": "user@x.com", "code": real_code, "password": "NewPassw0rd!"},
     )
     assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
-    assert store["user@x.com"]["attempts"] == 1
+    assert store["user@x.com"]["attempts"] == 2
     # restore the real (reset-purpose) hash: the right code sets the password
     store["user@x.com"]["code_hash"] = authcodes.hash_code(
         c.app.state.settings, "user@x.com", real_code, "reset"
     )
+    store["user@x.com"]["attempts"] = 0
     r = c.post(
         "/auth/reset/verify",
         json={

@@ -3,6 +3,7 @@
 POST /auth/signup/code    {email}                  → emails a signup code (Brevo)
 POST /auth/signup/verify  {email, code, password}  → creates the account
 POST /auth/reset/code     {email}                  → emails a password-reset code
+POST /auth/reset/check    {email, code}            → validates the code (not consumed)
 POST /auth/reset/verify   {email, code, password}  → sets the new password
 
 The Supabase account is created only after the signup code verifies (admin API,
@@ -43,6 +44,11 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 class SendCodeIn(BaseModel):
     email: str
+
+
+class CheckIn(BaseModel):
+    email: str
+    code: str
 
 
 class VerifyIn(BaseModel):
@@ -188,6 +194,20 @@ async def send_reset_code(body: SendCodeIn, request: Request) -> dict:
         )
     await _issue_code(settings, email, "reset")
     return {"sent": True}
+
+
+@router.post("/auth/reset/check", dependencies=[Depends(_auth_rl)])
+async def check_reset_code(body: CheckIn, request: Request) -> dict:
+    """Validate the code before the UI asks for a new password. The code is
+    not consumed — /verify re-checks it — and wrong guesses still count
+    against MAX_ATTEMPTS, so this is no better an oracle than /verify."""
+    settings: Settings = request.app.state.settings
+    email = _clean_email(body.email)
+    code = _clean_code(body.code)
+    _require_configured(settings)
+
+    await _check_code(settings, email, code, "reset")
+    return {"valid": True}
 
 
 @router.post("/auth/reset/verify", dependencies=[Depends(_auth_rl)])

@@ -103,6 +103,10 @@ and never needs a code.
 **`/auth/reset/code`** `{ "email": "you@x.com" }` → `{ "sent": true }`
 Same errors as signup's `/code`, except `404 not_found` when the email has no account.
 
+**`/auth/reset/check`** `{ "email": "...", "code": "482917" }` → `{ "valid": true }`
+Validates the code without consuming it (the UI only asks for a new password after
+this passes). Wrong guesses count against the same 5-attempt cap as `/verify`.
+
 **`/auth/reset/verify`** `{ "email": "...", "code": "482917", "password": "..." }` → `{ "reset": true }`
 Same errors as signup's `/verify`, plus `404 not_found` when the account no longer exists.
 
