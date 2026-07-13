@@ -183,12 +183,16 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
 
   async function resend() {
     if (cooldown > 0) return;
+    // Start the countdown before the request — instant feedback, and a
+    // double-click can't fire a second send.
+    setCooldown(RESEND_COOLDOWN_SEC);
     setError(null);
+    setNotice(null);
     try {
       await postJson("/auth/signup/code", { email });
       setNotice("Sent a new code.");
-      setCooldown(RESEND_COOLDOWN_SEC);
     } catch (err) {
+      setCooldown(0);
       setError(err instanceof Error ? friendly(err.message) : "Couldn’t resend the code.");
     }
   }

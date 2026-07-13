@@ -131,8 +131,13 @@ async def verify_signup_code(body: VerifyIn, request: Request) -> dict:
             INVALID_CODE, "That code didn’t match — check for typos.", status=400
         )
 
+    # If GoTrue rejects the password (policy), this raises 400 and the code row
+    # survives, so the user can retry with a better password on the same code.
     result = await authcodes.create_confirmed_user(settings, email, body.password)
-    await authcodes.delete_code(settings, email)
+    try:
+        await authcodes.delete_code(settings, email)
+    except Exception:  # noqa: BLE001 — account already created; the row just expires
+        pass
     if result == "exists":
         raise DartError(
             CONFLICT, "That email already has an account — sign in instead.", status=409

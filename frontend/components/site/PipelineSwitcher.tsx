@@ -144,6 +144,9 @@ export function PipelineSwitcher() {
       setPill({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
     };
     measure();
+    // A late webfont swap can change button widths without resizing the
+    // tablist's own box, which the ResizeObserver wouldn't see.
+    document.fonts.ready.then(measure);
     const ro = new ResizeObserver(measure);
     if (listRef.current) ro.observe(listRef.current);
     return () => ro.disconnect();

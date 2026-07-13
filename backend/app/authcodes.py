@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 import httpx
 
 from .config import Settings
+from .errors import INVALID_INPUT, DartError
 
 MAX_ATTEMPTS = 5
 RESEND_COOLDOWN_SEC = 60
@@ -89,22 +90,25 @@ async def store_code(settings: Settings, email: str, code_hash: str) -> None:
 
 
 async def bump_attempts(settings: Settings, email: str, attempts: int) -> None:
+    # Must not fail silently — the attempt counter is what enforces MAX_ATTEMPTS.
     base, auth = _sb(settings)
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        await client.patch(
+        r = await client.patch(
             f"{base}/rest/v1/auth_codes",
             headers=auth,
             params={"email": f"eq.{email}"},
             json={"attempts": attempts},
         )
+        r.raise_for_status()
 
 
 async def delete_code(settings: Settings, email: str) -> None:
     base, auth = _sb(settings)
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        await client.delete(
+        r = await client.delete(
             f"{base}/rest/v1/auth_codes", headers=auth, params={"email": f"eq.{email}"}
         )
+        r.raise_for_status()
 
 
 async def send_code_email(settings: Settings, to: str, code: str) -> None:
@@ -132,10 +136,20 @@ async def send_code_email(settings: Settings, to: str, code: str) -> None:
         r.raise_for_status()
 
 
+def _gotrue_msg(r: httpx.Response) -> str:
+    try:
+        data = r.json()
+    except ValueError:
+        return "Supabase rejected the signup."
+    msg = data.get("msg") or data.get("message") or data.get("error_description")
+    return msg if isinstance(msg, str) and msg else "Supabase rejected the signup."
+
+
 async def create_confirmed_user(settings: Settings, email: str, password: str) -> str:
     """Create the account (pre-confirmed) via the GoTrue admin API.
 
-    Returns "ok" or "exists". Anything else raises.
+    Returns "ok" or "exists". A password the project's policy rejects surfaces
+    as a 400 DartError; anything else raises.
     """
     base, auth = _sb(settings)
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
@@ -144,12 +158,17 @@ async def create_confirmed_user(settings: Settings, email: str, password: str) -
             headers=auth,
             json={"email": email, "password": password, "email_confirm": True},
         )
-        if r.status_code in (200, 201):
-            return "ok"
-        if "already" in r.text.lower() or r.status_code == 422:
-            return "exists"
-        r.raise_for_status()
-        return "ok"  # unreachable; keeps type-checkers happy
+    if r.status_code in (200, 201):
+        return "ok"
+    body = r.text.lower()
+    if "already" in body or "email_exists" in body:
+        return "exists"
+    if r.status_code in (400, 422):
+        # GoTrue also 422s a password its policy rejects — a user error, not a
+        # conflict. Surface GoTrue's own message so they know what to change.
+        raise DartError(INVALID_INPUT, _gotrue_msg(r), status=400)
+    r.raise_for_status()
+    return "ok"  # unreachable; keeps type-checkers happy
 
 
 __all__ = [

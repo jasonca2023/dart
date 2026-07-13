@@ -385,12 +385,56 @@ def test_code_hash_deterministic_case_insensitive_peppered():
         assert len(code) == 6 and code.isdigit()
 
 
+def test_create_user_maps_gotrue_replies(monkeypatch):
+    """422 means "exists" only when GoTrue says so — a password-policy 422 is
+    the user's error (400 invalid_input), not a conflict."""
+    import asyncio
+
+    from app import authcodes
+    from app.errors import DartError
+
+    s = Settings(
+        supabase_url="https://x.supabase.co", supabase_service_key="svc", _env_file=None
+    )
+    real_client = httpx.AsyncClient
+
+    def respond_with(status: int, body: dict) -> None:
+        transport = httpx.MockTransport(lambda req: httpx.Response(status, json=body))
+
+        class Client(real_client):
+            def __init__(self, **kw):
+                super().__init__(**kw, transport=transport)
+
+        monkeypatch.setattr(authcodes.httpx, "AsyncClient", Client)
+
+    respond_with(200, {"id": "u1"})
+    assert asyncio.run(authcodes.create_confirmed_user(s, "a@b.com", "Passw0rd!")) == "ok"
+
+    respond_with(
+        422, {"msg": "A user with this email address has already been registered"}
+    )
+    assert (
+        asyncio.run(authcodes.create_confirmed_user(s, "a@b.com", "Passw0rd!"))
+        == "exists"
+    )
+
+    respond_with(
+        422,
+        {"error_code": "weak_password", "msg": "Password should be at least 10 characters."},
+    )
+    with pytest.raises(DartError) as ei:
+        asyncio.run(authcodes.create_confirmed_user(s, "a@b.com", "Passw0rd!"))
+    assert ei.value.status == 400 and ei.value.code == "invalid_input"
+    assert "10 characters" in ei.value.message
+
+
 def test_signup_flow_with_fakes(monkeypatch):
     """Full flow against in-memory fakes: send → cooldown → wrong code → right
     code creates the account → existing email is refused at the send step."""
     from datetime import datetime, timedelta, timezone
 
     from app import authcodes
+    from app.errors import INVALID_INPUT, DartError
 
     store: dict[str, dict] = {}
     sent: dict[str, str] = {}
@@ -421,6 +465,8 @@ def test_signup_flow_with_fakes(monkeypatch):
         sent[to] = code
 
     async def fake_create(s, email, pw):
+        if pw == "Policy-reject1!":  # simulate GoTrue's password-policy 422
+            raise DartError(INVALID_INPUT, "Password should be different.", status=400)
         return "ok"
 
     monkeypatch.setattr(authcodes, "user_exists", fake_user_exists)
@@ -451,6 +497,18 @@ def test_signup_flow_with_fakes(monkeypatch):
     )
     assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
     assert store["new@x.com"]["attempts"] == 1
+    # a password GoTrue's policy rejects is a 400 — and the code row survives,
+    # so the same code still works with a better password
+    r = c.post(
+        "/auth/signup/verify",
+        json={
+            "email": "new@x.com",
+            "code": sent["new@x.com"],
+            "password": "Policy-reject1!",
+        },
+    )
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_input"
+    assert "new@x.com" in store
     # the right code creates the account and consumes the row
     r = c.post(
         "/auth/signup/verify",
