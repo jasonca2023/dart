@@ -701,15 +701,24 @@ def test_account_flow_with_fakes(monkeypatch):
     async def fake_delete_user(s, uid):
         calls.append(f"user:{uid}")
 
+    async def fake_storage_usage(s, uid):
+        return 123_456
+
     monkeypatch.setattr(authcodes, "get_token_user", fake_get_token_user)
     monkeypatch.setattr(authcodes, "check_password", fake_check_password)
     monkeypatch.setattr(authcodes, "set_user_password", fake_set_password)
     monkeypatch.setattr(authcodes, "delete_user_data", fake_delete_data)
     monkeypatch.setattr(authcodes, "delete_user", fake_delete_user)
+    monkeypatch.setattr(authcodes, "storage_usage", fake_storage_usage)
 
     c = make_client(
         supabase_url="https://x.supabase.co", supabase_service_key="svc"
     )
+
+    # overview: bad token → 401, good token → stats
+    assert c.post("/auth/overview", json={"token": "bad"}).status_code == 401
+    r = c.post("/auth/overview", json={"token": "good-token"})
+    assert r.status_code == 200 and r.json()["storage_bytes"] == 123_456
 
     # bad session token
     r = c.post(

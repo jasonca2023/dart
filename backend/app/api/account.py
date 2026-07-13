@@ -24,6 +24,10 @@ router = APIRouter()
 _account_rl = rate_limit(10, limit_attr="rate_limit_auth_per_min")
 
 
+class TokenIn(BaseModel):
+    token: str
+
+
 class PasswordIn(BaseModel):
     token: str
     current_password: str
@@ -51,6 +55,19 @@ async def _confirmed_user(
     if not await authcodes.check_password(settings, email, password):
         raise DartError(INVALID_INPUT, "That password is wrong.", status=400)
     return uid, email
+
+
+@router.post("/auth/overview", dependencies=[Depends(_account_rl)])
+async def account_overview(body: TokenIn, request: Request) -> dict:
+    """Read-only stats for the account page (the ads count is client-side —
+    the rows are user-readable via RLS; storage sizes are not)."""
+    settings: Settings = request.app.state.settings
+    _require_configured(settings)
+    user = await authcodes.get_token_user(settings, body.token)
+    if not user:
+        raise DartError(UNAUTHORIZED, "Invalid or expired session.", status=401)
+    uid, _ = user
+    return {"storage_bytes": await authcodes.storage_usage(settings, uid)}
 
 
 @router.post("/auth/password", dependencies=[Depends(_account_rl)])

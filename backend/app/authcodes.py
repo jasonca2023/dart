@@ -268,6 +268,24 @@ async def delete_user_data(settings: Settings, user_id: str) -> None:
             r.raise_for_status()
 
 
+async def storage_usage(settings: Settings, user_id: str) -> int:
+    """Total bytes stored under the user's prefix in the video bucket."""
+    base, auth = _sb(settings)
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{base}/storage/v1/object/list/{VIDEO_BUCKET}",
+            headers=auth,
+            json={"prefix": f"{user_id}/", "limit": 1000},
+        )
+        r.raise_for_status()
+    total = 0
+    for o in r.json():
+        size = (o.get("metadata") or {}).get("size")
+        if isinstance(size, (int, float)):
+            total += int(size)
+    return total
+
+
 async def delete_user(settings: Settings, user_id: str) -> None:
     """Delete the account via the GoTrue admin API."""
     base, auth = _sb(settings)
@@ -312,6 +330,7 @@ __all__ = [
     "set_user_password",
     "get_token_user",
     "check_password",
+    "storage_usage",
     "delete_user_data",
     "delete_user",
 ]

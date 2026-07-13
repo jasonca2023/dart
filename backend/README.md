@@ -27,7 +27,8 @@ images. It does no video generation.
   cap; sign-in stays plain email+password.
 - **`POST /auth/password` + `POST /auth/delete-account`** — signed-in account management
   (change password; delete the account plus its library rows and stored files). Both
-  require the session token **and** a fresh password confirmation.
+  require the session token **and** a fresh password confirmation. `POST /auth/overview`
+  reports storage usage for the account page (token only).
 - **`GET /health`** — liveness, which providers are wired, whether `/save-ad` is configured,
   whether the Safari colour re-tag is ready (`video_retag_ready`), and whether signup code
   emails are configured (`signup_email_ready`).
