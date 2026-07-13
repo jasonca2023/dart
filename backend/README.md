@@ -19,15 +19,18 @@ images. It does no video generation.
 - **`GET /store-products?url=`** — imports a store's **public** Shopify products feed (or a
   single product page's JSON-LD / OpenGraph) for batch generation. SSRF-guarded like the
   image proxy.
-- **`POST /auth/signup/code` + `/auth/signup/verify`** — signup with a Dart-emailed 6-digit
-  code (Brevo). The Supabase account is created (admin API, pre-confirmed) **only after the
-  code verifies**, so an unverified signup never exists. Codes are stored hashed with a
-  10-minute TTL and a 5-attempt cap; sign-in stays plain email+password.
+- **`POST /auth/signup/*` + `POST /auth/reset/*`** — signup and password reset with a
+  Dart-emailed 6-digit code (Brevo). The Supabase account is created (admin API,
+  pre-confirmed) **only after the signup code verifies**, so an unverified signup never
+  exists; reset verifies a code the same way, then sets the new password via the admin
+  API. Codes are stored hashed (purpose-scoped) with a 10-minute TTL and a 5-attempt
+  cap; sign-in stays plain email+password.
 - **`GET /health`** — liveness, which providers are wired, whether `/save-ad` is configured,
   whether the Safari colour re-tag is ready (`video_retag_ready`), and whether signup code
   emails are configured (`signup_email_ready`).
 
-The public endpoints (`/proxy-image`, `/store-products`, `/save-ad`, `/auth/signup/*`) are
+The public endpoints (`/proxy-image`, `/store-products`, `/save-ad`, `/auth/signup/*`,
+`/auth/reset/*`) are
 **per-IP rate limited**, keyed on the real client from `X-Forwarded-For` (spoof-resistant).
 
 > A legacy mock/LTX pipeline (`/jobs`, `/settings`, the `providers/` adapters and the
@@ -40,8 +43,8 @@ The public endpoints (`/proxy-image`, `/store-products`, `/save-ad`, `/auth/sign
 app/
   main.py            # app factory + /save-ad, /proxy-image, /store-products, /health, colour re-tag
   auth.py            # verify_token via Supabase /auth/v1/user; require_user dependency
-  authcodes.py       # signup email codes: Brevo sender, hashed code store, admin user create
-  api/signup.py      # /auth/signup/code + /auth/signup/verify
+  authcodes.py       # auth email codes: Brevo sender, hashed code store, admin user create/update
+  api/signup.py      # /auth/signup/* + /auth/reset/* (emailed-code flows)
   config.py          # env-driven settings (pydantic-settings)
   errors.py          # DartError + contract error envelope
   netguard.py        # shared SSRF guard — streamed, size-capped fetch
@@ -77,9 +80,10 @@ pytest                                # the test suite, no network/keys
 | `SUPABASE_SERVICE_KEY` | Service-role key used by `/save-ad` for Storage + DB writes that bypass RLS. **Server-side only.** |
 | `CORS_ORIGINS` | JSON array of allowed browser origins (default `["http://localhost:3000"]`). |
 
-Signup code emails need `BREVO_API_KEY` + `AUTH_EMAIL_FROM` (a Brevo-verified
-sender). Without them, `/auth/signup/*` returns 503 and no accounts can be
-created (sign-in for existing accounts still works).
+Auth code emails need `BREVO_API_KEY` + `AUTH_EMAIL_FROM` (a Brevo-verified
+sender). Without them, `/auth/signup/*` and `/auth/reset/*` return 503 — no
+accounts can be created and no passwords reset (sign-in for existing accounts
+still works).
 
 Optional tuning (sane defaults built in): `RATE_LIMIT_*` per-IP ceilings and
 `VIDEO_RETAG_ENABLED`. See `../.env.example`.

@@ -33,11 +33,15 @@ def gen_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
-def hash_code(settings: Settings, email: str, code: str) -> str:
+def hash_code(settings: Settings, email: str, code: str, purpose: str = "signup") -> str:
     # Peppered with the service key so a leaked table row can't be reversed to
     # a code offline. Codes are 6 digits with a 5-attempt cap and short TTL.
+    # The purpose is part of the pre-image, so a signup code can never verify
+    # as a password-reset code (or vice versa).
     pepper = settings.supabase_service_key or ""
-    return hashlib.sha256(f"{email.lower()}|{code}|{pepper}".encode()).hexdigest()
+    return hashlib.sha256(
+        f"{email.lower()}|{code}|{pepper}|{purpose}".encode()
+    ).hexdigest()
 
 
 def _sb(settings: Settings) -> tuple[str, dict[str, str]]:
@@ -54,6 +58,16 @@ async def user_exists(settings: Settings, email: str) -> bool:
         )
         r.raise_for_status()
         return bool(r.json())
+
+
+async def user_id_by_email(settings: Settings, email: str) -> str | None:
+    base, auth = _sb(settings)
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.post(
+            f"{base}/rest/v1/rpc/user_id_by_email", headers=auth, json={"p_email": email}
+        )
+        r.raise_for_status()
+        return r.json() or None
 
 
 async def get_code_row(settings: Settings, email: str) -> dict | None:
@@ -111,20 +125,30 @@ async def delete_code(settings: Settings, email: str) -> None:
         r.raise_for_status()
 
 
-async def send_code_email(settings: Settings, to: str, code: str) -> None:
+async def send_code_email(
+    settings: Settings, to: str, code: str, purpose: str = "signup"
+) -> None:
     """Email the code via Brevo's free transactional API. Raises on failure."""
+    if purpose == "reset":
+        subject = "Your Dart password reset code"
+        action = "Enter this code to set a new password."
+        unasked = "you can ignore this email — your password is unchanged."
+    else:
+        subject = "Your Dart signup code"
+        action = "Enter this code to finish creating your account."
+        unasked = "you can ignore this email."
     html = (
         "<div style='font-family:sans-serif'>"
-        "<h2>Your Dart signup code</h2>"
+        f"<h2>{subject}</h2>"
         f"<p style='font-size:32px;letter-spacing:8px;font-weight:bold'>{code}</p>"
-        "<p>Enter this code to finish creating your account. It expires in "
+        f"<p>{action} It expires in "
         f"{settings.auth_code_ttl_sec // 60} minutes. If you didn’t request it, "
-        "you can ignore this email.</p></div>"
+        f"{unasked}</p></div>"
     )
     payload = {
         "sender": {"email": settings.auth_email_from, "name": settings.auth_email_from_name},
         "to": [{"email": to}],
-        "subject": "Your Dart signup code",
+        "subject": subject,
         "htmlContent": html,
     }
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
@@ -171,6 +195,23 @@ async def create_confirmed_user(settings: Settings, email: str, password: str) -
     return "ok"  # unreachable; keeps type-checkers happy
 
 
+async def set_user_password(settings: Settings, user_id: str, password: str) -> None:
+    """Set an existing user's password via the GoTrue admin API."""
+    base, auth = _sb(settings)
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        r = await client.put(
+            f"{base}/auth/v1/admin/users/{user_id}",
+            headers=auth,
+            json={"password": password},
+        )
+    if r.status_code == 200:
+        return
+    if r.status_code in (400, 422):
+        # Most likely the project's password policy — the user's to fix.
+        raise DartError(INVALID_INPUT, _gotrue_msg(r), status=400)
+    r.raise_for_status()
+
+
 __all__ = [
     "MAX_ATTEMPTS",
     "RESEND_COOLDOWN_SEC",
@@ -178,10 +219,12 @@ __all__ = [
     "gen_code",
     "hash_code",
     "user_exists",
+    "user_id_by_email",
     "get_code_row",
     "store_code",
     "bump_attempts",
     "delete_code",
     "send_code_email",
     "create_confirmed_user",
+    "set_user_password",
 ]

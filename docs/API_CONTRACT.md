@@ -82,22 +82,32 @@ and rate limited like the image proxy.
 
 ---
 
-## `POST /auth/signup/code` + `POST /auth/signup/verify` — signup with an emailed code
+## `POST /auth/signup/*` + `POST /auth/reset/*` — emailed-code auth flows
 
-Dart emails the 6-digit signup code itself (Brevo) and creates the Supabase account
+Dart emails the 6-digit codes itself (Brevo). Signup creates the Supabase account
 (admin API, pre-confirmed) **only after the code verifies** — an unverified signup never
-exists as an account. Sign-in is plain Supabase email+password and never needs a code.
+exists as an account. Password reset runs the same code flow for accounts that do exist,
+then sets the new password via the admin API. Sign-in is plain Supabase email+password
+and never needs a code.
 
-**`/code`** `{ "email": "you@x.com" }` → `{ "sent": true }`
+**`/auth/signup/code`** `{ "email": "you@x.com" }` → `{ "sent": true }`
 `400 invalid_input` bad email · `409 conflict` email already has an account ·
 `429 rate_limited` per-IP limit or 60s per-address cooldown · `502` email send failed ·
 `503` Brevo not configured.
 
-**`/verify`** `{ "email": "...", "code": "482917", "password": "..." }` → `{ "created": true }`
-`400 invalid_input` bad shape · `400 invalid_code` wrong/expired (5 attempts max) ·
-`409 conflict` already exists · `429 rate_limited`.
+**`/auth/signup/verify`** `{ "email": "...", "code": "482917", "password": "..." }` → `{ "created": true }`
+`400 invalid_input` bad shape or the password fails Supabase's policy ·
+`400 invalid_code` wrong/expired (5 attempts max) · `409 conflict` already exists ·
+`429 rate_limited`.
 
-Codes are stored hashed (peppered) in `auth_codes` with a 10-minute TTL.
+**`/auth/reset/code`** `{ "email": "you@x.com" }` → `{ "sent": true }`
+Same errors as signup's `/code`, except `404 not_found` when the email has no account.
+
+**`/auth/reset/verify`** `{ "email": "...", "code": "482917", "password": "..." }` → `{ "reset": true }`
+Same errors as signup's `/verify`, plus `404 not_found` when the account no longer exists.
+
+Codes are stored hashed (peppered, purpose-scoped — a signup code can't verify as a
+reset code) in `auth_codes` with a 10-minute TTL.
 
 ---
 

@@ -380,6 +380,10 @@ def test_code_hash_deterministic_case_insensitive_peppered():
     s2 = Settings(supabase_service_key="k2", _env_file=None)
     assert hash_code(s1, "a@b.com", "123456") == hash_code(s1, "A@B.com", "123456")
     assert hash_code(s1, "a@b.com", "123456") != hash_code(s2, "a@b.com", "123456")
+    # purpose-scoped: a signup code can never verify as a reset code
+    assert hash_code(s1, "a@b.com", "123456") != hash_code(
+        s1, "a@b.com", "123456", "reset"
+    )
     for _ in range(50):
         code = gen_code()
         assert len(code) == 6 and code.isdigit()
@@ -461,7 +465,7 @@ def test_signup_flow_with_fakes(monkeypatch):
     async def fake_delete(s, email):
         store.pop(email, None)
 
-    async def fake_send(s, to, code):
+    async def fake_send(s, to, code, purpose="signup"):
         sent[to] = code
 
     async def fake_create(s, email, pw):
@@ -518,3 +522,95 @@ def test_signup_flow_with_fakes(monkeypatch):
     assert "new@x.com" not in store
     # an email that already has an account is refused at the send step
     assert c.post("/auth/signup/code", json={"email": "taken@x.com"}).status_code == 409
+
+
+def test_reset_flow_with_fakes(monkeypatch):
+    """Password reset: unknown email → 404; the code round-trip sets the new
+    password via the admin API; a signup-purpose code can't verify as reset."""
+    from datetime import datetime, timedelta, timezone
+
+    from app import authcodes
+
+    store: dict[str, dict] = {}
+    sent: dict[str, str] = {}
+    passwords: dict[str, str] = {}
+
+    async def fake_user_exists(s, email):
+        return email == "user@x.com"
+
+    async def fake_user_id(s, email):
+        return "uid-1" if email == "user@x.com" else None
+
+    async def fake_get(s, email):
+        return store.get(email)
+
+    async def fake_store(s, email, code_hash):
+        now = datetime.now(timezone.utc)
+        store[email] = {
+            "email": email,
+            "code_hash": code_hash,
+            "attempts": 0,
+            "expires_at": (now + timedelta(minutes=10)).isoformat(),
+            "created_at": now.isoformat(),
+        }
+
+    async def fake_bump(s, email, n):
+        store[email]["attempts"] = n
+
+    async def fake_delete(s, email):
+        store.pop(email, None)
+
+    async def fake_send(s, to, code, purpose="signup"):
+        sent[to] = code
+
+    async def fake_set_password(s, user_id, pw):
+        passwords[user_id] = pw
+
+    monkeypatch.setattr(authcodes, "user_exists", fake_user_exists)
+    monkeypatch.setattr(authcodes, "user_id_by_email", fake_user_id)
+    monkeypatch.setattr(authcodes, "get_code_row", fake_get)
+    monkeypatch.setattr(authcodes, "store_code", fake_store)
+    monkeypatch.setattr(authcodes, "bump_attempts", fake_bump)
+    monkeypatch.setattr(authcodes, "delete_code", fake_delete)
+    monkeypatch.setattr(authcodes, "send_code_email", fake_send)
+    monkeypatch.setattr(authcodes, "set_user_password", fake_set_password)
+
+    c = make_client(
+        supabase_url="https://x.supabase.co",
+        supabase_service_key="svc",
+        brevo_api_key="brevo",
+        auth_email_from="codes@dart.test",
+    )
+
+    # an email with no account is refused
+    r = c.post("/auth/reset/code", json={"email": "nobody@x.com"})
+    assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+    # a known email gets a code
+    assert c.post("/auth/reset/code", json={"email": "user@x.com"}).status_code == 200
+    real_code = sent["user@x.com"]
+    assert len(real_code) == 6
+    # a signup-purpose hash for the same code must not verify as a reset code
+    store["user@x.com"]["code_hash"] = authcodes.hash_code(
+        c.app.state.settings, "user@x.com", real_code, "signup"
+    )
+    r = c.post(
+        "/auth/reset/verify",
+        json={"email": "user@x.com", "code": real_code, "password": "NewPassw0rd!"},
+    )
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_code"
+    assert store["user@x.com"]["attempts"] == 1
+    # restore the real (reset-purpose) hash: the right code sets the password
+    store["user@x.com"]["code_hash"] = authcodes.hash_code(
+        c.app.state.settings, "user@x.com", real_code, "reset"
+    )
+    r = c.post(
+        "/auth/reset/verify",
+        json={
+            "email": "user@x.com",
+            "code": real_code,
+            "password": "NewPassw0rd!",
+        },
+    )
+    assert r.status_code == 200 and r.json()["reset"] is True
+    assert passwords["uid-1"] == "NewPassw0rd!"
+    assert "user@x.com" not in store

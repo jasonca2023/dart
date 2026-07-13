@@ -8,7 +8,7 @@ import { Field, Input } from "../ui/Field";
 import { Button } from "../ui/Button";
 import { Alert, ArrowRight } from "../icons";
 
-type Mode = "signin" | "signup";
+type Mode = "signin" | "signup" | "reset";
 
 // Supabase sends at most one email per address per minute.
 const RESEND_COOLDOWN_SEC = 60;
@@ -62,7 +62,8 @@ async function postJson(path: string, body: unknown): Promise<void> {
 
 // Email + password auth, with one twist: a new account must type the 6-digit
 // code we email before it exists — proof the address is really theirs.
-// Returning users log in with just their password, no code.
+// Returning users log in with just their password, no code. Password reset
+// runs the same code machinery: code → verify → new password.
 export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -77,7 +78,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
   const codeRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
 
-  const pwErr = mode === "signup" ? passwordError(password) : null;
+  const pwErr = mode === "signin" ? null : passwordError(password);
 
   // Land the cursor in the email box — on arrival, on mode switch, and when
   // coming back from the code step. (The code step focuses its own input.)
@@ -96,6 +97,9 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     setMode(next);
     setError(null);
     setNotice(null);
+    // Whatever was typed into the log-in password box must not leak into the
+    // reset flow's "new password".
+    if (next === "reset") setPassword("");
   }
 
   function toConfirmStep(msg: string | null) {
@@ -124,13 +128,16 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     setError(null);
     setNotice(null);
     try {
-      if (mode === "signup") {
+      if (mode === "signup" || mode === "reset") {
         if (!API_BASE) {
           setError("Signup isn’t configured (missing backend URL).");
           return;
         }
-        // Dart's backend emails the code; no account exists yet.
-        await postJson("/auth/signup/code", { email: addr });
+        // Dart's backend emails the code (signup: no account exists yet;
+        // reset: proves the address before the password changes).
+        await postJson(`/auth/${mode === "reset" ? "reset" : "signup"}/code`, {
+          email: addr,
+        });
         setEmail(addr);
         toConfirmStep(null);
       } else {
@@ -144,8 +151,10 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       }
     } catch (err) {
       const msg = err instanceof Error ? friendly(err.message) : "Something went wrong.";
-      // An email that already has an account belongs on the log-in form.
+      // An email that already has an account belongs on the log-in form; an
+      // email without one belongs on signup.
       if (msg.includes("already has an account")) setMode("signin");
+      if (msg.includes("create one")) setMode("signup");
       setError(msg);
     } finally {
       setBusy(false);
@@ -160,14 +169,26 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       setError("Enter the 6-digit code from the email.");
       return;
     }
+    // Reset collects the new password on this step, so validate it here.
+    if (mode === "reset") {
+      const pe = passwordError(password);
+      if (pe) {
+        setError(pe);
+        return;
+      }
+    }
     setBusy(true);
     setError(null);
     try {
-      // Verifying the code is what creates the account (backend, admin API).
-      await postJson("/auth/signup/verify", { email, code: token, password });
+      // Verifying the code is what creates the account / sets the password
+      // (backend, admin API), then we sign straight in.
+      await postJson(
+        mode === "reset" ? "/auth/reset/verify" : "/auth/signup/verify",
+        { email, code: token, password },
+      );
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // Created and signed in — keep the button loading while we navigate.
+      // Done and signed in — keep the button loading while we navigate.
       router.push("/");
       router.refresh();
     } catch (err) {
@@ -175,6 +196,10 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
       if (msg.includes("already has an account")) {
         setStep("form");
         setMode("signin");
+      }
+      if (msg.includes("create one")) {
+        setStep("form");
+        setMode("signup");
       }
       setError(msg);
       setBusy(false);
@@ -189,7 +214,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     setError(null);
     setNotice(null);
     try {
-      await postJson("/auth/signup/code", { email });
+      await postJson(`/auth/${mode === "reset" ? "reset" : "signup"}/code`, { email });
       setNotice("Sent a new code.");
     } catch (err) {
       setCooldown(0);
@@ -197,15 +222,18 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     }
   }
 
-  // --- Step 2 of signup: type the emailed code -----------------------------
+  // --- Step 2 of signup / reset: type the emailed code ---------------------
   if (step === "confirm") {
+    const reset = mode === "reset";
     return (
       <div>
         <h1 className="t-heading">Check your email</h1>
         <p className="mt-3 text-[15px] leading-relaxed text-driftwood">
           We sent a 6-digit code to{" "}
-          <span className="font-medium text-ink">{email}</span>. Enter it below
-          — that’s what creates your account.
+          <span className="font-medium text-ink">{email}</span>.{" "}
+          {reset
+            ? "Enter it with your new password."
+            : "Enter it below — that’s what creates your account."}
         </p>
 
         <form onSubmit={verify} className="mt-8 flex flex-col gap-5">
@@ -223,6 +251,29 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
             />
           </Field>
 
+          {reset && (
+            <Field
+              label="New password"
+              htmlFor="new-password"
+              hint={!password ? PASSWORD_REQ : undefined}
+            >
+              <Input
+                id="new-password"
+                type="password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+              {password && (
+                <p className={`text-[12px] ${pwErr ? "text-ink" : "text-driftwood"}`}>
+                  {pwErr ?? "Strong password."}
+                </p>
+              )}
+            </Field>
+          )}
+
           {error && (
             <p role="alert" className="flex items-center gap-2 text-[14px] text-ink">
               <Alert className="shrink-0 text-[18px] text-driftwood" />
@@ -234,7 +285,7 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
           )}
 
           <Button type="submit" size="lg" loading={busy} className="w-full">
-            Confirm &amp; create account
+            {reset ? "Set new password" : "Confirm & create account"}
             {!busy && <ArrowRight className="text-[18px]" />}
           </Button>
         </form>
@@ -268,15 +319,20 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
     );
   }
 
-  // --- Log in / create account ---------------------------------------------
+  // --- Log in / create account / reset a password ---------------------------
   const signup = mode === "signup";
+  const reset = mode === "reset";
   return (
     <div>
-      <h1 className="t-heading">{signup ? "Create your account" : "Welcome back"}</h1>
+      <h1 className="t-heading">
+        {signup ? "Create your account" : reset ? "Reset your password" : "Welcome back"}
+      </h1>
       <p className="mt-3 max-w-[36ch] text-[15px] leading-relaxed text-driftwood">
         {signup
           ? "Your first ad is one photo away."
-          : "Log in to your library and pick up where you left off."}
+          : reset
+            ? "We’ll email you a code, then you choose a new password."
+            : "Log in to your library and pick up where you left off."}
       </p>
 
       <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
@@ -291,26 +347,39 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
             autoComplete="email"
           />
         </Field>
-        <Field
-          label="Password"
-          htmlFor="password"
-          hint={signup && !password ? PASSWORD_REQ : undefined}
-        >
-          <Input
-            id="password"
-            type="password"
-            required
-            minLength={signup ? 8 : undefined}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={signup ? "new-password" : "current-password"}
-          />
-          {signup && password && (
-            <p className={`text-[12px] ${pwErr ? "text-ink" : "text-driftwood"}`}>
-              {pwErr ?? "Strong password."}
-            </p>
-          )}
-        </Field>
+        {!reset && (
+          <Field
+            label="Password"
+            htmlFor="password"
+            hint={signup && !password ? PASSWORD_REQ : undefined}
+          >
+            <Input
+              id="password"
+              type="password"
+              required
+              minLength={signup ? 8 : undefined}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={signup ? "new-password" : "current-password"}
+            />
+            {signup && password && (
+              <p className={`text-[12px] ${pwErr ? "text-ink" : "text-driftwood"}`}>
+                {pwErr ?? "Strong password."}
+              </p>
+            )}
+            {!signup && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => switchMode("reset")}
+                  className="text-[12px] text-driftwood transition-colors duration-150 ease-out hover:text-ink"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+          </Field>
+        )}
 
         {error && (
           <p role="alert" className="flex items-center gap-2 text-[14px] text-ink">
@@ -323,23 +392,25 @@ export function AuthForm({ initialMode = "signin" }: { initialMode?: Mode }) {
         )}
 
         <Button type="submit" size="lg" loading={busy} className="w-full">
-          {signup ? "Send my code" : "Log in"}
+          {signup ? "Send my code" : reset ? "Send reset code" : "Log in"}
           {!busy && <ArrowRight className="text-[18px]" />}
         </Button>
       </form>
 
       {/* The other door — quiet, behind a hairline, clearly labelled. */}
       <div className="mt-8 flex items-baseline justify-between border-t border-ash pt-4 text-[13px] text-driftwood">
-        <span>{signup ? "Already have an account?" : "New to Dart?"}</span>
+        <span>
+          {signup ? "Already have an account?" : reset ? "Remembered it?" : "New to Dart?"}
+        </span>
         <button
           type="button"
-          onClick={() => switchMode(signup ? "signin" : "signup")}
+          onClick={() => switchMode(mode === "signin" ? "signup" : "signin")}
           className="font-medium text-ink underline-offset-2 transition-colors duration-150 ease-out hover:underline"
         >
-          {signup ? "Log in" : "Create an account"}
+          {mode === "signin" ? "Create an account" : "Log in"}
         </button>
       </div>
-      {!signup && (
+      {mode === "signin" && (
         <p className="mt-3 text-[12px] leading-relaxed text-fog">
           Every ad you generate saves to your library.
         </p>
