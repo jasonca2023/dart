@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { buildAdSpec, TONE_ACCENTS, type Tone } from "@/lib/adSpec";
+import { buildAdSpec, TONE_ACCENTS, type AdSpec, type Tone } from "@/lib/adSpec";
 import { Orb } from "../ui/Orb";
 
 // The real preview player (the same composition the app renders and exports).
@@ -24,14 +24,121 @@ const DEMO = {
   durationSec: 8,
 };
 
-const MOODS: { tone: Tone; name: string; audience: string; note: string }[] = [
-  { tone: "luxe", name: "Luxe", audience: "luxury gifting", note: "Gold & serif, slow, editorial" },
-  { tone: "techy", name: "Techy", audience: "tech early adopters", note: "Electric, mono, snappy" },
-  { tone: "energetic", name: "Energetic", audience: "trail runners", note: "Bold, fast, athletic" },
-  { tone: "playful", name: "Playful", audience: "college students", note: "Bright, bouncy, warm" },
-  { tone: "calm", name: "Calm", audience: "wellness mornings", note: "Soft, gentle, considered" },
-  { tone: "bold", name: "Bold", audience: "streetwear heads", note: "High-contrast, punchy" },
+// Hand-written copy per mood — the brain's generated lines are tuned for
+// unknown products, and a pinned demo deserves better than generic filler.
+// Palette, type, layout, pacing and motion stay 100% live from buildAdSpec.
+interface DemoCopy {
+  eyebrow: string;
+  hook: string;
+  subhead: string;
+  feature: { label: string; value: string };
+  cta: string;
+}
+
+const MOODS: {
+  tone: Tone;
+  name: string;
+  audience: string;
+  note: string;
+  copy: DemoCopy;
+}[] = [
+  {
+    tone: "luxe",
+    name: "Luxe",
+    audience: "luxury gifting",
+    note: "Gold & serif, slow, editorial",
+    copy: {
+      eyebrow: "The considered gift",
+      hook: "Some gifts outlast the occasion.",
+      subhead: "Insulated steel, capped in bamboo.",
+      feature: { label: "Keeps cold", value: "A full 24 hours" },
+      cta: "Gift well",
+    },
+  },
+  {
+    tone: "techy",
+    name: "Techy",
+    audience: "tech early adopters",
+    note: "Electric, mono, snappy",
+    copy: {
+      eyebrow: "Thermal engineering",
+      hook: "Cold for 24 hours. Measured.",
+      subhead: "Double-wall vacuum. Zero condensation.",
+      feature: { label: "Retention", value: "24 h cold · 12 h hot" },
+      cta: "See the specs",
+    },
+  },
+  {
+    tone: "energetic",
+    name: "Energetic",
+    audience: "trail runners",
+    note: "Bold, fast, athletic",
+    copy: {
+      eyebrow: "Trail ready",
+      hook: "Mile ten tastes better cold.",
+      subhead: "Ice at the trailhead, ice at the summit.",
+      feature: { label: "Weight", value: "310 g, packed" },
+      cta: "Grab yours",
+    },
+  },
+  {
+    tone: "playful",
+    name: "Playful",
+    audience: "college students",
+    note: "Bright, bouncy, warm",
+    copy: {
+      eyebrow: "Hydration, but cute",
+      hook: "Your lectures deserve cold water.",
+      subhead: "One bottle, zero soggy backpacks.",
+      feature: { label: "Fits", value: "Every cupholder" },
+      cta: "Get the bottle",
+    },
+  },
+  {
+    tone: "calm",
+    name: "Calm",
+    audience: "wellness mornings",
+    note: "Soft, gentle, considered",
+    copy: {
+      eyebrow: "Morning ritual",
+      hook: "Begin with cold water.",
+      subhead: "Steel that keeps the quiet in.",
+      feature: { label: "Keeps cold", value: "All day long" },
+      cta: "Start slow",
+    },
+  },
+  {
+    tone: "bold",
+    name: "Bold",
+    audience: "streetwear heads",
+    note: "High-contrast, punchy",
+    copy: {
+      eyebrow: "No lukewarm",
+      hook: "Lukewarm is a choice.",
+      subhead: "Matte steel. Loud restraint.",
+      feature: { label: "Finish", value: "Matte sage" },
+      cta: "Cop it",
+    },
+  },
 ];
+
+// Overlay the hand-written lines on the generated spec; everything visual
+// (palette, layout, font, motion, scene timing) stays from the live brain.
+function withDemoCopy(spec: AdSpec, c: DemoCopy): AdSpec {
+  return {
+    ...spec,
+    eyebrow: c.eyebrow,
+    subhead: c.subhead,
+    cta: c.cta,
+    scenes: spec.scenes.map((s) => {
+      if (s.type === "hook") return { ...s, text: c.hook };
+      if (s.type === "feature")
+        return { ...s, label: c.feature.label, value: c.feature.value };
+      if (s.type === "outro") return { ...s, text: c.cta };
+      return s;
+    }),
+  };
+}
 
 export function MoodDemo() {
   const [active, setActive] = useState(0);
@@ -76,12 +183,15 @@ export function MoodDemo() {
   }, []);
 
   const mood = MOODS[active];
-  const spec = buildAdSpec({
-    title: DEMO.title,
-    audience: mood.audience,
-    price: DEMO.price,
-    durationSec: DEMO.durationSec,
-  });
+  const spec = withDemoCopy(
+    buildAdSpec({
+      title: DEMO.title,
+      audience: mood.audience,
+      price: DEMO.price,
+      durationSec: DEMO.durationSec,
+    }),
+    mood.copy,
+  );
 
   return (
     <section id="moods" className="scroll-mt-20 py-20">
