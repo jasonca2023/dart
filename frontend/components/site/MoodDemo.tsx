@@ -200,8 +200,8 @@ export function MoodDemo() {
           <p className="t-caption text-driftwood">Ad moods · live demo</p>
           <h2 className="t-heading mt-3">This is a real ad, rendering right now.</h2>
           <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-driftwood">
-            Not a screen recording — the actual Dart engine, running in your
-            browser on a sample product. Tell Dart who the ad is for and it
+            Not a screen recording. This is the actual Dart engine, running in
+            your browser on a sample product. Tell Dart who the ad is for and it
             picks the mood: palette, typography, pacing, motion. Try one.
           </p>
         </div>

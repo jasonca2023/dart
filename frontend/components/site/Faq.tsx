@@ -9,11 +9,11 @@ const QA: { q: string; a: string }[] = [
   },
   {
     q: "What do I need to start?",
-    a: "One product photo and a sentence about who it's for. Dart writes the copy and picks the palette, type, pacing and motion — you review the result and can re-roll the look before saving.",
+    a: "One product photo and a sentence about who it's for. Dart writes the copy and picks the palette, type, pacing and motion. You review the result and can re-roll the look before saving.",
   },
   {
     q: "Which formats and lengths?",
-    a: "16:9, 9:16, 1:1 and 4:5, from 3 to 20 seconds, exported as 1080p MP4 — sized for feed, story, reel or banner.",
+    a: "16:9, 9:16, 1:1 and 4:5, from 3 to 20 seconds, exported as 1080p MP4, sized for feed, story, reel or banner.",
   },
   {
     q: "Do I own what Dart makes?",

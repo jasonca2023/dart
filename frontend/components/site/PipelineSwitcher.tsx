@@ -34,10 +34,10 @@ function InputsVisual() {
 
 function ScriptVisual() {
   const scenes: [string, string][] = [
-    ["0–3s", "hook"],
-    ["3–6s", "product hero"],
-    ["6–8s", "feature"],
-    ["8–10s", "brand sign-off"],
+    ["0s", "hook"],
+    ["3s", "product hero"],
+    ["6s", "feature"],
+    ["8s", "brand sign-off"],
   ];
   return (
     <ul className="flex flex-col gap-2.5">

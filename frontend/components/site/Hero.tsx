@@ -46,7 +46,7 @@ export function Hero() {
         >
           <SignInCta />
           <p className="font-mono text-[12px] text-fog">
-            3–20s · 16:9 · 9:16 · 1:1 · 4:5 · 1080p
+            3 to 20s · 16:9 · 9:16 · 1:1 · 4:5 · 1080p
           </p>
         </div>
 

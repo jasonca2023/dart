@@ -20,8 +20,8 @@ export function StoreImport() {
             One link. An ad for every product.
           </h2>
           <p className="mt-5 max-w-md text-[16px] leading-relaxed text-driftwood">
-            Paste your store&rsquo;s link and Dart reads the public catalogue —
-            no OAuth, no API key, nothing to install. Pick the products you
+            Paste your store&rsquo;s link and Dart reads the public catalogue.
+            No OAuth, no API key, nothing to install. Pick the products you
             want and it generates an ad for each one, batch after batch.
           </p>
           <ul className="mt-6 flex flex-col gap-3">
