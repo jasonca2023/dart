@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 640">
+  <!-- Sample product for the landing-page live demo: a matte insulated bottle
+       with a bamboo cap, drawn as a cutout (transparent background) the way
+       Dart's background removal would deliver a real product photo. -->
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#76896f"/>
+      <stop offset="0.32" stop-color="#a9bda2"/>
+      <stop offset="0.62" stop-color="#93a88c"/>
+      <stop offset="1" stop-color="#6c7f66"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a97f52"/>
+      <stop offset="0.38" stop-color="#d9b183"/>
+      <stop offset="1" stop-color="#9d7448"/>
+    </linearGradient>
+    <linearGradient id="collar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#49573f"/>
+      <stop offset="0.5" stop-color="#66765a"/>
+      <stop offset="1" stop-color="#404d38"/>
+    </linearGradient>
+  </defs>
+
+  <!-- cap -->
+  <rect x="146" y="70" width="108" height="82" rx="24" fill="url(#cap)"/>
+  <path d="M158 96h84M154 116h92" stroke="#5f4326" stroke-opacity="0.18" stroke-width="3" stroke-linecap="round"/>
+  <rect x="160" y="78" width="14" height="60" rx="7" fill="#ffffff" opacity="0.22"/>
+
+  <!-- collar -->
+  <rect x="150" y="142" width="100" height="28" rx="9" fill="url(#collar)"/>
+
+  <!-- body with shoulder taper -->
+  <path
+    d="M152 166
+       C 128 178 118 216 118 252
+       L 118 556
+       Q 118 604 166 604
+       L 234 604
+       Q 282 604 282 556
+       L 282 252
+       C 282 216 272 178 248 166
+       Z"
+    fill="url(#body)"/>
+
+  <!-- matte speculars -->
+  <rect x="138" y="216" width="26" height="352" rx="13" fill="#ffffff" opacity="0.16"/>
+  <rect x="172" y="228" width="9" height="328" rx="4.5" fill="#ffffff" opacity="0.09"/>
+  <path d="M258 216 C 262 264 262 512 256 556" stroke="#2f3a2a" stroke-opacity="0.14" stroke-width="10" stroke-linecap="round" fill="none"/>
+
+  <!-- minimal wordmark band -->
+  <text x="200" y="404" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="26" letter-spacing="10" fill="#f4f1e8" opacity="0.85">ATLAS</text>
+</svg>

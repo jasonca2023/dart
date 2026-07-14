@@ -3,9 +3,10 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { Hero } from "@/components/site/Hero";
 import { TrustRow } from "@/components/site/TrustRow";
 import { PipelineSwitcher } from "@/components/site/PipelineSwitcher";
-import { MoodCarousel } from "@/components/site/MoodCarousel";
+import { MoodDemo } from "@/components/site/MoodDemo";
 import { FeatureShowcase } from "@/components/site/FeatureShowcase";
-import { FeatureCards } from "@/components/site/FeatureCards";
+import { StoreImport } from "@/components/site/StoreImport";
+import { Faq } from "@/components/site/Faq";
 import { CtaSection } from "@/components/site/CtaSection";
 import { Reveal } from "@/components/Reveal";
 import { HomeSwitch } from "@/components/app/HomeSwitch";
@@ -20,19 +21,22 @@ export default function Home() {
       <main>
         <Hero />
         <Reveal>
+          <MoodDemo />
+        </Reveal>
+        <Reveal>
           <TrustRow />
         </Reveal>
         <Reveal>
           <PipelineSwitcher />
         </Reveal>
         <Reveal>
-          <MoodCarousel />
+          <StoreImport />
         </Reveal>
         <Reveal>
           <FeatureShowcase />
         </Reveal>
         <Reveal>
-          <FeatureCards />
+          <Faq />
         </Reveal>
         <Reveal>
           <CtaSection />

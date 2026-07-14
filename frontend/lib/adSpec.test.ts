@@ -145,3 +145,29 @@ describe("coreName", () => {
     expect(typeof coreName("🔥🔥🔥")).toBe("string");
   });
 });
+
+// The landing page's live demo (components/site/MoodDemo.tsx) pins one product
+// and relies on these audiences hitting exactly these tones. If a keyword edit
+// breaks one, the demo silently shows the wrong mood — this catches it.
+describe("landing MoodDemo audiences", () => {
+  const cases: [string, string][] = [
+    ["luxury gifting", "luxe"],
+    ["tech early adopters", "techy"],
+    ["trail runners", "energetic"],
+    ["college students", "playful"],
+    ["wellness mornings", "calm"],
+    ["streetwear heads", "bold"],
+  ];
+  it("each demo audience maps to its advertised tone for Atlas Bottle", () => {
+    for (const [audience, expected] of cases) {
+      expect(
+        buildAdSpec({
+          title: "Atlas Bottle",
+          audience,
+          price: "$48",
+          durationSec: 8,
+        }).tone,
+      ).toBe(expected);
+    }
+  });
+});
