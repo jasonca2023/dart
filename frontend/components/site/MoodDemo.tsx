@@ -40,6 +40,25 @@ export function MoodDemo() {
   const [live, setLive] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
 
+  // One white card that slides to the active mood (same treatment as the
+  // pipeline tabs), measured off the real buttons.
+  const listRef = useRef<HTMLUListElement>(null);
+  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    const measure = () => {
+      const el = btnRefs.current[active];
+      if (!el) return;
+      setPill({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+    };
+    measure();
+    document.fonts.ready.then(measure);
+    const ro = new ResizeObserver(measure);
+    if (listRef.current) ro.observe(listRef.current);
+    return () => ro.disconnect();
+  }, [active]);
+
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
@@ -81,19 +100,36 @@ export function MoodDemo() {
       <div className="mx-auto max-w-[var(--page-max)] px-5 sm:px-8">
         <div className="rounded-card-lg bg-sand p-4 sm:p-8">
           {/* Mood picker — the orbs, now doing the actual job */}
-          <ul className="flex snap-x gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-6 sm:gap-3 sm:overflow-visible">
+          <ul
+            ref={listRef}
+            className="relative flex snap-x gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-6 sm:gap-3 sm:overflow-visible"
+          >
+            {pill && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-0 top-0 rounded-card bg-white shadow-[var(--shadow-inset)] transition-[transform,width,height] duration-[260ms] ease-out motion-reduce:transition-none"
+                style={{
+                  transform: `translate(${pill.x}px, ${pill.y}px)`,
+                  width: pill.w,
+                  height: pill.h,
+                }}
+              />
+            )}
             {MOODS.map((m, i) => {
               const on = i === active;
               return (
                 <li key={m.tone} className="shrink-0 snap-center">
                   <button
+                    ref={(el) => {
+                      btnRefs.current[i] = el;
+                    }}
                     type="button"
                     aria-pressed={on}
                     onClick={() => setActive(i)}
                     className={
-                      "flex w-28 flex-col items-center rounded-card px-2 py-4 text-center transition-[background-color,transform] " +
+                      "relative z-[1] flex w-28 flex-col items-center rounded-card px-2 py-4 text-center transition-[background-color,transform] " +
                       "duration-[180ms] ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-full " +
-                      (on ? "bg-white shadow-[var(--shadow-inset)]" : "hover:bg-white/50")
+                      (on ? "" : "hover:bg-white/50")
                     }
                   >
                     <Orb

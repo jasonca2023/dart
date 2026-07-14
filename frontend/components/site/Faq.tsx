@@ -1,4 +1,7 @@
-// Native details/summary — accessible, zero JS, styled to the hairline system.
+"use client";
+
+import { useState } from "react";
+
 const QA: { q: string; a: string }[] = [
   {
     q: "Is it really free?",
@@ -22,6 +25,51 @@ const QA: { q: string; a: string }[] = [
   },
 ];
 
+// Accordion rows: the answer expands via the 0fr→1fr grid-rows trick (animates
+// to auto height cross-browser, which native <details> can't), the plus turns
+// into an ×. aria-expanded keeps it honest for screen readers.
+function Item({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-ash">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-baseline justify-between gap-6 py-5 text-left text-[16px] font-medium text-ink transition-colors duration-150 ease-out hover:text-driftwood focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      >
+        {q}
+        <span
+          aria-hidden
+          className={
+            "shrink-0 font-display text-[20px] font-light text-driftwood transition-transform duration-[260ms] ease-out motion-reduce:transition-none " +
+            (open ? "rotate-45" : "")
+          }
+        >
+          +
+        </span>
+      </button>
+      <div
+        className={
+          "grid transition-[grid-template-rows] duration-[300ms] ease-out motion-reduce:transition-none " +
+          (open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")
+        }
+      >
+        <div className="overflow-hidden">
+          <p
+            className={
+              "max-w-[60ch] pb-6 text-[15px] leading-relaxed text-driftwood transition-opacity duration-[240ms] ease-out motion-reduce:transition-none " +
+              (open ? "opacity-100" : "opacity-0")
+            }
+          >
+            {a}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Faq() {
   return (
     <section className="mx-auto max-w-[var(--page-max)] px-5 py-20 sm:px-8">
@@ -31,20 +79,7 @@ export function Faq() {
 
         <div className="mt-8 border-t border-ash">
           {QA.map(({ q, a }) => (
-            <details key={q} className="group border-b border-ash">
-              <summary className="flex cursor-pointer list-none items-baseline justify-between gap-6 py-5 text-[16px] font-medium text-ink transition-colors duration-150 ease-out hover:text-driftwood [&::-webkit-details-marker]:hidden">
-                {q}
-                <span
-                  aria-hidden
-                  className="shrink-0 font-display text-[20px] font-light text-driftwood transition-transform duration-200 ease-out group-open:rotate-45"
-                >
-                  +
-                </span>
-              </summary>
-              <p className="max-w-[60ch] pb-6 text-[15px] leading-relaxed text-driftwood">
-                {a}
-              </p>
-            </details>
+            <Item key={q} q={q} a={a} />
           ))}
         </div>
       </div>
