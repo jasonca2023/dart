@@ -9,10 +9,19 @@ import { Orb } from "../ui/Orb";
 // Split out and browser-only, so Remotion never weighs down the first paint.
 const AdPreview = dynamic(() => import("../app/AdPreview"), {
   ssr: false,
-  loading: () => (
-    <div className="aspect-video w-full animate-pulse rounded-[14px] bg-ink" />
-  ),
+  loading: () => <StagePlaceholder />,
 });
+
+// Shown before the player mounts (chunk loading, or not yet scrolled into
+// view). A quiet pulsing sand surface reads as "loading", never as a broken
+// black box, if it's ever glimpsed.
+function StagePlaceholder() {
+  return (
+    <div className="grid aspect-video w-full place-items-center bg-sand">
+      <span className="size-6 animate-pulse rounded-full bg-mist" aria-hidden />
+    </div>
+  );
+}
 
 // One pinned sample product; only the audience changes per mood. The audience
 // strings are chosen to deterministically trigger each tone in buildAdSpec
@@ -276,7 +285,7 @@ export function MoodDemo() {
                   spec={spec}
                 />
               ) : (
-                <div className="aspect-video w-full" />
+                <StagePlaceholder />
               )}
             </div>
             <p className="mt-3 text-center font-mono text-[12px] text-driftwood">
