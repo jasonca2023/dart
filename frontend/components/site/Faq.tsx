@@ -36,7 +36,7 @@ function Item({ q, a }: { q: string; a: string }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-baseline justify-between gap-6 py-5 text-left text-[16px] font-medium text-ink transition-colors duration-150 ease-out hover:text-driftwood focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        className="flex w-full items-baseline justify-between gap-6 py-5 text-left text-[16px] font-medium text-ink transition-colors duration-150 ease-out hover:text-driftwood active:text-fog focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
       >
         {q}
         <span

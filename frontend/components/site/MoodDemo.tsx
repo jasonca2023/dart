@@ -238,7 +238,7 @@ export function MoodDemo() {
                     onClick={() => setActive(i)}
                     className={
                       "relative z-[1] flex w-28 flex-col items-center rounded-card px-2 py-4 text-center transition-[background-color,transform] " +
-                      "duration-[180ms] ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-full " +
+                      "duration-[180ms] ease-out active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-full " +
                       (on ? "" : "hover:bg-white/50")
                     }
                   >

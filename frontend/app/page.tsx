@@ -8,7 +8,6 @@ import { FeatureShowcase } from "@/components/site/FeatureShowcase";
 import { StoreImport } from "@/components/site/StoreImport";
 import { Faq } from "@/components/site/Faq";
 import { CtaSection } from "@/components/site/CtaSection";
-import { Reveal } from "@/components/Reveal";
 import { HomeSwitch } from "@/components/app/HomeSwitch";
 import { AppShell } from "@/components/app/AppShell";
 import { Generate } from "@/components/app/Generate";
@@ -19,28 +18,16 @@ export default function Home() {
     <>
       <SiteNav />
       <main>
+        {/* One orchestrated entrance (the hero's own rise); sections below
+            stand still — scroll-stagger on every section is motion noise. */}
         <Hero />
-        <Reveal>
-          <MoodDemo />
-        </Reveal>
-        <Reveal>
-          <TrustRow />
-        </Reveal>
-        <Reveal>
-          <PipelineSwitcher />
-        </Reveal>
-        <Reveal>
-          <StoreImport />
-        </Reveal>
-        <Reveal>
-          <FeatureShowcase />
-        </Reveal>
-        <Reveal>
-          <Faq />
-        </Reveal>
-        <Reveal>
-          <CtaSection />
-        </Reveal>
+        <MoodDemo />
+        <TrustRow />
+        <PipelineSwitcher />
+        <StoreImport />
+        <FeatureShowcase />
+        <Faq />
+        <CtaSection />
       </main>
       <SiteFooter />
     </>

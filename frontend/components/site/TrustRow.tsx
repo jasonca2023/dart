@@ -1,19 +1,20 @@
 // Honest social proof: these are the platforms Dart reads from and hands off to
-// (per the PRD), rendered uniformly — not invented customer logos.
+// (per the PRD) — not invented customer logos. A hairline strip, not another
+// card, so the section rhythm varies: card (demo) → rule (this) → card (pipeline).
 const PLATFORMS = ["Shopify", "Amazon", "Etsy", "WooCommerce", "TikTok", "Meta"];
 
 export function TrustRow() {
   return (
-    <section className="mx-auto max-w-[var(--page-max)] px-5 pb-8 sm:px-8">
-      <p className="mb-4 text-center text-[14px] text-driftwood">
-        For the channels you already sell and advertise on
-      </p>
-      <div className="rounded-card bg-sand px-6 py-7">
-        <ul className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 md:grid-cols-6">
+    <section className="mx-auto max-w-[var(--page-max)] px-5 pb-6 sm:px-8">
+      <div className="flex flex-col gap-4 border-y border-ash py-6 sm:flex-row sm:items-baseline sm:justify-between">
+        <p className="t-caption shrink-0 text-driftwood">
+          For the channels you sell on
+        </p>
+        <ul className="flex flex-wrap gap-x-7 gap-y-2 sm:justify-end">
           {PLATFORMS.map((name) => (
             <li
               key={name}
-              className="text-center font-display text-[18px] font-light tracking-tight text-driftwood"
+              className="font-display text-[17px] font-light tracking-tight text-driftwood"
             >
               {name}
             </li>

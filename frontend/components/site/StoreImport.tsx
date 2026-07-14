@@ -40,11 +40,11 @@ export function StoreImport() {
 
         {/* Mock import */}
         <div className="mx-auto w-full max-w-md rounded-card bg-white p-5 shadow-[var(--shadow-elevated)]">
-          <div className="flex items-center gap-3 rounded-input border border-ash bg-parchment px-4 py-3">
-            <span className="size-1.5 shrink-0 rounded-full bg-ink" aria-hidden />
+          <div className="flex items-baseline justify-between gap-3 rounded-input border border-ash bg-parchment px-4 py-3">
             <span className="truncate font-mono text-[13px] text-driftwood">
               https://atlas-goods.com
             </span>
+            <span className="shrink-0 text-[12px] font-medium text-ink">Import</span>
           </div>
           <ul className="mt-4 flex flex-col">
             {ROWS.map(({ name, price }) => (
