@@ -24,6 +24,7 @@ _TIMEOUT = 15.0
 
 BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
 VIDEO_BUCKET = "dart-videos"  # matches main.VIDEO_BUCKET (import would be circular)
+_LIST_PAGE = 1000  # Supabase storage list caps a single response at 1000 rows.
 
 
 def email_ready(settings: Settings) -> bool:
@@ -239,15 +240,53 @@ async def get_token_user(settings: Settings, token: str) -> tuple[str, str] | No
 
 
 async def check_password(settings: Settings, email: str, password: str) -> bool:
-    """True when email+password signs in (GoTrue password grant)."""
+    """True when email+password signs in (GoTrue password grant).
+
+    The grant mints a session; since these are confirm-only checks we throw the
+    tokens away, so revoke just that one session (scope=local) to keep the
+    refresh-token table from filling with dead rows."""
     base, _ = _sb(settings)
+    apikey = settings.supabase_service_key or ""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         r = await client.post(
             f"{base}/auth/v1/token?grant_type=password",
-            headers={"apikey": settings.supabase_service_key or ""},
+            headers={"apikey": apikey},
             json={"email": email, "password": password},
         )
-    return r.status_code == 200
+        if r.status_code != 200:
+            return False
+        access = r.json().get("access_token")
+        if access:
+            try:
+                await client.post(
+                    f"{base}/auth/v1/logout?scope=local",
+                    headers={"apikey": apikey, "Authorization": f"Bearer {access}"},
+                )
+            except Exception:  # noqa: BLE001 — cleanup only; the check already passed
+                pass
+    return True
+
+
+async def _list_all_objects(
+    client: httpx.AsyncClient, base: str, auth: dict[str, str], user_id: str
+) -> list[dict]:
+    """Every object under the user's prefix, paging past the 1000-row cap so a
+    large library isn't silently truncated (undercounted usage, orphaned files
+    on delete)."""
+    out: list[dict] = []
+    offset = 0
+    while True:
+        r = await client.post(
+            f"{base}/storage/v1/object/list/{VIDEO_BUCKET}",
+            headers=auth,
+            json={"prefix": f"{user_id}/", "limit": _LIST_PAGE, "offset": offset},
+        )
+        r.raise_for_status()
+        page = r.json()
+        out.extend(page)
+        if len(page) < _LIST_PAGE:
+            return out
+        offset += _LIST_PAGE
 
 
 async def delete_user_data(settings: Settings, user_id: str) -> None:
@@ -259,19 +298,15 @@ async def delete_user_data(settings: Settings, user_id: str) -> None:
             f"{base}/rest/v1/dart_ads", headers=auth, params={"user_id": f"eq.{user_id}"}
         )
         r.raise_for_status()
-        r = await client.post(
-            f"{base}/storage/v1/object/list/{VIDEO_BUCKET}",
-            headers=auth,
-            json={"prefix": f"{user_id}/", "limit": 1000},
-        )
-        r.raise_for_status()
-        names = [f"{user_id}/{o['name']}" for o in r.json() if o.get("name")]
-        if names:
+        objects = await _list_all_objects(client, base, auth, user_id)
+        names = [f"{user_id}/{o['name']}" for o in objects if o.get("name")]
+        # Delete in pages too — the remove body has the same practical ceiling.
+        for i in range(0, len(names), _LIST_PAGE):
             r = await client.request(
                 "DELETE",
                 f"{base}/storage/v1/object/{VIDEO_BUCKET}",
                 headers=auth,
-                json={"prefixes": names},
+                json={"prefixes": names[i : i + _LIST_PAGE]},
             )
             r.raise_for_status()
 
@@ -280,14 +315,9 @@ async def storage_usage(settings: Settings, user_id: str) -> int:
     """Total bytes stored under the user's prefix in the video bucket."""
     base, auth = _sb(settings)
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        r = await client.post(
-            f"{base}/storage/v1/object/list/{VIDEO_BUCKET}",
-            headers=auth,
-            json={"prefix": f"{user_id}/", "limit": 1000},
-        )
-        r.raise_for_status()
+        objects = await _list_all_objects(client, base, auth, user_id)
     total = 0
-    for o in r.json():
+    for o in objects:
         size = (o.get("metadata") or {}).get("size")
         if isinstance(size, (int, float)):
             total += int(size)

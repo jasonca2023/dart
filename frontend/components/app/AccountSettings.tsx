@@ -129,7 +129,15 @@ function ChangePasswordCard() {
       setCode("");
       setCooldown(60);
     } catch (err) {
-      setError(errMsg(err, "Couldn’t send the code."));
+      // A pending code from this browser (we still hold its request token) means
+      // the per-address cooldown fired — the code is already in their inbox and
+      // bound to that token, so jump to entering it instead of stranding them.
+      if (err instanceof ApiError && err.code === "rate_limited" && reqToken) {
+        setStep("confirm");
+        setNotice("A code was already sent. Enter it below.");
+      } else {
+        setError(errMsg(err, "Couldn’t send the code."));
+      }
     } finally {
       setBusy(false);
     }
@@ -308,7 +316,15 @@ function ChangeEmailCard() {
       setCode("");
       setCooldown(60);
     } catch (err) {
-      setError(errMsg(err, "Couldn’t send the code."));
+      // A pending code from this browser (we still hold its request token) means
+      // the per-address cooldown fired — the code is already in their inbox and
+      // bound to that token, so jump to entering it instead of stranding them.
+      if (err instanceof ApiError && err.code === "rate_limited" && reqToken) {
+        setStep("confirm");
+        setNotice("A code was already sent. Enter it below.");
+      } else {
+        setError(errMsg(err, "Couldn’t send the code."));
+      }
     } finally {
       setBusy(false);
     }

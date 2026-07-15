@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Orb } from "../ui/Orb";
 import { TONE_ACCENTS } from "@/lib/adSpec";
+import { useSlidingPill } from "@/lib/useSlidingPill";
 
 interface Stage {
   key: string;
@@ -131,26 +132,8 @@ export function PipelineSwitcher() {
   const stage = STAGES[active];
 
   // The white pill is one element that slides to the active tab (instead of
-  // each tab toggling its own background). Measured off the real buttons so it
-  // survives wrapping and resizes.
-  const listRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-
-  useEffect(() => {
-    const measure = () => {
-      const el = tabRefs.current[active];
-      if (!el) return;
-      setPill({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
-    };
-    measure();
-    // A late webfont swap can change button widths without resizing the
-    // tablist's own box, which the ResizeObserver wouldn't see.
-    document.fonts.ready.then(measure);
-    const ro = new ResizeObserver(measure);
-    if (listRef.current) ro.observe(listRef.current);
-    return () => ro.disconnect();
-  }, [active]);
+  // each tab toggling its own background), measured off the real buttons.
+  const { listRef, btnRefs: tabRefs, pill } = useSlidingPill<HTMLDivElement>(active);
 
   return (
     <section

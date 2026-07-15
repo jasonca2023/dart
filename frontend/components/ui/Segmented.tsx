@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { useSlidingPill } from "@/lib/useSlidingPill";
 
 export interface SegOption<T extends string | number> {
   value: T;
@@ -23,24 +24,9 @@ export function Segmented<T extends string | number>({
   const active = options.findIndex((opt) => opt.value === value);
 
   // Measured off the real buttons so the pill survives wrapping and resizes.
-  const listRef = useRef<HTMLDivElement>(null);
-  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-
-  useEffect(() => {
-    const measure = () => {
-      const el = btnRefs.current[active];
-      if (!el) return;
-      setPill({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
-    };
-    measure();
-    // A late webfont swap can change button widths without resizing the
-    // group's own box, which the ResizeObserver wouldn't see.
-    document.fonts.ready.then(measure);
-    const ro = new ResizeObserver(measure);
-    if (listRef.current) ro.observe(listRef.current);
-    return () => ro.disconnect();
-  }, [active, options.length]);
+  const { listRef, btnRefs, pill } = useSlidingPill<HTMLDivElement>(active, [
+    options.length,
+  ]);
 
   return (
     <div

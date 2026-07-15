@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { buildAdSpec, TONE_ACCENTS, type AdSpec, type Tone } from "@/lib/adSpec";
+import { useSlidingPill } from "@/lib/useSlidingPill";
 import { Orb } from "../ui/Orb";
 
 // The real preview player (the same composition the app renders and exports).
@@ -158,22 +159,7 @@ export function MoodDemo() {
 
   // One white card that slides to the active mood (same treatment as the
   // pipeline tabs), measured off the real buttons.
-  const listRef = useRef<HTMLUListElement>(null);
-  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-
-  useEffect(() => {
-    const measure = () => {
-      const el = btnRefs.current[active];
-      if (!el) return;
-      setPill({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
-    };
-    measure();
-    document.fonts.ready.then(measure);
-    const ro = new ResizeObserver(measure);
-    if (listRef.current) ro.observe(listRef.current);
-    return () => ro.disconnect();
-  }, [active]);
+  const { listRef, btnRefs, pill } = useSlidingPill<HTMLUListElement>(active);
 
   useEffect(() => {
     const el = stageRef.current;

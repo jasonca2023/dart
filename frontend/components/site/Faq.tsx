@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 const QA: { q: string; a: string }[] = [
   {
@@ -27,14 +27,18 @@ const QA: { q: string; a: string }[] = [
 
 // Accordion rows: the answer expands via the 0fr→1fr grid-rows trick (animates
 // to auto height cross-browser, which native <details> can't), the plus turns
-// into an ×. aria-expanded keeps it honest for screen readers.
+// into an ×. aria-expanded + aria-controls keep it honest for screen readers,
+// and the collapsed panel is `inert` so its text stays out of the a11y tree
+// (the grid trick only hides it visually).
 function Item({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   return (
     <div className="border-b border-ash">
       <button
         type="button"
         aria-expanded={open}
+        aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-baseline justify-between gap-6 py-5 text-left text-[16px] font-medium text-ink transition-colors duration-150 ease-out hover:text-driftwood active:text-fog focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
       >
@@ -50,6 +54,8 @@ function Item({ q, a }: { q: string; a: string }) {
         </span>
       </button>
       <div
+        id={panelId}
+        inert={!open}
         className={
           "grid transition-[grid-template-rows] duration-[300ms] ease-out motion-reduce:transition-none " +
           (open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")
