@@ -2,7 +2,16 @@ import { Check } from "../icons";
 import { Orb } from "../ui/Orb";
 import { TONE_ACCENTS } from "@/lib/adSpec";
 
-const STAGES = ["Upload", "Render", "Ready"];
+// A 2×2 library grid stands in for "the dashboard" — each tile is a saved ad in
+// its own mood. This sells the payoff (ads collect in your library) and, unlike
+// the old single mock with a fake stage-rail, doesn't re-tell the Pipeline
+// section that sits right above it.
+const LIBRARY: { title: string; tone: keyof typeof TONE_ACCENTS; fmt: string }[] = [
+  { title: "Aero Runner", tone: "energetic", fmt: "9:16" },
+  { title: "Atlas Bottle", tone: "luxe", fmt: "16:9" },
+  { title: "Peak Flask", tone: "calm", fmt: "1:1" },
+  { title: "Trail Tumbler", tone: "bold", fmt: "4:5" },
+];
 
 export function FeatureShowcase() {
   return (
@@ -11,39 +20,27 @@ export function FeatureShowcase() {
       className="mx-auto max-w-[var(--page-max)] scroll-mt-20 px-5 py-20 sm:px-8"
     >
       <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-        {/* Visual left, copy right — flips the hero's bias for rhythm */}
+        {/* Visual left, copy right — flips the store-import section's bias */}
         <div className="order-2 lg:order-1">
-          <div className="mx-auto max-w-md rounded-card bg-white p-5 shadow-[var(--shadow-elevated)]">
-            <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-[14px] bg-sand">
-              <Orb accent={TONE_ACCENTS.luxe} className="size-24" />
-            </div>
-
-            {/* Stage rail — the live pipeline, settled */}
-            <div className="mt-5 flex items-center">
-              {STAGES.map((s, i) => (
-                <div key={s} className="flex flex-1 items-center last:flex-none">
-                  <div className="flex flex-col items-center gap-1.5">
-                    <span className="flex size-6 items-center justify-center rounded-full bg-ink text-parchment">
-                      <Check className="text-[13px]" />
-                    </span>
-                    <span className="text-[11px] text-driftwood">{s}</span>
-                  </div>
-                  {i < STAGES.length - 1 && (
-                    <span className="mx-1 -mt-5 h-px flex-1 bg-ink" />
-                  )}
+          <div className="mx-auto grid max-w-md grid-cols-2 gap-3">
+            {LIBRARY.map(({ title, tone, fmt }) => (
+              <div
+                key={title}
+                className="rounded-card bg-white p-3 shadow-[var(--shadow-ring)]"
+              >
+                <div className="grid aspect-video place-items-center overflow-hidden rounded-[10px] bg-sand">
+                  <Orb accent={TONE_ACCENTS[tone]} className="size-12" float={false} />
                 </div>
-              ))}
-            </div>
-
-            <div className="mt-5 flex items-center justify-between border-t border-ash pt-4">
-              <div>
-                <p className="text-[14px] font-medium text-ink">Aero Runner</p>
-                <p className="font-mono text-[12px] text-fog">$148.00 · upload</p>
+                <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                  <span className="truncate text-[13px] font-medium text-ink">
+                    {title}
+                  </span>
+                  <span className="shrink-0 font-mono text-[11px] text-fog">
+                    {fmt}
+                  </span>
+                </div>
               </div>
-              <span className="font-mono text-[12px] text-driftwood">
-                16:9 · 1080p
-              </span>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -51,12 +48,12 @@ export function FeatureShowcase() {
         <div className="order-1 lg:order-2">
           <p className="t-caption text-driftwood">The dashboard</p>
           <h2 className="t-heading-lg mt-3 max-w-[16ch]">
-            You stay in the loop. Always.
+            Every ad lands in your library.
           </h2>
           <p className="mt-5 max-w-md text-[16px] leading-relaxed text-driftwood">
             Upload your product photo and Dart composes a short, polished animated
-            ad around it: motion, type and your branding. When it's ready, you see
-            the finished video right away, saved to your library.
+            ad around it: motion, type and your branding. When it's ready, the
+            finished video is there, saved and ready to post.
           </p>
           <ul className="mt-6 flex flex-col gap-3">
             {[

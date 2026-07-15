@@ -31,7 +31,7 @@ const DEMO = {
   title: "Atlas Bottle",
   price: "$48",
   image: "/demo/atlas-bottle.svg",
-  durationSec: 8,
+  durationSec: 15,
 };
 
 // Hand-written copy per mood — the brain's generated lines are tuned for
