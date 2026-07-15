@@ -2,9 +2,10 @@ import { SignInCta } from "./SignInCta";
 import { HeroVisual } from "./HeroVisual";
 
 // Centred-narrow editorial hero with the eyebrow row off-axis (left label,
-// right-flush mono note) so not everything sits on one centred column. The
-// CTA lands above the orb, keeping headline + lede + CTA inside a 1280×800
-// fold; the orb then carries the eye across it.
+// right-flush mono note) so not everything sits on one centred column. Reading
+// order is headline → lede → orb → CTA: the orb is the centrepiece and the
+// button sits directly under it, where the eye lands, instead of floating
+// above it.
 export function Hero() {
   return (
     <section className="mx-auto max-w-[var(--page-max)] px-5 pb-20 pt-10 sm:px-8 sm:pb-24 sm:pt-12">
@@ -40,22 +41,25 @@ export function Hero() {
           right in your browser. No editing suite, no render farm.
         </p>
 
+        {/* 3D centerpiece — glass orb, orbiting motion graphics */}
+        <div
+          className="hero-rise relative mx-auto mt-10 h-[340px] w-full max-w-3xl sm:mt-12 sm:h-[440px]"
+          style={{ "--d": "280ms" } as React.CSSProperties}
+        >
+          <div className="hero-glow" aria-hidden />
+          <div className="hero-canvas-wrap">
+            <HeroVisual />
+          </div>
+        </div>
+
         <div
           className="hero-rise mt-8 flex flex-col items-center gap-4"
-          style={{ "--d": "280ms" } as React.CSSProperties}
+          style={{ "--d": "380ms" } as React.CSSProperties}
         >
           <SignInCta />
           <p className="font-mono text-[12px] text-fog">
             3 to 20s · 16:9 · 9:16 · 1:1 · 4:5 · 1080p
           </p>
-        </div>
-
-        {/* 3D centerpiece — glass orb, orbiting motion graphics */}
-        <div className="relative mx-auto mt-10 h-[340px] w-full max-w-3xl sm:h-[440px]">
-          <div className="hero-glow" aria-hidden />
-          <div className="hero-canvas-wrap">
-            <HeroVisual />
-          </div>
         </div>
       </div>
     </section>
