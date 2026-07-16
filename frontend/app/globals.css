@@ -207,10 +207,18 @@
   --text-display-lg: 4rem; /* 64 */
 
   /* ── Elevation (hairline only — no soft blurs) ──────────── */
+  /* Exactly 2 layers each, matching the dark-mode pair below. box-shadow
+   * can only interpolate between values with the SAME layer count — a
+   * mismatch can't animate at all, so the browser holds the old shadow for
+   * the whole transition and snaps to the new one at the very end. That
+   * read as "a delay, then it changes" on every card/button/input using
+   * these tokens (nearly everything), even after every color-transition
+   * fix. These two soft layers used to be near-duplicates anyway; merged
+   * into one mid-point layer costs nothing visible. */
   --shadow-ring: rgba(0, 0, 0, 0.06) 0px 0px 0px 1px,
-    rgba(0, 0, 0, 0.04) 0px 1px 2px 0px, rgba(0, 0, 0, 0.04) 0px 2px 4px 0px;
+    rgba(0, 0, 0, 0.04) 0px 1.5px 3px 0px;
   --shadow-elevated: rgba(0, 0, 0, 0.4) 0px 0px 1px 0px,
-    rgba(0, 0, 0, 0.04) 0px 1px 1px 0px, rgba(0, 0, 0, 0.04) 0px 2px 4px 0px;
+    rgba(0, 0, 0, 0.04) 0px 1.5px 3px 0px;
   --shadow-inset: rgba(0, 0, 0, 0.075) 0px 0px 0px 0.5px inset;
   --shadow-inset-warm: rgb(235, 232, 228) 0px 0px 0px 0.5px inset;
 
