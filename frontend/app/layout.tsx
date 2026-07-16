@@ -80,8 +80,19 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
+      // The inline script below stamps data-theme before hydration.
+      suppressHydrationWarning
       className={`${bricolage.variable} ${hanken.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
+      <head>
+        {/* No-FOUC theme stamp: saved choice, else OS preference, before paint. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{var t=localStorage.getItem("dart-theme");if(t!=="night"&&t!=="bloom")t=matchMedia("(prefers-color-scheme: dark)").matches?"night":"bloom";document.documentElement.dataset.theme=t}catch(e){}})()',
+          }}
+        />
+      </head>
       <body>
         <AuthProvider initialUser={data.user}>{children}</AuthProvider>
       </body>

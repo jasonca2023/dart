@@ -1,13 +1,14 @@
-/* Hallmark · macrostructure: Marquee Hero · genre: atmospheric · theme: Bloom (light paper)
+/* Hallmark · macrostructure: Marquee Hero · genre: atmospheric · theme: Bloom ⇄ Midnight
+ * (user-toggleable via <html data-theme="bloom|night">; Bloom is the default)
  * nav: N9 edge-aligned minimal · footer: Ft5 statement · enrichment: WebGL orb centerpiece (user-kept)
  * H1 knobs: size=xl-clamp · alignment=centred (atmospheric loosens gate 6) · underlay=none
  * tone: luminous-technical · audience: solo e-commerce merchants · use: start-free signup
  * pre-emit critique: P5 H4 E4 S4 R4 V5
- * Light factory floor: warm paper under two whisper blooms; the orb is the only chroma.
- * The landing tokens are ROLES (canvas/surface/elevated/text tiers) named for the night
- * build — `.landing-light` overrides their values; swap the wrapper class back to
- * `.landing-night` to run dark mode later. The signed-in app keeps parchment untouched.
- * Previous builds: Midnight marquee · studied-DNA parchment — see .hallmark/log.json
+ * The landing tokens are ROLES (canvas/surface/elevated/text tiers): Bloom values apply
+ * when data-theme ≠ night; under data-theme="night" they fall through to the Midnight
+ * values in @theme. The signed-in app re-values its parchment tokens under the same
+ * attribute, so one toggle flips both surfaces.
+ * Previous builds: Bloom relight · Midnight marquee · studied-DNA parchment — see .hallmark/log.json
  */
 @import "tailwindcss";
 
@@ -556,8 +557,10 @@ h3 {
   }
 }
 
-/* Light mode (Bloom): warm paper, ink text, the same two whisper blooms. */
-.landing-light {
+/* Light mode (Bloom): warm paper, ink text, the same two whisper blooms.
+ * Scoped to "not night" so the overrides vanish in dark mode and the role
+ * tokens fall through to the Midnight values defined in @theme. */
+:root:not([data-theme="night"]) .landing {
   --color-night: oklch(97.5% 0.006 75);
   --color-night-2: oklch(94.5% 0.009 75);
   --color-night-3: oklch(99.2% 0.003 75);
@@ -583,8 +586,8 @@ h3 {
 }
 
 /* Dark mode (Midnight) — the token values in @theme are already the dark set;
- * this class only paints the dark canvas. Held for a later release. */
-.landing-night {
+ * this rule only paints the dark canvas. */
+:root[data-theme="night"] .landing {
   background:
     radial-gradient(
       52% 34% at 16% -6%,
@@ -598,6 +601,63 @@ h3 {
     ),
     var(--color-night);
   background-attachment: fixed, fixed, scroll;
+}
+
+/* ── Night mode for the signed-in app ─────────────────────── */
+/* Tailwind v4 utilities emit var() references, so re-valuing the parchment
+ * tokens under the theme attribute flips every app screen (AppShell, Generate,
+ * /ads, /account, /auth, /jobs) with zero component edits. Values mirror the
+ * Midnight role set in @theme. Elevation on dark = lighter surface, so the
+ * ring/elevated shadows become faint light outlines instead of drop shadows. */
+:root[data-theme="night"] {
+  color-scheme: dark;
+  --color-parchment: oklch(15% 0.018 275);
+  --color-sand: oklch(19% 0.02 275);
+  --color-sand-2: oklch(22% 0.021 275);
+  --color-ash: oklch(31% 0.02 275);
+  --color-ink: oklch(94% 0.01 275);
+  --color-driftwood: oklch(75% 0.018 275);
+  --color-fog: oklch(63% 0.02 275);
+  --color-mist: oklch(63% 0.02 275);
+  --color-white: oklch(24% 0.022 275);
+  --shadow-ring: rgba(255, 255, 255, 0.07) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.35) 0px 1px 2px 0px;
+  --shadow-elevated: rgba(255, 255, 255, 0.09) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.45) 0px 2px 6px 0px;
+  --shadow-inset: rgba(255, 255, 255, 0.12) 0px 0px 0px 0.5px inset;
+  --shadow-inset-warm: oklch(35% 0.02 275) 0px 0px 0px 0.5px inset;
+}
+
+/* ── Theme toggle (sun ⇄ moon morph) ──────────────────────── */
+/* One SVG: the core disc scales up while the masking "bite" slides in to
+ * carve the crescent, and the rays retract. Transform/opacity only; the
+ * global reduced-motion block collapses the transition. */
+.theme-toggle .tt-core,
+.theme-toggle .tt-bite,
+.theme-toggle .tt-rays {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    transform 350ms var(--ease-in-out),
+    opacity 300ms var(--ease-in-out);
+}
+/* Sun (bloom): small core, rays out, bite parked off the disc. */
+.theme-toggle .tt-core {
+  transform: scale(0.55);
+}
+.theme-toggle .tt-bite {
+  transform: translate(10px, -10px);
+}
+/* Moon (night): full disc, bite carves the crescent, rays retract. */
+:root[data-theme="night"] .theme-toggle .tt-core {
+  transform: scale(1);
+}
+:root[data-theme="night"] .theme-toggle .tt-bite {
+  transform: translate(4.5px, -4.5px);
+}
+:root[data-theme="night"] .theme-toggle .tt-rays {
+  transform: scale(0.4) rotate(-40deg);
+  opacity: 0;
 }
 
 /* ── Reduced motion: keep comprehension, drop spatial motion ─ */

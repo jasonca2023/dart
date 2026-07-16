@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Logo } from "../ui/Logo";
+import { ThemeToggle } from "../ui/ThemeToggle";
 import { AccountMenu } from "./AccountMenu";
 import { AppNav } from "./AppNav";
 import { AuthGate } from "./AuthGate";
@@ -25,6 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 Demo data
               </span>
             )}
+            <ThemeToggle />
             <AccountMenu />
           </div>
         </div>

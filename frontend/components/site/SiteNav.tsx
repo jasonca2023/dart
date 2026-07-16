@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "../ui/Logo";
 import { ButtonLink } from "../ui/Button";
+import { ThemeToggle } from "../ui/ThemeToggle";
 
 // Hallmark nav — Previous: N5 Floating pill (detached blur pill over parchment).
 // This build: N9 Edge-aligned minimal, because the night canvas and the orb own
@@ -19,6 +20,7 @@ export function SiteNav() {
           >
             Log in
           </Link>
+          <ThemeToggle className="text-moth hover:text-linen" />
           <ButtonLink href="/auth?mode=signup" variant="moon" size="sm">
             Start free
           </ButtonLink>

@@ -15,7 +15,7 @@ import { Generate } from "@/components/app/Generate";
 export default function Home() {
   // Signed-out: the marketing landing (generate CTAs → sign-in).
   const landing = (
-    <div className="landing landing-light">
+    <div className="landing">
       <SiteNav />
       <main>
         {/* One orchestrated entrance (the hero's own rise); sections below
