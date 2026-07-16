@@ -770,15 +770,22 @@ h3 {
 /* ── Theme toggle (sun ⇄ moon morph) ──────────────────────── */
 /* One SVG: the core disc scales up while the masking "bite" slides in to
  * carve the crescent, and the rays retract. Transform/opacity only; the
- * global reduced-motion block collapses the transition. */
+ * global reduced-motion block collapses the transition. Was 350ms/300ms
+ * ease-in-out — slower than the rest of the page's theme-fade (now 180ms
+ * ease-out) AND using the same flat-start curve already identified as
+ * reading like "a delay" for colors, but never applied here. Since this
+ * icon is exactly what the user is looking at when they click it, it
+ * lagging behind everything else settling was probably the single most
+ * visible source of "still a delay" — fixed to match the rest of the
+ * theme-switch motion exactly. */
 .theme-toggle .tt-core,
 .theme-toggle .tt-bite,
 .theme-toggle .tt-rays {
   transform-box: fill-box;
   transform-origin: center;
   transition:
-    transform 350ms var(--ease-in-out),
-    opacity 300ms var(--ease-in-out);
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
 }
 /* Sun (bloom): small core, rays out, bite parked off the disc. */
 .theme-toggle .tt-core {
