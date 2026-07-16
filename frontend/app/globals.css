@@ -679,21 +679,29 @@ h3 {
 
 /* ── Theme switch — cross-fade colors instead of snapping ─── */
 /* Flipping data-theme changes the CSS custom properties instantly; without
- * this, every background/text/border repaints in one frame. Elements that
- * already declare their own transition (buttons, nav links) keep their own
- * timing — Tailwind's class-based transition-property wins over this
- * universal rule on specificity, so hover/press micro-interactions are
- * unaffected. This only fills in the elements that had no transition of
- * their own. Transform/opacity are untouched, so entrance animations
- * elsewhere in this file don't pick up the delay. */
+ * this, every background/text/border repaints in one frame. Must live in
+ * @layer base: an unlayered rule here would beat Tailwind's own utilities
+ * layer on EVERY element regardless of selector specificity (unlayered
+ * author styles always win over layered ones), which silently forced
+ * buttons/nav links off their intended fast 140–150ms hover transition and
+ * onto this slower one — the exact "some elements lag, then snap" bug.
+ * Inside @layer base, Tailwind's utilities layer (declared after base)
+ * still wins wherever a component sets its own transition; this only fills
+ * in the elements that had none (headings, paragraphs, section chrome).
+ * Kept faster than the old --dur-slow (420ms) so it's closer to the rest
+ * of the UI's motion language and the muddy OKLCH cross-fade midpoint is
+ * on screen for less time. Transform/opacity are untouched, so entrance
+ * animations elsewhere in this file don't pick up the delay. */
 @media (prefers-reduced-motion: no-preference) {
-  *,
-  *::before,
-  *::after {
-    transition-property: background-color, color, border-color, box-shadow,
-      fill, stroke;
-    transition-duration: var(--dur-slow);
-    transition-timing-function: var(--ease-in-out);
+  @layer base {
+    *,
+    *::before,
+    *::after {
+      transition-property: background-color, color, border-color,
+        box-shadow, fill, stroke;
+      transition-duration: var(--dur-base);
+      transition-timing-function: var(--ease-in-out);
+    }
   }
 }
 
