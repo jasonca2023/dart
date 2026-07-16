@@ -668,6 +668,26 @@ h3 {
   opacity: 0;
 }
 
+/* ── Theme switch — cross-fade colors instead of snapping ─── */
+/* Flipping data-theme changes the CSS custom properties instantly; without
+ * this, every background/text/border repaints in one frame. Elements that
+ * already declare their own transition (buttons, nav links) keep their own
+ * timing — Tailwind's class-based transition-property wins over this
+ * universal rule on specificity, so hover/press micro-interactions are
+ * unaffected. This only fills in the elements that had no transition of
+ * their own. Transform/opacity are untouched, so entrance animations
+ * elsewhere in this file don't pick up the delay. */
+@media (prefers-reduced-motion: no-preference) {
+  *,
+  *::before,
+  *::after {
+    transition-property: background-color, color, border-color, box-shadow,
+      fill, stroke;
+    transition-duration: var(--dur-slow);
+    transition-timing-function: var(--ease-in-out);
+  }
+}
+
 /* ── Reduced motion: keep comprehension, drop spatial motion ─ */
 @media (prefers-reduced-motion: reduce) {
   *,
