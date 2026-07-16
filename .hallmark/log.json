@@ -2,6 +2,16 @@
   {
     "date": "2026-07-16",
     "macrostructure": "Marquee Hero",
+    "theme": "Afterglow (custom)",
+    "genre": "atmospheric",
+    "enrichment": "existing WebGL orb centerpiece (kept per user request)",
+    "nav": "N9 edge-aligned minimal",
+    "footer": "Ft5 statement",
+    "brief": "Dart · replaced Aurora (hue-only re-hue of Midnight, still read as generic dark-AI-tool) with a bespoke construction: single warm-to-cool glow radiating from the orb's hero position, over a warm-anchored (hue 55) near-black canvas — the two-corner-bloom formula itself was the problem, not the hue; brand violet/ember orb accent (--color-glint) left untouched"
+  },
+  {
+    "date": "2026-07-16",
+    "macrostructure": "Marquee Hero",
     "theme": "Aurora",
     "genre": "atmospheric",
     "enrichment": "existing WebGL orb centerpiece (kept per user request)",
