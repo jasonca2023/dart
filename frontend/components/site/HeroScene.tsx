@@ -202,14 +202,42 @@ function Grabbable({
 
   const onDown = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
-    (e.target as Element).setPointerCapture(e.pointerId);
+    try {
+      (e.target as Element).setPointerCapture(e.pointerId);
+    } catch {
+      // capture unavailable — the buttons guard in onMove still ends drags
+    }
     dragging.current = true;
     last.current = { x: e.clientX, y: e.clientY, t: performance.now() };
     vel.current = { x: 0, y: 0 };
     gl.domElement.style.cursor = "grabbing";
   };
+  // One exit path for every way a drag can end (pointerup, pointercancel,
+  // lost capture, or a buttons-up move after a missed release) so the drag
+  // flag can never stay latched — a past click must never steer the orb.
+  const endDrag = (e?: ThreeEvent<PointerEvent>) => {
+    if (e) {
+      try {
+        (e.target as Element).releasePointerCapture(e.pointerId);
+      } catch {
+        // capture already gone — nothing to release
+      }
+    }
+    dragging.current = false;
+    last.current = null;
+    if (reduced) vel.current = { x: 0, y: 0 };
+    gl.domElement.style.cursor = hovering.current ? "grab" : "auto";
+  };
   const onMove = (e: ThreeEvent<PointerEvent>) => {
-    if (!dragging.current || !last.current || !group.current) return;
+    if (!dragging.current) return;
+    // The button was released but we never saw the up event (release outside
+    // the window, OS-level grab, etc.) — end the stale drag instead of
+    // steering the orb from a hover.
+    if (e.buttons === 0) {
+      endDrag(e);
+      return;
+    }
+    if (!last.current || !group.current) return;
     const now = performance.now();
     const dtMs = Math.max(1, now - last.current.t);
     const dx = e.clientX - last.current.x;
@@ -219,13 +247,6 @@ function Grabbable({
     vel.current = { x: (dx * 6) / dtMs, y: (dy * 4) / dtMs };
     last.current = { x: e.clientX, y: e.clientY, t: now };
   };
-  const onUp = (e: ThreeEvent<PointerEvent>) => {
-    (e.target as Element).releasePointerCapture(e.pointerId);
-    dragging.current = false;
-    last.current = null;
-    if (reduced) vel.current = { x: 0, y: 0 };
-    gl.domElement.style.cursor = hovering.current ? "grab" : "auto";
-  };
 
   return (
     <group ref={group}>
@@ -233,7 +254,9 @@ function Grabbable({
       <mesh
         onPointerDown={onDown}
         onPointerMove={onMove}
-        onPointerUp={onUp}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onLostPointerCapture={endDrag}
         onPointerOver={() => {
           hovering.current = true;
           if (!dragging.current) gl.domElement.style.cursor = "grab";
