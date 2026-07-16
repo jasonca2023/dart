@@ -792,27 +792,30 @@ h3 {
 }
 
 /* ── Theme switch — cross-fade colors instead of snapping ─── */
-/* background-color/border-color/box-shadow do NOT inherit, so a blanket
- * transition on every element is safe for them — each element's own value
- * is resolved directly, never chained through a parent. `color`/`fill`/
- * `stroke` are deliberately NOT listed here: those inherit, and giving
- * every element its own competing transition on an inherited property was
- * the 1000ms+ compounding-delay bug (see the @property block above this
- * file's tokens for the real fix — the source variables animate once,
- * every var(--color-x) consumer just reads the already-smooth value).
- * Must live in @layer base: an unlayered rule here would beat Tailwind's
- * own utilities layer on EVERY element regardless of selector specificity
- * (unlayered author styles always win over layered ones), which silently
- * forced buttons/nav links off their intended fast 140–150ms hover
- * transition and onto this slower one. Inside @layer base, Tailwind's
- * utilities layer (declared after base) still wins wherever a component
- * sets its own transition; this only fills in elements that had none. */
+/* Only `box-shadow` belongs in a blanket per-element transition. The
+ * --shadow-* tokens are plain (untyped) custom properties — they swap
+ * instantly, so an element consuming one needs its OWN transition to fade.
+ * background-color and border-color used to be listed here too, but every
+ * color token they'd consume (--color-parchment, --color-ash, etc.) is
+ * ALREADY animating at its source (the @property block above + the :root/
+ * .landing transitions below) — giving the CONSUMING element a second,
+ * redundant transition on the same property retriggers every single frame
+ * the source variable moves, and the two overlapping animations sum their
+ * durations instead of running once. That's exactly what made the app
+ * header's background take ~600ms to settle instead of the declared
+ * 240ms (measured live) — the visible "changes, stalls, then finishes"
+ * the user reported. `color`/`fill`/`stroke` were never listed here either,
+ * for the inheritance version of the same mistake (see the @property
+ * block's comment). Must live in @layer base: an unlayered rule here would
+ * beat Tailwind's own utilities layer on EVERY element regardless of
+ * selector specificity, which silently forced buttons/nav links off their
+ * intended fast 140–150ms hover transition and onto this slower one. */
 @media (prefers-reduced-motion: no-preference) {
   @layer base {
     *,
     *::before,
     *::after {
-      transition-property: background-color, border-color, box-shadow;
+      transition-property: box-shadow;
       transition-duration: var(--dur-base);
       transition-timing-function: var(--ease-in-out);
     }
