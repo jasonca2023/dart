@@ -2,6 +2,16 @@
   {
     "date": "2026-07-15",
     "macrostructure": "Marquee Hero",
+    "theme": "Bloom (light paper)",
+    "genre": "atmospheric",
+    "enrichment": "existing WebGL orb centerpiece (kept per user request)",
+    "nav": "N9 edge-aligned minimal",
+    "footer": "Ft5 statement",
+    "brief": "Dart · relight of the Midnight marquee to light mode (user request); dark set retained behind .landing-night"
+  },
+  {
+    "date": "2026-07-15",
+    "macrostructure": "Marquee Hero",
     "theme": "Midnight",
     "genre": "atmospheric",
     "enrichment": "existing WebGL orb centerpiece (kept per user request)",

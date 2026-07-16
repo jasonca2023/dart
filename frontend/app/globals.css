@@ -1,12 +1,13 @@
-/* Hallmark · macrostructure: Marquee Hero · genre: atmospheric · theme: Midnight
+/* Hallmark · macrostructure: Marquee Hero · genre: atmospheric · theme: Bloom (light paper)
  * nav: N9 edge-aligned minimal · footer: Ft5 statement · enrichment: WebGL orb centerpiece (user-kept)
  * H1 knobs: size=xl-clamp · alignment=centred (atmospheric loosens gate 6) · underlay=none
- * tone: nocturnal-technical · audience: solo e-commerce merchants · use: start-free signup
+ * tone: luminous-technical · audience: solo e-commerce merchants · use: start-free signup
  * pre-emit critique: P5 H4 E4 S4 R4 V5
- * Night factory floor: the orb is the page's only light source; color appears only as ad
- * energy made visible. Night tokens are landing-scoped — the signed-in app keeps the
- * parchment system below untouched.
- * Previous build: studied-DNA (ElevenLabs parchment) · N5 pill · index footer — see .hallmark/log.json
+ * Light factory floor: warm paper under two whisper blooms; the orb is the only chroma.
+ * The landing tokens are ROLES (canvas/surface/elevated/text tiers) named for the night
+ * build — `.landing-light` overrides their values; swap the wrapper class back to
+ * `.landing-night` to run dark mode later. The signed-in app keeps parchment untouched.
+ * Previous builds: Midnight marquee · studied-DNA parchment — see .hallmark/log.json
  */
 @import "tailwindcss";
 
@@ -500,9 +501,89 @@ h3 {
   }
 }
 
-/* ── Night landing (atmospheric marquee — landing scope only) ─ */
-/* Two faint fixed blooms at the top edge; the orb's own glow is the page's
- * real light source, so these stay whisper-quiet (≤16% chroma mix). */
+/* ── Atmospheric landing (landing scope only) ─────────────── */
+/* The landing components consume the night-set tokens as ROLES: night=canvas,
+ * night-2=surface, night-3=elevated, seam=border, linen=primary text,
+ * moth=secondary, dusk=tertiary, glint=accent. `.landing` carries the shared
+ * behaviour; the mode class (`landing-light` today, `landing-night` when dark
+ * mode ships) sets the values and the canvas blooms. */
+.landing {
+  color: var(--color-linen);
+}
+.landing ::selection {
+  background: var(--color-linen);
+  color: var(--color-night);
+}
+.landing :focus-visible {
+  outline-color: var(--color-linen);
+}
+/* Brand copy accents keyed to the role tokens. */
+.landing .hero-em {
+  color: var(--color-linen);
+  font-weight: 500;
+}
+.landing .hero-accent {
+  color: var(--color-glint);
+}
+.landing .hero-live-dot {
+  background: var(--color-glint);
+}
+@keyframes hero-live-glint {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-glint) 55%, transparent);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-glint) 0%, transparent);
+    opacity: 0.65;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .landing .hero-live-dot {
+    animation-name: hero-live-glint;
+  }
+  /* Atmospheric motion discipline: entrances fade, never slide. */
+  .night-fade {
+    opacity: 0;
+    animation: night-fade 700ms var(--ease-out) forwards;
+    animation-delay: var(--d, 0ms);
+  }
+}
+@keyframes night-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Light mode (Bloom): warm paper, ink text, the same two whisper blooms. */
+.landing-light {
+  --color-night: oklch(97.5% 0.006 75);
+  --color-night-2: oklch(94.5% 0.009 75);
+  --color-night-3: oklch(99.2% 0.003 75);
+  --color-seam: oklch(88% 0.01 75);
+  --color-linen: oklch(21% 0.015 75);
+  --color-linen-2: oklch(30% 0.015 75);
+  --color-moth: oklch(44% 0.015 75);
+  --color-dusk: oklch(52% 0.015 75);
+  --color-glint: oklch(48% 0.17 264);
+  background:
+    radial-gradient(
+      52% 34% at 16% -6%,
+      color-mix(in oklab, var(--color-violet) 10%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      44% 30% at 86% 2%,
+      color-mix(in oklab, var(--color-ember) 7%, transparent),
+      transparent 68%
+    ),
+    var(--color-night);
+  background-attachment: fixed, fixed, scroll;
+}
+
+/* Dark mode (Midnight) — the token values in @theme are already the dark set;
+ * this class only paints the dark canvas. Held for a later release. */
 .landing-night {
   background:
     radial-gradient(
@@ -517,51 +598,6 @@ h3 {
     ),
     var(--color-night);
   background-attachment: fixed, fixed, scroll;
-  color: var(--color-linen);
-}
-.landing-night ::selection {
-  background: var(--color-linen);
-  color: var(--color-night);
-}
-.landing-night :focus-visible {
-  outline-color: var(--color-linen);
-}
-/* Brand copy accents re-lit for the dark ground. */
-.landing-night .hero-em {
-  color: var(--color-linen);
-}
-.landing-night .hero-accent {
-  color: var(--color-glint);
-}
-.landing-night .hero-live-dot {
-  background: var(--color-glint);
-}
-@keyframes hero-live-night {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-glint) 55%, transparent);
-    opacity: 1;
-  }
-  50% {
-    box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-glint) 0%, transparent);
-    opacity: 0.65;
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .landing-night .hero-live-dot {
-    animation-name: hero-live-night;
-  }
-  /* Atmospheric motion discipline: entrances fade, never slide. */
-  .night-fade {
-    opacity: 0;
-    animation: night-fade 700ms var(--ease-out) forwards;
-    animation-delay: var(--d, 0ms);
-  }
-}
-@keyframes night-fade {
-  to {
-    opacity: 1;
-  }
 }
 
 /* ── Reduced motion: keep comprehension, drop spatial motion ─ */
