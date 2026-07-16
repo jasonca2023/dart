@@ -1,13 +1,15 @@
-/* Hallmark · macrostructure: Marquee Hero · genre: atmospheric · theme: Bloom ⇄ Midnight
+/* Hallmark · macrostructure: Marquee Hero · genre: atmospheric · theme: Bloom ⇄ Aurora
  * (user-toggleable via <html data-theme="bloom|night">; Bloom is the default)
  * nav: N9 edge-aligned minimal · footer: Ft5 statement · enrichment: WebGL orb centerpiece (user-kept)
  * H1 knobs: size=xl-clamp · alignment=centred (atmospheric loosens gate 6) · underlay=none
  * tone: luminous-technical · audience: solo e-commerce merchants · use: start-free signup
  * pre-emit critique: P5 H4 E4 S4 R4 V5
  * The landing tokens are ROLES (canvas/surface/elevated/text tiers): Bloom values apply
- * when data-theme ≠ night; under data-theme="night" they fall through to the Midnight
- * values in @theme. The signed-in app re-values its parchment tokens under the same
- * attribute, so one toggle flips both surfaces.
+ * when data-theme ≠ night; under data-theme="night" they fall through to the Aurora
+ * values in @theme (dark cyan canvas, hue 205 — swapped from Midnight's hue 275 for a
+ * cooler, less dev-tool-coded dark mode; the brand's fixed violet/ember orb accent is
+ * untouched by this swap, see --color-glint below). The signed-in app re-values its
+ * parchment tokens under the same attribute, so one toggle flips both surfaces.
  * Previous builds: Bloom relight · Midnight marquee · studied-DNA parchment — see .hallmark/log.json
  */
 @import "tailwindcss";
@@ -28,15 +30,19 @@
   --color-white: #ffffff; /* elevated card */
 
   /* ── Night set (landing only — the app keeps parchment) ──── */
-  --color-night: oklch(15% 0.018 275); /* canvas */
-  --color-night-2: oklch(19% 0.02 275); /* elevated card */
-  --color-night-3: oklch(24% 0.022 275); /* higher elevation / pill */
-  --color-seam: oklch(31% 0.02 275); /* border on night */
-  --color-linen: oklch(94% 0.01 275); /* primary text on night */
-  --color-linen-2: oklch(97% 0.008 275); /* filled-CTA hover */
-  --color-moth: oklch(75% 0.018 275); /* secondary text on night */
-  --color-dusk: oklch(63% 0.02 275); /* tertiary / meta on night */
-  --color-glint: oklch(74% 0.13 275); /* brand violet, lifted for dark */
+  /* Aurora — hue 205 (blue-cyan), re-anchored from Hallmark's canonical Midnight
+   * (hue 250-ish) to Dart's own bespoke hue 275, now to Aurora's cooler cyan.
+   * --color-glint stays untouched: it's the fixed brand accent tied to the hero
+   * orb, not part of the canvas identity, and reads even richer against cyan. */
+  --color-night: oklch(15% 0.018 205); /* canvas */
+  --color-night-2: oklch(19% 0.02 205); /* elevated card */
+  --color-night-3: oklch(24% 0.022 205); /* higher elevation / pill */
+  --color-seam: oklch(31% 0.02 205); /* border on night */
+  --color-linen: oklch(94% 0.01 205); /* primary text on night */
+  --color-linen-2: oklch(97% 0.008 205); /* filled-CTA hover */
+  --color-moth: oklch(75% 0.018 205); /* secondary text on night */
+  --color-dusk: oklch(63% 0.02 205); /* tertiary / meta on night */
+  --color-glint: oklch(74% 0.13 275); /* brand violet, lifted for dark — unchanged */
 
   /* ── Type families (wired to next/font in layout.tsx) ────── */
   --font-display: var(--font-bricolage), ui-sans-serif, system-ui, -apple-system,
@@ -560,7 +566,7 @@ h3 {
 
 /* Light mode (Bloom): warm paper, ink text, the same two whisper blooms.
  * Scoped to "not night" so the overrides vanish in dark mode and the role
- * tokens fall through to the Midnight values defined in @theme. */
+ * tokens fall through to the Aurora values defined in @theme. */
 :root:not([data-theme="night"]) .landing {
   --color-night: oklch(97.5% 0.006 75);
   --color-night-2: oklch(94.5% 0.009 75);
@@ -586,7 +592,7 @@ h3 {
   background-attachment: fixed, fixed, scroll;
 }
 
-/* Dark mode (Midnight) — the token values in @theme are already the dark set;
+/* Dark mode (Aurora) — the token values in @theme are already the dark set;
  * this rule only paints the dark canvas. */
 :root[data-theme="night"] .landing {
   background:
@@ -608,26 +614,26 @@ h3 {
 /* Tailwind v4 utilities emit var() references, so re-valuing the parchment
  * tokens under the theme attribute flips every app screen (AppShell, Generate,
  * /ads, /account, /auth, /jobs) with zero component edits. Values mirror the
- * Midnight role set in @theme. Elevation on dark = lighter surface, so the
+ * Aurora role set in @theme. Elevation on dark = lighter surface, so the
  * ring/elevated shadows become faint light outlines instead of drop shadows. */
 :root[data-theme="night"] {
   color-scheme: dark;
-  --color-parchment: oklch(15% 0.018 275);
-  --color-sand: oklch(19% 0.02 275);
-  --color-sand-2: oklch(22% 0.021 275);
-  --color-ash: oklch(31% 0.02 275);
-  --color-ink: oklch(94% 0.01 275);
-  --color-ink-2: oklch(88% 0.012 275); /* filled-control hover on night */
-  --color-driftwood: oklch(75% 0.018 275);
-  --color-fog: oklch(63% 0.02 275);
-  --color-mist: oklch(63% 0.02 275);
-  --color-white: oklch(24% 0.022 275);
+  --color-parchment: oklch(15% 0.018 205);
+  --color-sand: oklch(19% 0.02 205);
+  --color-sand-2: oklch(22% 0.021 205);
+  --color-ash: oklch(31% 0.02 205);
+  --color-ink: oklch(94% 0.01 205);
+  --color-ink-2: oklch(88% 0.012 205); /* filled-control hover on night */
+  --color-driftwood: oklch(75% 0.018 205);
+  --color-fog: oklch(63% 0.02 205);
+  --color-mist: oklch(63% 0.02 205);
+  --color-white: oklch(24% 0.022 205);
   --shadow-ring: rgba(255, 255, 255, 0.07) 0px 0px 0px 1px,
     rgba(0, 0, 0, 0.35) 0px 1px 2px 0px;
   --shadow-elevated: rgba(255, 255, 255, 0.09) 0px 0px 0px 1px,
     rgba(0, 0, 0, 0.45) 0px 2px 6px 0px;
   --shadow-inset: rgba(255, 255, 255, 0.12) 0px 0px 0px 0.5px inset;
-  --shadow-inset-warm: oklch(35% 0.02 275) 0px 0px 0px 0.5px inset;
+  --shadow-inset-warm: oklch(35% 0.02 205) 0px 0px 0px 0.5px inset;
 }
 
 /* ── Theme toggle (sun ⇄ moon morph) ──────────────────────── */

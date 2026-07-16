@@ -91,11 +91,12 @@ export default async function RootLayout({
       className={`${bricolage.variable} ${hanken.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
       <head>
-        {/* No-FOUC theme stamp: saved choice, else OS preference, before paint. */}
+        {/* No-FOUC theme stamp: saved choice, else light — Dart defaults to
+            light regardless of OS scheme; dark is opt-in via the toggle. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              '(function(){try{var t=localStorage.getItem("dart-theme");if(t!=="night"&&t!=="bloom")t=matchMedia("(prefers-color-scheme: dark)").matches?"night":"bloom";document.documentElement.dataset.theme=t}catch(e){}})()',
+              '(function(){try{var t=localStorage.getItem("dart-theme");document.documentElement.dataset.theme=t==="night"?"night":"bloom"}catch(e){}})()',
           }}
         />
       </head>

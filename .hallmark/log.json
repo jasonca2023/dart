@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-07-16",
+    "macrostructure": "Marquee Hero",
+    "theme": "Aurora",
+    "genre": "atmospheric",
+    "enrichment": "existing WebGL orb centerpiece (kept per user request)",
+    "nav": "N9 edge-aligned minimal",
+    "footer": "Ft5 statement",
+    "brief": "Dart · swapped the toggleable dark mode from Midnight (hue 275) to Aurora (hue 205, blue-cyan) — cooler, non-dev-tool-coded canvas; brand violet/ember orb accent (--color-glint, hero blooms) left untouched"
+  },
+  {
     "date": "2026-07-15",
     "macrostructure": "Marquee Hero",
     "theme": "Bloom (light paper)",
