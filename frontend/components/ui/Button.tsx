@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { Spinner } from "../icons";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "moon";
 type Size = "sm" | "md" | "lg";
 
 const base =
@@ -19,6 +19,10 @@ const variants: Record<Variant, string> = {
   secondary:
     "bg-white text-ink border border-ash hover:bg-sand shadow-[var(--shadow-ring)]",
   ghost: "bg-transparent text-ink hover:text-driftwood",
+  // Filled light control for the night landing — linen on night, never pure white.
+  moon:
+    "bg-linen text-night border border-linen hover:bg-linen-2 " +
+    "focus-visible:outline-linen",
 };
 
 const sizes: Record<Size, string> = {

@@ -24,18 +24,15 @@ export function FeatureShowcase() {
         <div className="order-2 lg:order-1">
           <div className="mx-auto grid max-w-md grid-cols-2 gap-3">
             {LIBRARY.map(({ title, tone, fmt }) => (
-              <div
-                key={title}
-                className="rounded-card bg-white p-3 shadow-[var(--shadow-ring)]"
-              >
-                <div className="grid aspect-video place-items-center overflow-hidden rounded-[10px] bg-sand">
+              <div key={title} className="rounded-card bg-night-2 p-3">
+                <div className="grid aspect-video place-items-center overflow-hidden rounded-[10px] bg-night">
                   <Orb accent={TONE_ACCENTS[tone]} className="size-12" float={false} />
                 </div>
                 <div className="mt-2.5 flex items-baseline justify-between gap-2">
-                  <span className="truncate text-[13px] font-medium text-ink">
+                  <span className="truncate text-[13px] font-medium text-linen">
                     {title}
                   </span>
-                  <span className="shrink-0 font-mono text-[11px] text-fog">
+                  <span className="shrink-0 font-mono text-[11px] text-dusk">
                     {fmt}
                   </span>
                 </div>
@@ -46,11 +43,10 @@ export function FeatureShowcase() {
 
         {/* Copy */}
         <div className="order-1 lg:order-2">
-          <p className="t-caption text-driftwood">The dashboard</p>
-          <h2 className="t-heading-lg mt-3 max-w-[16ch]">
+          <h2 className="t-heading-lg max-w-[16ch]">
             Every ad lands in your library.
           </h2>
-          <p className="mt-5 max-w-md text-[16px] leading-relaxed text-driftwood">
+          <p className="mt-5 max-w-md text-[16px] leading-relaxed text-moth">
             Upload your product photo and Dart composes a short, polished animated
             ad around it: motion, type and your branding. When it's ready, the
             finished video is there, saved and ready to post.
@@ -61,8 +57,8 @@ export function FeatureShowcase() {
               "Every ad saved to your library automatically",
               "Export in 16:9, 9:16, 1:1 or 4:5 for any channel",
             ].map((t) => (
-              <li key={t} className="flex items-start gap-3 text-[15px] text-ink">
-                <Check className="mt-0.5 shrink-0 text-[18px] text-driftwood" />
+              <li key={t} className="flex items-start gap-3 text-[15px] text-linen">
+                <Check className="mt-0.5 shrink-0 text-[18px] text-moth" />
                 {t}
               </li>
             ))}

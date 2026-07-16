@@ -26,12 +26,21 @@ function DartMark({ className }: { className?: string }) {
   );
 }
 
-export function Logo({ href = "/" }: { href?: string }) {
+export function Logo({
+  href = "/",
+  className = "text-ink",
+}: {
+  href?: string;
+  className?: string;
+}) {
   return (
     <Link
       href={href}
       aria-label="Dart home"
-      className="inline-flex items-center gap-2 text-ink transition-opacity duration-150 ease-out hover:opacity-70"
+      className={
+        "inline-flex items-center gap-2 transition-opacity duration-150 ease-out hover:opacity-70 " +
+        className
+      }
     >
       <DartMark className="text-[20px]" />
       <span

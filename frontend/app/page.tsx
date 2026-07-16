@@ -15,7 +15,7 @@ import { Generate } from "@/components/app/Generate";
 export default function Home() {
   // Signed-out: the marketing landing (generate CTAs → sign-in).
   const landing = (
-    <>
+    <div className="landing-night">
       <SiteNav />
       <main>
         {/* One orchestrated entrance (the hero's own rise); sections below
@@ -30,7 +30,7 @@ export default function Home() {
         <CtaSection />
       </main>
       <SiteFooter />
-    </>
+    </div>
   );
 
   // Signed-in: the app — just the generator. The saved ads live on /ads.

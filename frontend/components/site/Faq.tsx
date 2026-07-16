@@ -34,19 +34,19 @@ function Item({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   return (
-    <div className="border-b border-ash">
+    <div className="border-b border-seam">
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-baseline justify-between gap-6 py-5 text-left text-[16px] font-medium text-ink transition-colors duration-150 ease-out hover:text-driftwood active:text-fog focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        className="flex w-full items-baseline justify-between gap-6 py-5 text-left text-[16px] font-medium text-linen transition-colors duration-150 ease-out hover:text-moth active:text-dusk focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-linen"
       >
         {q}
         <span
           aria-hidden
           className={
-            "shrink-0 font-display text-[20px] font-light text-driftwood transition-transform duration-[260ms] ease-out motion-reduce:transition-none " +
+            "shrink-0 font-display text-[20px] font-light text-moth transition-transform duration-[260ms] ease-out motion-reduce:transition-none " +
             (open ? "rotate-45" : "")
           }
         >
@@ -64,7 +64,7 @@ function Item({ q, a }: { q: string; a: string }) {
         <div className="overflow-hidden">
           <p
             className={
-              "max-w-[60ch] pb-6 text-[15px] leading-relaxed text-driftwood transition-opacity duration-[240ms] ease-out motion-reduce:transition-none " +
+              "max-w-[60ch] pb-6 text-[15px] leading-relaxed text-moth transition-opacity duration-[240ms] ease-out motion-reduce:transition-none " +
               (open ? "opacity-100" : "opacity-0")
             }
           >
@@ -80,10 +80,9 @@ export function Faq() {
   return (
     <section className="mx-auto max-w-[var(--page-max)] px-5 py-20 sm:px-8">
       <div className="mx-auto max-w-2xl">
-        <p className="t-caption text-driftwood">Questions</p>
-        <h2 className="t-heading mt-3">The short answers.</h2>
+        <h2 className="t-heading">The short answers.</h2>
 
-        <div className="mt-8 border-t border-ash">
+        <div className="mt-8 border-t border-seam">
           {QA.map(({ q, a }) => (
             <Item key={q} q={q} a={a} />
           ))}

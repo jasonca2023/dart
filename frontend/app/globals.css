@@ -1,8 +1,12 @@
-/* Hallmark · studied-DNA · source: ElevenLabs "Parchment command terminal"
- * macrostructure: asymmetric split hero → inset switcher card → alternating features → trust → CTA → footer
- * genre: modern-minimal · theme: studied-DNA · diversification: suspended (following external DNA)
- * pre-emit critique: P5 H5 E5 S5 R5 V4
- * Warm paper surfaces beneath monochrome controls; color appears only as ad energy made visible.
+/* Hallmark · macrostructure: Marquee Hero · genre: atmospheric · theme: Midnight
+ * nav: N9 edge-aligned minimal · footer: Ft5 statement · enrichment: WebGL orb centerpiece (user-kept)
+ * H1 knobs: size=xl-clamp · alignment=centred (atmospheric loosens gate 6) · underlay=none
+ * tone: nocturnal-technical · audience: solo e-commerce merchants · use: start-free signup
+ * pre-emit critique: P5 H4 E4 S4 R4 V5
+ * Night factory floor: the orb is the page's only light source; color appears only as ad
+ * energy made visible. Night tokens are landing-scoped — the signed-in app keeps the
+ * parchment system below untouched.
+ * Previous build: studied-DNA (ElevenLabs parchment) · N5 pill · index footer — see .hallmark/log.json
  */
 @import "tailwindcss";
 
@@ -19,6 +23,17 @@
   --color-violet: #0447ff; /* decorative orb only */
   --color-ember: #ff4704; /* decorative orb only */
   --color-white: #ffffff; /* elevated card */
+
+  /* ── Night set (landing only — the app keeps parchment) ──── */
+  --color-night: oklch(15% 0.018 275); /* canvas */
+  --color-night-2: oklch(19% 0.02 275); /* elevated card */
+  --color-night-3: oklch(24% 0.022 275); /* higher elevation / pill */
+  --color-seam: oklch(31% 0.02 275); /* border on night */
+  --color-linen: oklch(94% 0.01 275); /* primary text on night */
+  --color-linen-2: oklch(97% 0.008 275); /* filled-CTA hover */
+  --color-moth: oklch(75% 0.018 275); /* secondary text on night */
+  --color-dusk: oklch(63% 0.02 275); /* tertiary / meta on night */
+  --color-glint: oklch(74% 0.13 275); /* brand violet, lifted for dark */
 
   /* ── Type families (wired to next/font in layout.tsx) ────── */
   --font-display: var(--font-bricolage), ui-sans-serif, system-ui, -apple-system,
@@ -482,6 +497,70 @@ h3 {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* ── Night landing (atmospheric marquee — landing scope only) ─ */
+/* Two faint fixed blooms at the top edge; the orb's own glow is the page's
+ * real light source, so these stay whisper-quiet (≤16% chroma mix). */
+.landing-night {
+  background:
+    radial-gradient(
+      52% 34% at 16% -6%,
+      color-mix(in oklab, var(--color-violet) 14%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      44% 30% at 86% 2%,
+      color-mix(in oklab, var(--color-ember) 9%, transparent),
+      transparent 68%
+    ),
+    var(--color-night);
+  background-attachment: fixed, fixed, scroll;
+  color: var(--color-linen);
+}
+.landing-night ::selection {
+  background: var(--color-linen);
+  color: var(--color-night);
+}
+.landing-night :focus-visible {
+  outline-color: var(--color-linen);
+}
+/* Brand copy accents re-lit for the dark ground. */
+.landing-night .hero-em {
+  color: var(--color-linen);
+}
+.landing-night .hero-accent {
+  color: var(--color-glint);
+}
+.landing-night .hero-live-dot {
+  background: var(--color-glint);
+}
+@keyframes hero-live-night {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-glint) 55%, transparent);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-glint) 0%, transparent);
+    opacity: 0.65;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .landing-night .hero-live-dot {
+    animation-name: hero-live-night;
+  }
+  /* Atmospheric motion discipline: entrances fade, never slide. */
+  .night-fade {
+    opacity: 0;
+    animation: night-fade 700ms var(--ease-out) forwards;
+    animation-delay: var(--d, 0ms);
+  }
+}
+@keyframes night-fade {
+  to {
+    opacity: 1;
   }
 }
 

@@ -22,11 +22,11 @@ function InputsVisual() {
     ["length", '"10s"'],
   ];
   return (
-    <div className="font-mono text-[13px] leading-[1.7] text-driftwood">
+    <div className="font-mono text-[13px] leading-[1.7] text-moth">
       {rows.map(([k, v]) => (
         <div key={k} className="flex gap-3">
-          <span className="text-fog">{k}</span>
-          <span className="text-ink">{v}</span>
+          <span className="text-dusk">{k}</span>
+          <span className="text-linen">{v}</span>
         </div>
       ))}
     </div>
@@ -44,9 +44,9 @@ function ScriptVisual() {
     <ul className="flex flex-col gap-2.5">
       {scenes.map(([t, c]) => (
         <li key={t} className="flex items-center gap-3 text-[14px]">
-          <span className="w-14 font-mono text-[12px] text-fog">{t}</span>
-          <span className="h-px flex-1 bg-ash" />
-          <span className="text-ink">{c}</span>
+          <span className="w-14 font-mono text-[12px] text-dusk">{t}</span>
+          <span className="h-px flex-1 bg-seam" />
+          <span className="text-linen">{c}</span>
         </li>
       ))}
     </ul>
@@ -58,14 +58,14 @@ function RenderVisual() {
     <div className="flex items-center gap-5">
       <Orb accent={TONE_ACCENTS.techy} className="size-20 shrink-0" float={false} />
       <div className="flex-1">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-ash">
-          <div className="h-full w-full rounded-full bg-ink" />
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-seam">
+          <div className="h-full w-full rounded-full bg-linen" />
         </div>
         <div className="mt-3 flex gap-2">
           {["1080p", "16:9", "10s"].map((c) => (
             <span
               key={c}
-              className="rounded-full border border-ash bg-white px-2.5 py-1 font-mono text-[11px] text-driftwood"
+              className="rounded-full border border-seam bg-night-3 px-2.5 py-1 font-mono text-[11px] text-moth"
             >
               {c}
             </span>
@@ -85,8 +85,8 @@ function ExportVisual() {
           className={
             "rounded-full px-3.5 py-2 text-[13px] font-medium " +
             (i === 0
-              ? "bg-ink text-parchment"
-              : "border border-ash bg-white text-ink")
+              ? "bg-linen text-night"
+              : "border border-seam bg-night-3 text-linen")
           }
         >
           {d}
@@ -131,7 +131,7 @@ export function PipelineSwitcher() {
   const [active, setActive] = useState(0);
   const stage = STAGES[active];
 
-  // The white pill is one element that slides to the active tab (instead of
+  // The elevated pill is one element that slides to the active tab (instead of
   // each tab toggling its own background), measured off the real buttons.
   const { listRef, btnRefs: tabRefs, pill } = useSlidingPill<HTMLDivElement>(active);
 
@@ -141,11 +141,10 @@ export function PipelineSwitcher() {
       className="mx-auto max-w-[var(--page-max)] scroll-mt-20 px-5 py-20 sm:px-8"
     >
       <div className="mb-8 max-w-2xl">
-        <p className="t-caption text-driftwood">The pipeline</p>
-        <h2 className="t-heading mt-3">Four stages, one click.</h2>
+        <h2 className="t-heading">Four stages, one click.</h2>
       </div>
 
-      <div className="rounded-card-lg bg-sand p-3 sm:p-4">
+      <div className="rounded-card-lg bg-night-2 p-3 sm:p-4">
         {/* Tabs — one sliding pill, buttons stay transparent above it */}
         <div
           ref={listRef}
@@ -156,7 +155,7 @@ export function PipelineSwitcher() {
           {pill && (
             <span
               aria-hidden
-              className="absolute left-0 top-0 rounded-badge bg-white shadow-[var(--shadow-inset)] transition-[transform,width,height] duration-[260ms] ease-out motion-reduce:transition-none"
+              className="absolute left-0 top-0 rounded-badge bg-night-3 transition-[transform,width,height] duration-[260ms] ease-out motion-reduce:transition-none"
               style={{
                 transform: `translate(${pill.x}px, ${pill.y}px)`,
                 width: pill.w,
@@ -177,11 +176,11 @@ export function PipelineSwitcher() {
                 onClick={() => setActive(i)}
                 className={
                   "relative z-[1] rounded-badge px-3.5 py-2 text-[14px] font-medium transition-[color,transform] " +
-                  "duration-[180ms] ease-out active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink " +
-                  (on ? "text-ink" : "text-driftwood hover:text-ink")
+                  "duration-[180ms] ease-out active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-linen " +
+                  (on ? "text-linen" : "text-moth hover:text-linen")
                 }
               >
-                <span className="mr-1.5 font-mono text-[11px] text-fog">
+                <span className="mr-1.5 font-mono text-[11px] text-dusk">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 {s.tab}
@@ -193,17 +192,17 @@ export function PipelineSwitcher() {
         {/* Panel */}
         <div
           key={stage.key}
-          className="dart-fade mt-3 grid gap-6 rounded-card bg-white p-6 sm:grid-cols-2 sm:p-8"
+          className="dart-fade mt-3 grid gap-6 rounded-card bg-night-3 p-6 sm:grid-cols-2 sm:p-8"
         >
           <div className="flex flex-col justify-center">
-            <h3 className="font-display text-[24px] font-light leading-tight tracking-tight text-ink">
+            <h3 className="font-display text-[24px] font-light leading-tight tracking-tight text-linen">
               {stage.title}
             </h3>
-            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-driftwood">
+            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-moth">
               {stage.body}
             </p>
           </div>
-          <div className="flex min-h-32 items-center rounded-[14px] bg-sand p-6">
+          <div className="flex min-h-32 items-center rounded-[14px] bg-night-2 p-6">
             {stage.visual}
           </div>
         </div>

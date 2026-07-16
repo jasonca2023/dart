@@ -15,11 +15,10 @@ export function StoreImport() {
       <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
         {/* Copy */}
         <div>
-          <p className="t-caption text-driftwood">Store import</p>
-          <h2 className="t-heading-lg mt-3 max-w-[14ch]">
+          <h2 className="t-heading-lg max-w-[14ch]">
             One link. An ad for every product.
           </h2>
-          <p className="mt-5 max-w-md text-[16px] leading-relaxed text-driftwood">
+          <p className="mt-5 max-w-md text-[16px] leading-relaxed text-moth">
             Paste your store&rsquo;s link and Dart reads the public catalogue.
             No OAuth, no API key, nothing to install. Pick the products you
             want and it generates an ad for each one, batch after batch.
@@ -30,8 +29,8 @@ export function StoreImport() {
               "Each product gets its own copy, palette and motion",
               "Skip any product; the rest keep rendering",
             ].map((t) => (
-              <li key={t} className="flex items-start gap-3 text-[15px] text-ink">
-                <Check className="mt-0.5 shrink-0 text-[18px] text-driftwood" />
+              <li key={t} className="flex items-start gap-3 text-[15px] text-linen">
+                <Check className="mt-0.5 shrink-0 text-[18px] text-moth" />
                 {t}
               </li>
             ))}
@@ -39,30 +38,30 @@ export function StoreImport() {
         </div>
 
         {/* Mock import */}
-        <div className="mx-auto w-full max-w-md rounded-card bg-white p-5 shadow-[var(--shadow-elevated)]">
-          <div className="flex items-baseline justify-between gap-3 rounded-input border border-ash bg-parchment px-4 py-3">
-            <span className="truncate font-mono text-[13px] text-driftwood">
+        <div className="mx-auto w-full max-w-md rounded-card bg-night-2 p-5">
+          <div className="flex items-baseline justify-between gap-3 rounded-input border border-seam bg-night px-4 py-3">
+            <span className="truncate font-mono text-[13px] text-moth">
               https://atlas-goods.com
             </span>
-            <span className="shrink-0 text-[12px] font-medium text-ink">Import</span>
+            <span className="shrink-0 text-[12px] font-medium text-linen">Import</span>
           </div>
           <ul className="mt-4 flex flex-col">
             {ROWS.map(({ name, price }) => (
               <li
                 key={name}
-                className="flex items-center justify-between border-t border-ash py-3 first:border-t-0"
+                className="flex items-center justify-between border-t border-seam py-3 first:border-t-0"
               >
                 <div className="flex items-center gap-3">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-ink text-parchment">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-linen text-night">
                     <Check className="text-[13px]" />
                   </span>
-                  <span className="text-[14px] text-ink">{name}</span>
+                  <span className="text-[14px] text-linen">{name}</span>
                 </div>
-                <span className="font-mono text-[12px] text-fog">{price}</span>
+                <span className="font-mono text-[12px] text-dusk">{price}</span>
               </li>
             ))}
           </ul>
-          <p className="mt-2 border-t border-ash pt-3 text-center font-mono text-[12px] text-fog">
+          <p className="mt-2 border-t border-seam pt-3 text-center font-mono text-[12px] text-dusk">
             + 96 more from the catalogue
           </p>
         </div>

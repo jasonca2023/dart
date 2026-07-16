@@ -5,7 +5,7 @@ import { ArrowRight } from "../icons";
 // behind an account now, so the landing CTAs open the create-account door.
 export function SignInCta({ label = "Get started free" }: { label?: string }) {
   return (
-    <ButtonLink href="/auth?mode=signup" size="lg">
+    <ButtonLink href="/auth?mode=signup" variant="moon" size="lg">
       {label}
       <ArrowRight className="text-[18px]" />
     </ButtonLink>

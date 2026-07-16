@@ -18,8 +18,8 @@ const AdPreview = dynamic(() => import("../app/AdPreview"), {
 // black box, if it's ever glimpsed.
 function StagePlaceholder() {
   return (
-    <div className="grid aspect-video w-full place-items-center bg-sand">
-      <span className="size-6 animate-pulse rounded-full bg-mist" aria-hidden />
+    <div className="grid aspect-video w-full place-items-center bg-night-2">
+      <span className="size-6 animate-pulse rounded-full bg-seam" aria-hidden />
     </div>
   );
 }
@@ -192,9 +192,9 @@ export function MoodDemo() {
     <section id="moods" className="scroll-mt-20 py-20">
       <div className="mx-auto mb-10 max-w-[var(--page-max)] px-5 sm:px-8">
         <div className="max-w-2xl">
-          <p className="t-caption text-driftwood">Ad moods · live demo</p>
+          <p className="t-caption text-dusk">Ad moods · live demo</p>
           <h2 className="t-heading mt-3">This is a real ad, rendering right now.</h2>
-          <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-driftwood">
+          <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-moth">
             Not a screen recording. This is the actual Dart engine, running in
             your browser on a sample product. Tell Dart who the ad is for and it
             picks the mood: palette, typography, pacing, motion. Try one.
@@ -203,7 +203,7 @@ export function MoodDemo() {
       </div>
 
       <div className="mx-auto max-w-[var(--page-max)] px-5 sm:px-8">
-        <div className="rounded-card-lg bg-sand p-4 sm:p-8">
+        <div className="rounded-card-lg bg-night-2 p-4 sm:p-8">
           {/* Mood picker — the orbs, now doing the actual job */}
           <ul
             ref={listRef}
@@ -212,7 +212,7 @@ export function MoodDemo() {
             {pill && (
               <span
                 aria-hidden
-                className="pointer-events-none absolute left-0 top-0 rounded-card bg-white shadow-[var(--shadow-inset)] transition-[transform,width,height] duration-[260ms] ease-out motion-reduce:transition-none"
+                className="pointer-events-none absolute left-0 top-0 rounded-card bg-night-3 transition-[transform,width,height] duration-[260ms] ease-out motion-reduce:transition-none"
                 style={{
                   transform: `translate(${pill.x}px, ${pill.y}px)`,
                   width: pill.w,
@@ -233,8 +233,8 @@ export function MoodDemo() {
                     onClick={() => setActive(i)}
                     className={
                       "relative z-[1] flex w-28 flex-col items-center rounded-card px-2 py-4 text-center transition-[background-color,transform] " +
-                      "duration-[180ms] ease-out active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:w-full " +
-                      (on ? "" : "hover:bg-white/50")
+                      "duration-[180ms] ease-out active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-linen sm:w-full " +
+                      (on ? "" : "hover:bg-night-3/60")
                     }
                   >
                     <Orb
@@ -244,7 +244,7 @@ export function MoodDemo() {
                     />
                     <span
                       className={
-                        "mt-3 text-[14px] font-medium " + (on ? "text-ink" : "text-driftwood")
+                        "mt-3 text-[14px] font-medium " + (on ? "text-linen" : "text-moth")
                       }
                     >
                       {m.name}
@@ -274,7 +274,7 @@ export function MoodDemo() {
                 <StagePlaceholder />
               )}
             </div>
-            <p className="mt-3 text-center font-mono text-[12px] text-driftwood">
+            <p className="mt-3 text-center font-mono text-[12px] text-dusk">
               audience: “{mood.audience}” → {mood.tone} · {mood.note}
             </p>
           </div>

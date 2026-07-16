@@ -1,59 +1,32 @@
 import Link from "next/link";
 import { Logo } from "../ui/Logo";
 
-const GROUPS = [
-  {
-    heading: "Product",
-    links: [
-      { href: "/#pipeline", label: "Pipeline" },
-      { href: "/#moods", label: "Ad moods" },
-      { href: "/#dashboard", label: "Dashboard" },
-    ],
-  },
-  {
-    heading: "Account",
-    links: [
-      { href: "/auth", label: "Log in" },
-      { href: "/auth?mode=signup", label: "Sign up" },
-    ],
-  },
-];
-
+// Hallmark footer — Previous: index-column groups (the AI-footer shape).
+// This build: Ft5 Statement — one closing display sentence, then a quiet meta
+// row. Knobs: sentence width=16ch · wordmark under sentence · no rule above
+// meta (tonal shift only — atmospheric avoids hairlines where it can).
 export function SiteFooter() {
   return (
-    <footer className="border-t border-ash">
-      <div className="mx-auto max-w-[var(--page-max)] px-5 py-14 sm:px-8">
-        <div className="flex flex-col gap-10 sm:flex-row sm:justify-between">
-          <div className="max-w-xs">
-            <Logo />
-            <p className="mt-4 text-[14px] leading-relaxed text-driftwood">
-              A one-click ad factory. One product photo in, one finished animated
-              ad out.
-            </p>
-          </div>
-          <div className="flex gap-16">
-            {GROUPS.map((g) => (
-              <div key={g.heading}>
-                <p className="t-caption text-fog">{g.heading}</p>
-                <ul className="mt-4 flex flex-col gap-2.5">
-                  {g.links.map((l) => (
-                    <li key={l.label}>
-                      <Link
-                        href={l.href}
-                        className="text-[14px] text-driftwood transition-colors duration-150 ease-out hover:text-ink"
-                      >
-                        {l.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-12 flex flex-col gap-2 border-t border-ash pt-6 text-[12px] text-fog sm:flex-row sm:items-center sm:justify-between">
-          <span>© {2026} Dart.</span>
-          <span className="font-mono">Built for merchants who ship.</span>
+    <footer className="mx-auto max-w-[var(--page-max)] px-5 pb-10 pt-20 sm:px-8">
+      <p className="max-w-[16ch] text-balance font-display text-[clamp(2rem,5vw,3.25rem)] font-light leading-[1.05] tracking-[-0.02em] text-linen">
+        Aim at a product. Let it fly.
+      </p>
+      <div className="mt-12 flex flex-col gap-4 text-[13px] text-dusk sm:flex-row sm:items-baseline sm:justify-between">
+        <Logo className="text-linen" />
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+          <Link
+            href="/auth"
+            className="text-moth transition-colors duration-150 ease-out hover:text-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-linen"
+          >
+            Log in
+          </Link>
+          <Link
+            href="/auth?mode=signup"
+            className="text-moth transition-colors duration-150 ease-out hover:text-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-linen"
+          >
+            Sign up
+          </Link>
+          <span>© 2026 Dart</span>
         </div>
       </div>
     </footer>

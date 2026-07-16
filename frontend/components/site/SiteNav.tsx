@@ -1,41 +1,26 @@
 import Link from "next/link";
 import { Logo } from "../ui/Logo";
 import { ButtonLink } from "../ui/Button";
-import { AccountMenu } from "../app/AccountMenu";
 
-// Hallmark nav — Previous: N1a (wordmark + inline links + button-right +
-// full-width hairline border, the AI default). This build: N5 Floating pill,
-// because Dart's landing is restrained editorial-minimal and a detached,
-// blur-backed pill reads as deliberate chrome rather than the template, while
-// keeping the three section anchors + auth. Knobs: width=inset-to-page-max ·
-// backdrop=blur+saturate · anchor=top.
-const LINKS = [
-  { href: "/#pipeline", label: "Pipeline" },
-  { href: "/#moods", label: "Ad moods" },
-  { href: "/#dashboard", label: "Dashboard" },
-];
-
+// Hallmark nav — Previous: N5 Floating pill (detached blur pill over parchment).
+// This build: N9 Edge-aligned minimal, because the night canvas and the orb own
+// the fold — chrome should disappear into it, not float above it. Wordmark
+// hard-left, auth pair hard-right, nothing in between; the absence is the
+// design. Knobs: CTA=filled linen pill · wordmark=sans · padding=spacious.
 export function SiteNav() {
   return (
-    <header className="sticky top-0 z-50 px-4 pt-3 sm:px-6 sm:pt-4">
-      <nav className="mx-auto flex h-14 max-w-[var(--page-max)] items-center gap-6 rounded-full border border-ash bg-parchment/80 pl-5 pr-2 shadow-[var(--shadow-ring)] backdrop-blur-md backdrop-saturate-[1.4] sm:pl-6 sm:pr-3">
-        <Logo />
-        <ul className="hidden items-center gap-1 md:flex">
-          {LINKS.map((l) => (
-            <li key={l.href}>
-              <Link
-                href={l.href}
-                className="rounded-full px-3 py-1.5 text-[14px] text-driftwood transition-colors duration-150 ease-out hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              >
-                {l.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-        <div className="ml-auto flex items-center gap-2">
-          <AccountMenu />
-          <ButtonLink href="/auth?mode=signup" variant="primary" size="sm">
-            Sign up
+    <header className="relative z-50 px-5 pt-5 sm:px-8 sm:pt-6">
+      <nav className="mx-auto flex max-w-[var(--page-max)] items-center justify-between">
+        <Logo className="text-linen" />
+        <div className="flex items-center gap-5">
+          <Link
+            href="/auth"
+            className="text-[14px] text-moth transition-colors duration-150 ease-out hover:text-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-linen"
+          >
+            Log in
+          </Link>
+          <ButtonLink href="/auth?mode=signup" variant="moon" size="sm">
+            Start free
           </ButtonLink>
         </div>
       </nav>
