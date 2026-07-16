@@ -83,113 +83,40 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* ── Theme role tokens, registered as animatable ───────────── */
-/* `color` (and `fill`/`stroke`) INHERIT. A plain `transition: color` on
- * every element (the earlier attempt) meant each unstyled wrapper between
- * `.landing` and a leaf like `h1` had its own competing transition too —
- * every intermediate frame of a parent's fade re-triggered the child's own
- * transition toward a slightly-shifted target, compounding across nesting
- * depth into 1000ms+ instead of the declared 240ms (measured on the live
- * hero h1). Fix: transition the SOURCE variable itself, once, at the one
- * place it's reassigned (`:root` for the app tokens, `.landing` below for
- * the landing tokens) — same pattern the orb's --hot/--cool already use.
- * Every var(--color-x) consumer then just reads an already-smooth value
- * each frame; there's nothing left to chain. */
-@property --color-parchment {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #fdfcfc;
-}
-@property --color-sand {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #f5f3f1;
-}
-@property --color-sand-2 {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #efece9;
-}
-@property --color-ash {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #e5e5e5;
-}
-@property --color-ink {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #000000;
-}
-@property --color-ink-2 {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(21% 0 0);
-}
-@property --color-driftwood {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #777169;
-}
-@property --color-fog {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #a59f97;
-}
-@property --color-mist {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #b1b0b0;
-}
-@property --color-white {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #ffffff;
-}
-@property --color-night {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(13% 0.012 82);
-}
-@property --color-night-2 {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(17% 0.014 82);
-}
-@property --color-night-3 {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(22% 0.016 82);
-}
-@property --color-seam {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(34% 0.02 82);
-}
-@property --color-linen {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(93% 0.012 82);
-}
-@property --color-linen-2 {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(97% 0.008 82);
-}
-@property --color-moth {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(74% 0.016 82);
-}
-@property --color-dusk {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(60% 0.018 82);
-}
-@property --color-glint {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: oklch(60% 0.19 25);
-}
+/* ── Theme role tokens — deliberately NOT animated at the source ──
+ * Went through two architectures here before landing on this one:
+ * 1. Blanket `transition: color` on every element (`*`). `color` inherits,
+ *    so every unstyled wrapper between `.landing` and a leaf like `h1` got
+ *    its own competing transition too — each intermediate frame of a
+ *    parent's fade re-triggered the child's own transition toward a
+ *    shifted target, compounding across nesting depth into 1000ms+ instead
+ *    of the declared 240ms.
+ * 2. "Fix" that traded one bug for another: register these as @property
+ *    <color> and transition the CUSTOM PROPERTY itself once, at its single
+ *    reassignment point (`:root`/`.landing`), so every consumer just reads
+ *    an already-smooth value. This fixed inheritance chains — but any
+ *    element with ITS OWN local transition covering the same property
+ *    (buttons, pills, inputs — all their ordinary hover/press feedback)
+ *    now had TWO overlapping animations on one property: the variable
+ *    continuously moving underneath them for its own duration, retriggering
+ *    their local transition every frame. Measured live: inputs/pills
+ *    settling ~475ms against the page background's ~305ms.
+ * 3. This one: DON'T animate the source at all — let --color-x snap
+ *    instantly (plain custom properties, no @property). Instead give
+ *    `color` exactly ONE explicit transition, at the one place it's
+ *    actually assigned (`body` for the app, `.landing` below for the
+ *    landing) — proven in isolation to settle a plain inheriting child in
+ *    lockstep with its parent, no chain, since inheritance just reads the
+ *    parent's live value each frame. `background-color`/`border-color`
+ *    don't inherit at all, so they get a blanket rule with no chain risk
+ *    either way (see the box-shadow rule below, now widened back to
+ *    include them). The payoff: an element with its OWN local
+ *    transition (buttons, pills, inputs) now has NOTHING to compound
+ *    with — the source doesn't move, so it just runs its own declared
+ *    duration once and stops. Verified in isolation: a plain inheriting
+ *    node settled at ~168ms (matching its parent's 180ms transition) and
+ *    a button-like node with its own 140ms transition settled at ~133ms —
+ *    both close together, neither compounding. */
 
 :root {
   /* ── Type scale ─────────────────────────────────────────── */
@@ -807,65 +734,39 @@ h3 {
 }
 
 /* ── Theme switch — cross-fade colors instead of snapping ─── */
-/* Only `box-shadow` belongs in a blanket per-element transition. The
- * --shadow-* tokens are plain (untyped) custom properties — they swap
- * instantly, so an element consuming one needs its OWN transition to fade.
- * background-color and border-color used to be listed here too, but every
- * color token they'd consume (--color-parchment, --color-ash, etc.) is
- * ALREADY animating at its source (the @property block above + the :root/
- * .landing transitions below) — giving the CONSUMING element a second,
- * redundant transition on the same property retriggers every single frame
- * the source variable moves, and the two overlapping animations sum their
- * durations instead of running once. That's exactly what made the app
- * header's background take ~600ms to settle instead of the declared
- * 240ms (measured live) — the visible "changes, stalls, then finishes"
- * the user reported. `color`/`fill`/`stroke` were never listed here either,
- * for the inheritance version of the same mistake (see the @property
- * block's comment). Must live in @layer base: an unlayered rule here would
- * beat Tailwind's own utilities layer on EVERY element regardless of
- * selector specificity, which silently forced buttons/nav links off their
- * intended fast 140–150ms hover transition and onto this slower one. */
-/* --ease-out (fast start, gentle settle), NOT --ease-in-out. The in-out
- * curve (0.77, 0, 0.175, 1) barely moves for its first third — on a theme
- * flip that flat ramp reads as "a beat of delay, then it changes." ease-out
- * starts immediately, so the fade feels instant. */
+/* background-color/border-color/box-shadow don't inherit, so a blanket
+ * per-element transition is safe for them — each element resolves its own
+ * value directly, nothing to chain through a parent, and (now that the
+ * source tokens no longer animate on their own, see the comment above the
+ * @theme block) nothing to compound with either. `color` is deliberately
+ * NOT in this blanket list — it inherits, and a blanket `transition: color`
+ * on every element is what caused the original 1000ms+ compounding bug.
+ * Instead `color` gets exactly one explicit transition below, at the one
+ * place it's actually assigned (`body`, `.landing`); every descendant that
+ * merely inherits color rides that single fade for free. Must live in
+ * @layer base: an unlayered rule here would beat Tailwind's own utilities
+ * layer on EVERY element regardless of selector specificity, which
+ * silently forced buttons/nav links off their intended fast 140–150ms
+ * hover transition and onto this slower one. --ease-out (fast start,
+ * gentle settle), not --ease-in-out — the in-out curve barely moves for
+ * its first third, which on a theme flip reads as "a beat of delay, then
+ * it changes." */
 @media (prefers-reduced-motion: no-preference) {
   @layer base {
     *,
     *::before,
     *::after {
-      transition-property: box-shadow;
+      transition-property: background-color, border-color, box-shadow;
       transition-duration: var(--dur-fast);
       transition-timing-function: var(--ease-out);
     }
   }
 
-  :root {
-    transition:
-      --color-parchment var(--dur-fast) var(--ease-out),
-      --color-sand var(--dur-fast) var(--ease-out),
-      --color-sand-2 var(--dur-fast) var(--ease-out),
-      --color-ash var(--dur-fast) var(--ease-out),
-      --color-ink var(--dur-fast) var(--ease-out),
-      --color-ink-2 var(--dur-fast) var(--ease-out),
-      --color-driftwood var(--dur-fast) var(--ease-out),
-      --color-fog var(--dur-fast) var(--ease-out),
-      --color-mist var(--dur-fast) var(--ease-out),
-      --color-white var(--dur-fast) var(--ease-out);
-  }
-
-
+  body,
   .landing {
-    transition:
-      --color-night var(--dur-fast) var(--ease-out),
-      --color-night-2 var(--dur-fast) var(--ease-out),
-      --color-night-3 var(--dur-fast) var(--ease-out),
-      --color-seam var(--dur-fast) var(--ease-out),
-      --color-linen var(--dur-fast) var(--ease-out),
-      --color-linen-2 var(--dur-fast) var(--ease-out),
-      --color-moth var(--dur-fast) var(--ease-out),
-      --color-dusk var(--dur-fast) var(--ease-out),
-      --color-glint var(--dur-fast) var(--ease-out);
+    transition-property: color;
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease-out);
   }
 }
 

@@ -26,12 +26,18 @@ export function Field({
 }
 
 // Flat, editorial input — 4px radius keeps it distinct from pills and cards.
+// Only border-color actually changes state here (hover/focus) — bg/text stay
+// constant. Tailwind's `transition-colors` bundled background-color/color in
+// too, which don't need a local transition and only served to compound with
+// the theme-token's own animation on a switch (measured settling ~475ms vs
+// the page background's ~305ms). Scoping to just border-color lets bg/text
+// track the theme fade cleanly instead.
 export function Input({ className, ...rest }: ComponentProps<"input">) {
   return (
     <input
       className={
         "w-full rounded-input border border-ash bg-white px-4 py-3 text-[15px] " +
-        "text-ink placeholder:text-fog outline-none transition-colors duration-150 ease-out " +
+        "text-ink placeholder:text-fog outline-none transition-[border-color] duration-150 ease-out " +
         "hover:border-mist focus:border-ink focus-visible:outline-none " +
         (className ?? "")
       }
@@ -50,7 +56,7 @@ export function Select({
       <select
         className={
           "w-full appearance-none rounded-input border border-ash bg-white px-4 py-3 " +
-          "pr-10 text-[15px] text-ink outline-none transition-colors duration-150 ease-out " +
+          "pr-10 text-[15px] text-ink outline-none transition-[border-color] duration-150 ease-out " +
           "hover:border-mist focus:border-ink " +
           (className ?? "")
         }
