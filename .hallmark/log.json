@@ -2,6 +2,16 @@
   {
     "date": "2026-07-16",
     "macrostructure": "Marquee Hero",
+    "theme": "Broadsheet (custom)",
+    "genre": "atmospheric",
+    "enrichment": "existing WebGL orb centerpiece (kept per user request)",
+    "nav": "N9 edge-aligned minimal",
+    "footer": "Ft5 statement",
+    "brief": "Dart · hallmark redesign, scoped to dark mode only (font/macrostructure/nav/footer/light-mode explicitly out of scope per brief): 'advertising newspaper' construction — dark newsprint canvas (hue 82, was Afterglow's ember-adjacent hue 55) with a halftone dot-grain texture replacing the prior soft-glow formula, cream reversed-print text, and a masthead red (hue 25) replacing the fixed violet as the dark mode's accent (--color-glint); orb's own violet/ember (--color-violet/--color-ember) untouched"
+  },
+  {
+    "date": "2026-07-16",
+    "macrostructure": "Marquee Hero",
     "theme": "Afterglow (custom)",
     "genre": "atmospheric",
     "enrichment": "existing WebGL orb centerpiece (kept per user request)",

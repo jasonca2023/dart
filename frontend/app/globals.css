@@ -1,23 +1,27 @@
-/* Hallmark · macrostructure: Marquee Hero · genre: atmospheric · theme: Bloom ⇄ Afterglow (custom)
+/* Hallmark · macrostructure: Marquee Hero · genre: atmospheric · theme: Bloom ⇄ Broadsheet (custom)
  * (user-toggleable via <html data-theme="bloom|night">; Bloom is the default)
  * nav: N9 edge-aligned minimal · footer: Ft5 statement · enrichment: WebGL orb centerpiece (user-kept)
  * H1 knobs: size=xl-clamp · alignment=centred (atmospheric loosens gate 6) · underlay=none
  * tone: luminous-technical · audience: solo e-commerce merchants · use: start-free signup
  * pre-emit critique: P5 H4 E4 S4 R4 V5
  * The landing tokens are ROLES (canvas/surface/elevated/text tiers): Bloom values apply
- * when data-theme ≠ night; under data-theme="night" they fall through to the Afterglow
- * values in @theme. Afterglow is a bespoke dark construction, not a catalog theme: two
- * re-hues of the same "two diffuse corner blooms on cool near-black" formula (Midnight
- * hue 275, then Aurora hue 205) both still read as generic "AI dark mode" — the
- * formula was the problem, not the hue. Afterglow instead treats the WebGL orb as the
- * canvas's one light source: a single warm-to-cool glow radiating from where the orb
- * sits, over a warm-anchored near-black (hue 55, matching the orb's ember half and
- * Dart's own light-mode paper) instead of the prior cool-anchored blue-black. The
- * brand's fixed violet/ember orb accent is untouched, see --color-glint below. The
- * signed-in app re-values its parchment tokens under the same attribute, so one toggle
- * flips both surfaces.
- * Previous builds: Bloom relight · Midnight marquee · Aurora re-hue · studied-DNA
- * parchment — see .hallmark/log.json
+ * when data-theme ≠ night; under data-theme="night" they fall through to the Broadsheet
+ * values in @theme. `hallmark redesign` — scoped, single-file restyle of dark mode only;
+ * font stack, macrostructure, nav, footer, and the light-mode (Bloom) theme are all
+ * explicitly out of scope per the brief and untouched. Broadsheet replaces the previous
+ * Afterglow build's soft single-glow-from-the-orb formula with a flat "advertising
+ * newspaper" construction: a dark warm-grey newsprint canvas (hue 82, not Afterglow's
+ * ember-adjacent hue 55) with a fine halftone dot-grain texture standing in for
+ * atmospheric blur, cream "reversed-print" text, and a bold masthead red
+ * (--color-glint, hue 25) as the dark mode's one accent — replacing the previous fixed
+ * violet accent there. The orb's own violet/ember glow (--color-violet/--color-ember,
+ * .hero-glow, .orb) is untouched: a vivid photographed "product shot" sitting on
+ * matte printed stock is the whole joke of an advertising-newspaper page. The
+ * signed-in app re-values its parchment tokens under the same attribute (re-hued to
+ * match) but does NOT get the halftone texture — that's a marketing-page motif, not a
+ * working-UI one.
+ * Previous builds: Bloom relight · Midnight marquee · Aurora re-hue · Afterglow
+ * bespoke · studied-DNA parchment — see .hallmark/log.json
  */
 @import "tailwindcss";
 
@@ -37,21 +41,20 @@
   --color-white: #ffffff; /* elevated card */
 
   /* ── Night set (landing only — the app keeps parchment) ──── */
-  /* Afterglow — warm-anchored hue 55, low chroma so it stays a refined
-   * near-black rather than turning muddy brown. Chosen over two rounds of
-   * hue-only swaps (Midnight 275, Aurora 205) that all kept the same cool,
-   * two-corner-bloom construction and kept reading as generic dark mode.
-   * --color-glint stays untouched: it's the fixed brand accent tied to the
-   * hero orb, not part of the canvas identity. */
-  --color-night: oklch(14% 0.008 55); /* canvas */
-  --color-night-2: oklch(18% 0.01 55); /* elevated card */
-  --color-night-3: oklch(23% 0.012 55); /* higher elevation / pill */
-  --color-seam: oklch(30% 0.012 55); /* border on night */
-  --color-linen: oklch(95% 0.006 55); /* primary text on night */
-  --color-linen-2: oklch(98% 0.004 55); /* filled-CTA hover */
-  --color-moth: oklch(76% 0.012 55); /* secondary text on night */
-  --color-dusk: oklch(64% 0.014 55); /* tertiary / meta on night */
-  --color-glint: oklch(74% 0.13 275); /* brand violet, lifted for dark — unchanged */
+  /* Broadsheet — dark newsprint, hue 82 (warm kraft-paper grey, not
+   * Afterglow's ember-adjacent hue 55). --color-glint moves from the fixed
+   * violet(275) to a masthead red (25) here: it's the dark mode's own
+   * accent flourish (hero-accent word, live-dot), a separate concept from
+   * the orb's own --color-violet/--color-ember, which stay untouched. */
+  --color-night: oklch(13% 0.012 82); /* canvas */
+  --color-night-2: oklch(17% 0.014 82); /* elevated card */
+  --color-night-3: oklch(22% 0.016 82); /* higher elevation / pill */
+  --color-seam: oklch(34% 0.02 82); /* border on night — a print rule, not a soft hairline */
+  --color-linen: oklch(93% 0.012 82); /* primary text on night — reversed-print cream */
+  --color-linen-2: oklch(97% 0.008 82); /* filled-CTA hover */
+  --color-moth: oklch(74% 0.016 82); /* secondary text on night */
+  --color-dusk: oklch(60% 0.018 82); /* tertiary / meta on night — byline/dateline */
+  --color-glint: oklch(60% 0.19 25); /* masthead red — dark mode accent */
 
   /* ── Type families (wired to next/font in layout.tsx) ────── */
   --font-display: var(--font-bricolage), ui-sans-serif, system-ui, -apple-system,
@@ -145,47 +148,47 @@
 @property --color-night {
   syntax: "<color>";
   inherits: true;
-  initial-value: oklch(14% 0.008 55);
+  initial-value: oklch(13% 0.012 82);
 }
 @property --color-night-2 {
   syntax: "<color>";
   inherits: true;
-  initial-value: oklch(18% 0.01 55);
+  initial-value: oklch(17% 0.014 82);
 }
 @property --color-night-3 {
   syntax: "<color>";
   inherits: true;
-  initial-value: oklch(23% 0.012 55);
+  initial-value: oklch(22% 0.016 82);
 }
 @property --color-seam {
   syntax: "<color>";
   inherits: true;
-  initial-value: oklch(30% 0.012 55);
+  initial-value: oklch(34% 0.02 82);
 }
 @property --color-linen {
   syntax: "<color>";
   inherits: true;
-  initial-value: oklch(95% 0.006 55);
+  initial-value: oklch(93% 0.012 82);
 }
 @property --color-linen-2 {
   syntax: "<color>";
   inherits: true;
-  initial-value: oklch(98% 0.004 55);
+  initial-value: oklch(97% 0.008 82);
 }
 @property --color-moth {
   syntax: "<color>";
   inherits: true;
-  initial-value: oklch(76% 0.012 55);
+  initial-value: oklch(74% 0.016 82);
 }
 @property --color-dusk {
   syntax: "<color>";
   inherits: true;
-  initial-value: oklch(64% 0.014 55);
+  initial-value: oklch(60% 0.018 82);
 }
 @property --color-glint {
   syntax: "<color>";
   inherits: true;
-  initial-value: oklch(74% 0.13 275);
+  initial-value: oklch(60% 0.19 25);
 }
 
 :root {
@@ -683,7 +686,7 @@ h3 {
 
 /* Light mode (Bloom): warm paper, ink text, the same two whisper blooms.
  * Scoped to "not night" so the overrides vanish in dark mode and the role
- * tokens fall through to the Afterglow values defined in @theme. */
+ * tokens fall through to the Broadsheet values defined in @theme. */
 :root:not([data-theme="night"]) .landing {
   --color-night: oklch(97.5% 0.006 75);
   --color-night-2: oklch(94.5% 0.009 75);
@@ -709,48 +712,51 @@ h3 {
   background-attachment: fixed, fixed, scroll;
 }
 
-/* Dark mode (Afterglow) — the token values in @theme are already the dark
- * set; this rule paints the canvas as the orb's own light spilling onto it.
- * One glow, hero-centered, warm core (ember) fading through a cool rim
- * (violet) into the warm-black canvas — not two independent corner blooms.
- * Deliberately NOT background-attachment: fixed — the glow is anchored to
- * where the orb sits in the hero, so it should scroll away with the hero
- * rather than hang fixed behind sections that have no orb. */
+/* Dark mode (Broadsheet) — flat newsprint stock instead of Afterglow's
+ * soft glow-from-the-orb formula. A halftone dot-grain stands in for the
+ * atmospheric blur every prior dark build used (Midnight/Aurora/Afterglow
+ * all diffused a radial blur somewhere) — print doesn't blur, it screens
+ * ink into dots, so the texture itself is the "genuinely different"
+ * construction, not just another re-hue. Deliberately background-color +
+ * background-image (not the `background` shorthand) so this composes
+ * cleanly with nothing else needing to layer in here. Grain scrolls with
+ * the page — it's the paper's own texture, not a fixed light source. */
 :root[data-theme="night"] .landing {
-  background:
-    radial-gradient(
-      75% 60% at 50% 32%,
-      color-mix(in oklab, var(--color-ember) 10%, transparent) 0%,
-      color-mix(in oklab, var(--color-violet) 6%, transparent) 45%,
-      transparent 72%
-    ),
-    var(--color-night);
+  background-color: var(--color-night);
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in oklab, var(--color-linen) 8%, transparent) 1px,
+    transparent 1.4px
+  );
+  background-size: 5px 5px;
 }
 
 /* ── Night mode for the signed-in app ─────────────────────── */
 /* Tailwind v4 utilities emit var() references, so re-valuing the parchment
  * tokens under the theme attribute flips every app screen (AppShell, Generate,
  * /ads, /account, /auth, /jobs) with zero component edits. Values mirror the
- * Afterglow role set in @theme. Elevation on dark = lighter surface, so the
- * ring/elevated shadows become faint light outlines instead of drop shadows. */
+ * Broadsheet role set in @theme. Elevation on dark = lighter surface, so
+ * the ring/elevated shadows become faint light outlines instead of drop
+ * shadows. No halftone texture here — that's a marketing-page motif; the
+ * working app UI (forms, dashboard) just gets the re-hued flat tokens. */
 :root[data-theme="night"] {
   color-scheme: dark;
-  --color-parchment: oklch(14% 0.008 55);
-  --color-sand: oklch(18% 0.01 55);
-  --color-sand-2: oklch(23% 0.012 55);
-  --color-ash: oklch(30% 0.012 55);
-  --color-ink: oklch(95% 0.006 55);
-  --color-ink-2: oklch(89% 0.005 55); /* filled-control hover on night */
-  --color-driftwood: oklch(76% 0.012 55);
-  --color-fog: oklch(64% 0.014 55);
-  --color-mist: oklch(64% 0.014 55);
-  --color-white: oklch(23% 0.012 55);
+  --color-parchment: oklch(13% 0.012 82);
+  --color-sand: oklch(17% 0.014 82);
+  --color-sand-2: oklch(22% 0.016 82);
+  --color-ash: oklch(34% 0.02 82);
+  --color-ink: oklch(93% 0.012 82);
+  --color-ink-2: oklch(87% 0.014 82); /* filled-control hover on night */
+  --color-driftwood: oklch(74% 0.016 82);
+  --color-fog: oklch(60% 0.018 82);
+  --color-mist: oklch(60% 0.018 82);
+  --color-white: oklch(22% 0.016 82);
   --shadow-ring: rgba(255, 255, 255, 0.07) 0px 0px 0px 1px,
     rgba(0, 0, 0, 0.35) 0px 1px 2px 0px;
   --shadow-elevated: rgba(255, 255, 255, 0.09) 0px 0px 0px 1px,
     rgba(0, 0, 0, 0.45) 0px 2px 6px 0px;
   --shadow-inset: rgba(255, 255, 255, 0.12) 0px 0px 0px 0.5px inset;
-  --shadow-inset-warm: oklch(35% 0.012 55) 0px 0px 0px 0.5px inset;
+  --shadow-inset-warm: oklch(34% 0.02 82) 0px 0px 0px 0.5px inset;
 }
 
 /* ── Theme toggle (sun ⇄ moon morph) ──────────────────────── */
