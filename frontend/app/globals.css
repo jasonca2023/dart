@@ -820,37 +820,37 @@ h3 {
     *::before,
     *::after {
       transition-property: box-shadow;
-      transition-duration: var(--dur-base);
+      transition-duration: var(--dur-fast);
       transition-timing-function: var(--ease-out);
     }
   }
 
   :root {
     transition:
-      --color-parchment var(--dur-base) var(--ease-out),
-      --color-sand var(--dur-base) var(--ease-out),
-      --color-sand-2 var(--dur-base) var(--ease-out),
-      --color-ash var(--dur-base) var(--ease-out),
-      --color-ink var(--dur-base) var(--ease-out),
-      --color-ink-2 var(--dur-base) var(--ease-out),
-      --color-driftwood var(--dur-base) var(--ease-out),
-      --color-fog var(--dur-base) var(--ease-out),
-      --color-mist var(--dur-base) var(--ease-out),
-      --color-white var(--dur-base) var(--ease-out);
+      --color-parchment var(--dur-fast) var(--ease-out),
+      --color-sand var(--dur-fast) var(--ease-out),
+      --color-sand-2 var(--dur-fast) var(--ease-out),
+      --color-ash var(--dur-fast) var(--ease-out),
+      --color-ink var(--dur-fast) var(--ease-out),
+      --color-ink-2 var(--dur-fast) var(--ease-out),
+      --color-driftwood var(--dur-fast) var(--ease-out),
+      --color-fog var(--dur-fast) var(--ease-out),
+      --color-mist var(--dur-fast) var(--ease-out),
+      --color-white var(--dur-fast) var(--ease-out);
   }
 
 
   .landing {
     transition:
-      --color-night var(--dur-base) var(--ease-out),
-      --color-night-2 var(--dur-base) var(--ease-out),
-      --color-night-3 var(--dur-base) var(--ease-out),
-      --color-seam var(--dur-base) var(--ease-out),
-      --color-linen var(--dur-base) var(--ease-out),
-      --color-linen-2 var(--dur-base) var(--ease-out),
-      --color-moth var(--dur-base) var(--ease-out),
-      --color-dusk var(--dur-base) var(--ease-out),
-      --color-glint var(--dur-base) var(--ease-out);
+      --color-night var(--dur-fast) var(--ease-out),
+      --color-night-2 var(--dur-fast) var(--ease-out),
+      --color-night-3 var(--dur-fast) var(--ease-out),
+      --color-seam var(--dur-fast) var(--ease-out),
+      --color-linen var(--dur-fast) var(--ease-out),
+      --color-linen-2 var(--dur-fast) var(--ease-out),
+      --color-moth var(--dur-fast) var(--ease-out),
+      --color-dusk var(--dur-fast) var(--ease-out),
+      --color-glint var(--dur-fast) var(--ease-out);
   }
 }
 

@@ -92,11 +92,21 @@ export default async function RootLayout({
     >
       <head>
         {/* No-FOUC theme stamp: saved choice, else light — Dart defaults to
-            light regardless of OS scheme; dark is opt-in via the toggle. */}
+            light regardless of OS scheme; dark is opt-in via the toggle.
+            Signed-in only: something in the app-shell's post-hydration
+            render clears <html data-theme> a couple hundred ms after this
+            script sets it (reproduced — correct at paint, gone by
+            ~200ms, landing unaffected). Rather than chase that specific
+            React/Next timing, a MutationObserver self-heals it: any time
+            the attribute changes to something that doesn't match
+            localStorage, re-apply immediately. This can't fight a real
+            toggle — ThemeToggle sets the attribute and localStorage
+            together, so by the time this (async, microtask-queued)
+            callback runs, they already agree and the re-apply is a no-op. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              '(function(){try{var t=localStorage.getItem("dart-theme");document.documentElement.dataset.theme=t==="night"?"night":"bloom"}catch(e){}})()',
+              '(function(){try{var KEY="dart-theme";var apply=function(){var t=localStorage.getItem(KEY);var v=t==="night"?"night":"bloom";if(document.documentElement.dataset.theme!==v){document.documentElement.dataset.theme=v}};apply();new MutationObserver(function(muts){for(var i=0;i<muts.length;i++){if(muts[i].attributeName==="data-theme")apply()}}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]})}catch(e){}})()',
           }}
         />
       </head>
