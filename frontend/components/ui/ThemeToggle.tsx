@@ -25,13 +25,35 @@ export function ThemeToggle({
 
   const toggle = () => {
     const next: Theme = theme === "night" ? "bloom" : "night";
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem(KEY, next);
-    } catch {
-      // Blocked storage just loses persistence, not the toggle itself.
+    const apply = () => {
+      document.documentElement.dataset.theme = next;
+      try {
+        localStorage.setItem(KEY, next);
+      } catch {
+        // Blocked storage just loses persistence, not the toggle itself.
+      }
+      setTheme(next);
+    };
+    // View Transition: snapshot the page before/after and crossfade the WHOLE
+    // viewport as one image. Per-element CSS transitions fundamentally can't
+    // switch a theme in unison — every component has its own duration/easing
+    // for its own hover/press feedback, so some elements always visibly settle
+    // before others (measured spreads of 80–475ms across this app across three
+    // rounds of tuning). A single full-page crossfade can't desync by
+    // construction. Falls back to an instant flip where unsupported, and skips
+    // the animation entirely for reduced-motion users.
+    const canAnimate =
+      "startViewTransition" in document &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (canAnimate) {
+      (
+        document as Document & {
+          startViewTransition: (cb: () => void) => void;
+        }
+      ).startViewTransition(apply);
+    } else {
+      apply();
     }
-    setTheme(next);
   };
 
   return (

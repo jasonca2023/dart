@@ -83,40 +83,23 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* ── Theme role tokens — deliberately NOT animated at the source ──
- * Went through two architectures here before landing on this one:
- * 1. Blanket `transition: color` on every element (`*`). `color` inherits,
- *    so every unstyled wrapper between `.landing` and a leaf like `h1` got
- *    its own competing transition too — each intermediate frame of a
- *    parent's fade re-triggered the child's own transition toward a
- *    shifted target, compounding across nesting depth into 1000ms+ instead
- *    of the declared 240ms.
- * 2. "Fix" that traded one bug for another: register these as @property
- *    <color> and transition the CUSTOM PROPERTY itself once, at its single
- *    reassignment point (`:root`/`.landing`), so every consumer just reads
- *    an already-smooth value. This fixed inheritance chains — but any
- *    element with ITS OWN local transition covering the same property
- *    (buttons, pills, inputs — all their ordinary hover/press feedback)
- *    now had TWO overlapping animations on one property: the variable
- *    continuously moving underneath them for its own duration, retriggering
- *    their local transition every frame. Measured live: inputs/pills
- *    settling ~475ms against the page background's ~305ms.
- * 3. This one: DON'T animate the source at all — let --color-x snap
- *    instantly (plain custom properties, no @property). Instead give
- *    `color` exactly ONE explicit transition, at the one place it's
- *    actually assigned (`body` for the app, `.landing` below for the
- *    landing) — proven in isolation to settle a plain inheriting child in
- *    lockstep with its parent, no chain, since inheritance just reads the
- *    parent's live value each frame. `background-color`/`border-color`
- *    don't inherit at all, so they get a blanket rule with no chain risk
- *    either way (see the box-shadow rule below, now widened back to
- *    include them). The payoff: an element with its OWN local
- *    transition (buttons, pills, inputs) now has NOTHING to compound
- *    with — the source doesn't move, so it just runs its own declared
- *    duration once and stops. Verified in isolation: a plain inheriting
- *    node settled at ~168ms (matching its parent's 180ms transition) and
- *    a button-like node with its own 140ms transition settled at ~133ms —
- *    both close together, neither compounding. */
+/* ── Theme role tokens — never animated; theme switches crossfade ──
+ * The tokens snap instantly on a theme flip. Three CSS-transition
+ * architectures were tried and each left a measurable desync:
+ * 1. Blanket `transition: color` on `*` — color inherits, so nested
+ *    wrappers compounded each other's fades into 1000ms+ settles.
+ * 2. @property-registered tokens animated at their source — fixed
+ *    inheritance, but any element with its own hover/press transition on
+ *    the same property (buttons, pills, inputs) now had two overlapping
+ *    animations retriggering each other (inputs ~475ms vs bg ~305ms).
+ * 3. Single-point `color` transition + blanket non-inherited props —
+ *    eliminated compounding, but components' legitimately-different local
+ *    durations/easings still settled at visibly different times.
+ * The actual mechanism now is the View Transitions API (see the
+ * ::view-transition block below + ThemeToggle.tsx): the whole viewport
+ * crossfades as one snapshot, so per-element timing differences cannot
+ * exist during a theme switch, and every element keeps its own
+ * hover/press transitions for their real purpose. */
 
 :root {
   /* ── Type scale ─────────────────────────────────────────── */
@@ -733,40 +716,31 @@ h3 {
   opacity: 0;
 }
 
-/* ── Theme switch — cross-fade colors instead of snapping ─── */
-/* background-color/border-color/box-shadow don't inherit, so a blanket
- * per-element transition is safe for them — each element resolves its own
- * value directly, nothing to chain through a parent, and (now that the
- * source tokens no longer animate on their own, see the comment above the
- * @theme block) nothing to compound with either. `color` is deliberately
- * NOT in this blanket list — it inherits, and a blanket `transition: color`
- * on every element is what caused the original 1000ms+ compounding bug.
- * Instead `color` gets exactly one explicit transition below, at the one
- * place it's actually assigned (`body`, `.landing`); every descendant that
- * merely inherits color rides that single fade for free. Must live in
- * @layer base: an unlayered rule here would beat Tailwind's own utilities
- * layer on EVERY element regardless of selector specificity, which
- * silently forced buttons/nav links off their intended fast 140–150ms
- * hover transition and onto this slower one. --ease-out (fast start,
- * gentle settle), not --ease-in-out — the in-out curve barely moves for
- * its first third, which on a theme flip reads as "a beat of delay, then
- * it changes." */
-@media (prefers-reduced-motion: no-preference) {
-  @layer base {
-    *,
-    *::before,
-    *::after {
-      transition-property: background-color, border-color, box-shadow;
-      transition-duration: var(--dur-fast);
-      transition-timing-function: var(--ease-out);
-    }
-  }
-
-  body,
-  .landing {
-    transition-property: color;
-    transition-duration: var(--dur-fast);
-    transition-timing-function: var(--ease-out);
+/* ── Theme switch — one full-page crossfade (View Transitions) ── */
+/* Three rounds of per-element CSS transition tuning all left SOME spread:
+ * different components legitimately carry different durations/easings for
+ * their own hover/press feedback, so a token flip always had some elements
+ * visibly settling before others (80–475ms spreads, measured). Per-element
+ * transitions fundamentally cannot switch a theme in unison. So the toggle
+ * now wraps the flip in document.startViewTransition (ThemeToggle.tsx):
+ * the browser snapshots the page before and after and crossfades the WHOLE
+ * viewport as one image — nothing can lag anything else by construction.
+ * No per-element theme transitions remain (they'd animate inside the new
+ * snapshot and smear the crossfade); elements' own hover/press utilities
+ * are untouched. Unsupported browsers get an instant flip, which reads
+ * cleaner than a desynced fade; reduced-motion is skipped in the toggle
+ * AND disabled here (the global reduced-motion block below can't reach
+ * these pseudos — they're on the root's view-transition tree, not matched
+ * by *::before/after). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-base);
+  animation-timing-function: var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
   }
 }
 
