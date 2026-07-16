@@ -682,12 +682,18 @@ h3 {
  * unrelated dark. `.app-canvas` sits on each full-page app wrapper
  * (AppShell, the auth screen, the AuthGate loader) next to bg-parchment;
  * in light mode this rule doesn't match and the wrappers stay plain
- * paper. Ink at 8% here mirrors linen at 8% on the landing — identical
- * lightness in dark mode, so the grains match exactly. */
+ * paper. MUST reference --color-linen (like the landing's rule), NOT
+ * --color-ink: the production minifier statically resolves this
+ * color-mix using the token's @theme value, and ink's @theme value is
+ * the LIGHT-mode black — that compiled to invisible black-on-black dots
+ * in the deployed CSS (dev was fine; dev doesn't minify). Linen's @theme
+ * value is already the dark-mode cream, so it compiles correctly, and
+ * this rule only matches in dark mode where linen is cream at runtime
+ * too — right answer whether or not the minifier folds it. */
 :root[data-theme="night"] .app-canvas {
   background-image: radial-gradient(
     circle at 1px 1px,
-    color-mix(in oklab, var(--color-ink) 8%, transparent) 1px,
+    color-mix(in oklab, var(--color-linen) 8%, transparent) 1px,
     transparent 1.4px
   );
   background-size: 5px 5px;
