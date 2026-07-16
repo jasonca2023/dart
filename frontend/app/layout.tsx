@@ -62,8 +62,14 @@ export const metadata: Metadata = {
   // Favicon is auto-detected from app/icon.svg (file-convention metadata).
 };
 
+// Browser-chrome color follows the OS scheme; the in-app toggle can diverge
+// from it (meta themeColor can't react to a data attribute), which is fine —
+// first paint matches the no-FOUC script's own OS fallback.
 export const viewport: Viewport = {
-  themeColor: "#fdfcfc",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#16161f" },
+    { media: "(prefers-color-scheme: light)", color: "#fdfcfc" },
+  ],
 };
 
 export default async function RootLayout({

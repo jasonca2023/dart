@@ -19,6 +19,7 @@
   --color-sand-2: #efece9; /* one step deeper */
   --color-ash: #e5e5e5; /* hairline border */
   --color-ink: #000000; /* primary text / filled controls */
+  --color-ink-2: oklch(21% 0 0); /* filled-control hover (≈ #1a1a1a) */
   --color-driftwood: #777169; /* secondary text */
   --color-fog: #a59f97; /* tertiary helper text */
   --color-mist: #b1b0b0; /* subtle dividers */
@@ -616,6 +617,7 @@ h3 {
   --color-sand-2: oklch(22% 0.021 275);
   --color-ash: oklch(31% 0.02 275);
   --color-ink: oklch(94% 0.01 275);
+  --color-ink-2: oklch(88% 0.012 275); /* filled-control hover on night */
   --color-driftwood: oklch(75% 0.018 275);
   --color-fog: oklch(63% 0.02 275);
   --color-mist: oklch(63% 0.02 275);
