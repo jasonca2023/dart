@@ -72,7 +72,7 @@ export function AppNav() {
       {pill && activeIndex !== -1 && (
         <span
           aria-hidden
-          className="absolute top-0 h-full rounded-full bg-sand transition-[left,width] duration-300 ease-out motion-reduce:transition-none"
+          className="absolute top-0 h-full rounded-full bg-sand-2 transition-[left,width] duration-300 ease-out motion-reduce:transition-none"
           style={{ left: pill.left, width: pill.width }}
         />
       )}
