@@ -2,7 +2,13 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { buildAdSpec, TONE_ACCENTS, type AdSpec, type Tone } from "@/lib/adSpec";
+import {
+  buildAdSpec,
+  TONE_ACCENTS,
+  type AdSpec,
+  type LayoutVariant,
+  type Tone,
+} from "@/lib/adSpec";
 import { useSlidingPill } from "@/lib/useSlidingPill";
 import { Orb } from "../ui/Orb";
 
@@ -45,11 +51,23 @@ interface DemoCopy {
   cta: string;
 }
 
+// buildAdSpec() picks a layout for real ad batches from a per-tone pool via a
+// seeded pseudo-random shift, so a catalogue of many products spreads across
+// its tone's allowed formats. That's the wrong tool for six FIXED demo
+// audiences, though: this file's audience strings happen to hash to the same
+// pool index for five of six moods, so the demo showed "banded" nearly every
+// time despite the mechanism working correctly. Pinning each mood's layout
+// here — same pattern as the hand-written `copy` below — guarantees the demo
+// actually shows off the format range (banded/split/editorial/statement)
+// instead of leaving it to a coincidence of these six particular strings.
+// Picks stay inside each tone's own TONE_LAYOUT_POOL (adSpec.ts) — nothing
+// invented, just deliberate instead of accidental.
 const MOODS: {
   tone: Tone;
   name: string;
   audience: string;
   note: string;
+  layout: LayoutVariant;
   copy: DemoCopy;
 }[] = [
   {
@@ -57,6 +75,7 @@ const MOODS: {
     name: "Luxe",
     audience: "luxury gifting",
     note: "Gold & serif, slow, editorial",
+    layout: "editorial",
     copy: {
       eyebrow: "The considered gift",
       hook: "Some gifts outlast the occasion.",
@@ -70,6 +89,7 @@ const MOODS: {
     name: "Techy",
     audience: "tech early adopters",
     note: "Electric, mono, snappy",
+    layout: "banded",
     copy: {
       eyebrow: "Thermal engineering",
       hook: "Cold for 24 hours. Measured.",
@@ -83,6 +103,7 @@ const MOODS: {
     name: "Energetic",
     audience: "trail runners",
     note: "Bold, fast, athletic",
+    layout: "split",
     copy: {
       eyebrow: "Trail ready",
       hook: "Mile ten tastes better cold.",
@@ -96,6 +117,7 @@ const MOODS: {
     name: "Playful",
     audience: "college students",
     note: "Bright, bouncy, warm",
+    layout: "split",
     copy: {
       eyebrow: "Hydration, but cute",
       hook: "Your lectures deserve cold water.",
@@ -109,6 +131,7 @@ const MOODS: {
     name: "Calm",
     audience: "wellness mornings",
     note: "Soft, gentle, considered",
+    layout: "editorial",
     copy: {
       eyebrow: "Morning ritual",
       hook: "Begin with cold water.",
@@ -122,6 +145,7 @@ const MOODS: {
     name: "Bold",
     audience: "streetwear heads",
     note: "High-contrast, punchy",
+    layout: "statement",
     copy: {
       eyebrow: "No lukewarm",
       hook: "Lukewarm is a choice.",
@@ -132,11 +156,13 @@ const MOODS: {
   },
 ];
 
-// Overlay the hand-written lines on the generated spec; everything visual
-// (palette, layout, font, motion, scene timing) stays from the live brain.
-function withDemoCopy(spec: AdSpec, c: DemoCopy): AdSpec {
+// Overlay the hand-written lines (and the pinned layout, see MOODS above) on
+// the generated spec; palette, font, motion and scene timing stay live from
+// buildAdSpec — only the copy and the macro layout are demo-authored.
+function withDemoCopy(spec: AdSpec, c: DemoCopy, layout: LayoutVariant): AdSpec {
   return {
     ...spec,
+    layout,
     eyebrow: c.eyebrow,
     subhead: c.subhead,
     cta: c.cta,
@@ -186,6 +212,7 @@ export function MoodDemo() {
       durationSec: DEMO.durationSec,
     }),
     mood.copy,
+    mood.layout,
   );
 
   return (
