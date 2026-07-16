@@ -80,6 +80,114 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* ── Theme role tokens, registered as animatable ───────────── */
+/* `color` (and `fill`/`stroke`) INHERIT. A plain `transition: color` on
+ * every element (the earlier attempt) meant each unstyled wrapper between
+ * `.landing` and a leaf like `h1` had its own competing transition too —
+ * every intermediate frame of a parent's fade re-triggered the child's own
+ * transition toward a slightly-shifted target, compounding across nesting
+ * depth into 1000ms+ instead of the declared 240ms (measured on the live
+ * hero h1). Fix: transition the SOURCE variable itself, once, at the one
+ * place it's reassigned (`:root` for the app tokens, `.landing` below for
+ * the landing tokens) — same pattern the orb's --hot/--cool already use.
+ * Every var(--color-x) consumer then just reads an already-smooth value
+ * each frame; there's nothing left to chain. */
+@property --color-parchment {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fdfcfc;
+}
+@property --color-sand {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f5f3f1;
+}
+@property --color-sand-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #efece9;
+}
+@property --color-ash {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e5e5e5;
+}
+@property --color-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #000000;
+}
+@property --color-ink-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(21% 0 0);
+}
+@property --color-driftwood {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #777169;
+}
+@property --color-fog {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a59f97;
+}
+@property --color-mist {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b1b0b0;
+}
+@property --color-white {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+@property --color-night {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(14% 0.008 55);
+}
+@property --color-night-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(18% 0.01 55);
+}
+@property --color-night-3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(23% 0.012 55);
+}
+@property --color-seam {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(30% 0.012 55);
+}
+@property --color-linen {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(95% 0.006 55);
+}
+@property --color-linen-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(98% 0.004 55);
+}
+@property --color-moth {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(76% 0.012 55);
+}
+@property --color-dusk {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(64% 0.014 55);
+}
+@property --color-glint {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(74% 0.13 275);
+}
+
 :root {
   /* ── Type scale ─────────────────────────────────────────── */
   --text-caption: 0.625rem; /* 10 */
@@ -678,30 +786,58 @@ h3 {
 }
 
 /* ── Theme switch — cross-fade colors instead of snapping ─── */
-/* Flipping data-theme changes the CSS custom properties instantly; without
- * this, every background/text/border repaints in one frame. Must live in
- * @layer base: an unlayered rule here would beat Tailwind's own utilities
- * layer on EVERY element regardless of selector specificity (unlayered
- * author styles always win over layered ones), which silently forced
- * buttons/nav links off their intended fast 140–150ms hover transition and
- * onto this slower one — the exact "some elements lag, then snap" bug.
- * Inside @layer base, Tailwind's utilities layer (declared after base)
- * still wins wherever a component sets its own transition; this only fills
- * in the elements that had none (headings, paragraphs, section chrome).
- * Kept faster than the old --dur-slow (420ms) so it's closer to the rest
- * of the UI's motion language and the muddy OKLCH cross-fade midpoint is
- * on screen for less time. Transform/opacity are untouched, so entrance
- * animations elsewhere in this file don't pick up the delay. */
+/* background-color/border-color/box-shadow do NOT inherit, so a blanket
+ * transition on every element is safe for them — each element's own value
+ * is resolved directly, never chained through a parent. `color`/`fill`/
+ * `stroke` are deliberately NOT listed here: those inherit, and giving
+ * every element its own competing transition on an inherited property was
+ * the 1000ms+ compounding-delay bug (see the @property block above this
+ * file's tokens for the real fix — the source variables animate once,
+ * every var(--color-x) consumer just reads the already-smooth value).
+ * Must live in @layer base: an unlayered rule here would beat Tailwind's
+ * own utilities layer on EVERY element regardless of selector specificity
+ * (unlayered author styles always win over layered ones), which silently
+ * forced buttons/nav links off their intended fast 140–150ms hover
+ * transition and onto this slower one. Inside @layer base, Tailwind's
+ * utilities layer (declared after base) still wins wherever a component
+ * sets its own transition; this only fills in elements that had none. */
 @media (prefers-reduced-motion: no-preference) {
   @layer base {
     *,
     *::before,
     *::after {
-      transition-property: background-color, color, border-color,
-        box-shadow, fill, stroke;
+      transition-property: background-color, border-color, box-shadow;
       transition-duration: var(--dur-base);
       transition-timing-function: var(--ease-in-out);
     }
+  }
+
+  :root {
+    transition:
+      --color-parchment var(--dur-base) var(--ease-in-out),
+      --color-sand var(--dur-base) var(--ease-in-out),
+      --color-sand-2 var(--dur-base) var(--ease-in-out),
+      --color-ash var(--dur-base) var(--ease-in-out),
+      --color-ink var(--dur-base) var(--ease-in-out),
+      --color-ink-2 var(--dur-base) var(--ease-in-out),
+      --color-driftwood var(--dur-base) var(--ease-in-out),
+      --color-fog var(--dur-base) var(--ease-in-out),
+      --color-mist var(--dur-base) var(--ease-in-out),
+      --color-white var(--dur-base) var(--ease-in-out);
+  }
+
+
+  .landing {
+    transition:
+      --color-night var(--dur-base) var(--ease-in-out),
+      --color-night-2 var(--dur-base) var(--ease-in-out),
+      --color-night-3 var(--dur-base) var(--ease-in-out),
+      --color-seam var(--dur-base) var(--ease-in-out),
+      --color-linen var(--dur-base) var(--ease-in-out),
+      --color-linen-2 var(--dur-base) var(--ease-in-out),
+      --color-moth var(--dur-base) var(--ease-in-out),
+      --color-dusk var(--dur-base) var(--ease-in-out),
+      --color-glint var(--dur-base) var(--ease-in-out);
   }
 }
 
