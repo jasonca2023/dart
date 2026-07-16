@@ -17,7 +17,7 @@ export default async function AuthPage({
 }) {
   const { mode } = await searchParams;
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="app-canvas grid min-h-screen bg-parchment lg:grid-cols-2">
       {/* Brand panel */}
       <aside className="relative hidden flex-col justify-between bg-sand p-12 lg:flex">
         <Logo />

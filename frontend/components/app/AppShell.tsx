@@ -11,7 +11,7 @@ import { USING_MOCK } from "@/lib/api";
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <AuthGate>
-      <div className="min-h-screen bg-parchment">
+      <div className="app-canvas min-h-screen bg-parchment">
         <header className="sticky top-0 z-40 border-b border-ash bg-parchment/85 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-[var(--page-max)] items-center gap-5 px-5 sm:px-8">
           <Logo />

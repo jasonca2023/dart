@@ -18,7 +18,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (supabaseEnabled && (loading || !user)) {
     return (
-      <div className="grid min-h-screen place-items-center bg-parchment">
+      <div className="app-canvas grid min-h-screen place-items-center bg-parchment">
         <span
           aria-label="Loading"
           className="size-6 animate-spin rounded-full border-2 border-ash border-t-ink"

@@ -655,8 +655,7 @@ h3 {
  * /ads, /account, /auth, /jobs) with zero component edits. Values mirror the
  * Broadsheet role set in @theme. Elevation on dark = lighter surface, so
  * the ring/elevated shadows become faint light outlines instead of drop
- * shadows. No halftone texture here — that's a marketing-page motif; the
- * working app UI (forms, dashboard) just gets the re-hued flat tokens. */
+ * shadows. */
 :root[data-theme="night"] {
   color-scheme: dark;
   --color-parchment: oklch(13% 0.012 82);
@@ -675,6 +674,23 @@ h3 {
     rgba(0, 0, 0, 0.45) 0px 2px 6px 0px;
   --shadow-inset: rgba(255, 255, 255, 0.12) 0px 0px 0px 0.5px inset;
   --shadow-inset-warm: oklch(34% 0.02 82) 0px 0px 0px 0.5px inset;
+}
+
+/* Broadsheet grain for the app's dark mode — the same halftone dot-screen
+ * the landing's dark canvas wears (see the .landing night rule), so the
+ * signed-in surface reads as the same "printed stock" instead of a flat
+ * unrelated dark. `.app-canvas` sits on each full-page app wrapper
+ * (AppShell, the auth screen, the AuthGate loader) next to bg-parchment;
+ * in light mode this rule doesn't match and the wrappers stay plain
+ * paper. Ink at 8% here mirrors linen at 8% on the landing — identical
+ * lightness in dark mode, so the grains match exactly. */
+:root[data-theme="night"] .app-canvas {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in oklab, var(--color-ink) 8%, transparent) 1px,
+    transparent 1.4px
+  );
+  background-size: 5px 5px;
 }
 
 /* ── Theme toggle (sun ⇄ moon morph) ──────────────────────── */
