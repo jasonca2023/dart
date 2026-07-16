@@ -810,6 +810,10 @@ h3 {
  * beat Tailwind's own utilities layer on EVERY element regardless of
  * selector specificity, which silently forced buttons/nav links off their
  * intended fast 140–150ms hover transition and onto this slower one. */
+/* --ease-out (fast start, gentle settle), NOT --ease-in-out. The in-out
+ * curve (0.77, 0, 0.175, 1) barely moves for its first third — on a theme
+ * flip that flat ramp reads as "a beat of delay, then it changes." ease-out
+ * starts immediately, so the fade feels instant. */
 @media (prefers-reduced-motion: no-preference) {
   @layer base {
     *,
@@ -817,36 +821,36 @@ h3 {
     *::after {
       transition-property: box-shadow;
       transition-duration: var(--dur-base);
-      transition-timing-function: var(--ease-in-out);
+      transition-timing-function: var(--ease-out);
     }
   }
 
   :root {
     transition:
-      --color-parchment var(--dur-base) var(--ease-in-out),
-      --color-sand var(--dur-base) var(--ease-in-out),
-      --color-sand-2 var(--dur-base) var(--ease-in-out),
-      --color-ash var(--dur-base) var(--ease-in-out),
-      --color-ink var(--dur-base) var(--ease-in-out),
-      --color-ink-2 var(--dur-base) var(--ease-in-out),
-      --color-driftwood var(--dur-base) var(--ease-in-out),
-      --color-fog var(--dur-base) var(--ease-in-out),
-      --color-mist var(--dur-base) var(--ease-in-out),
-      --color-white var(--dur-base) var(--ease-in-out);
+      --color-parchment var(--dur-base) var(--ease-out),
+      --color-sand var(--dur-base) var(--ease-out),
+      --color-sand-2 var(--dur-base) var(--ease-out),
+      --color-ash var(--dur-base) var(--ease-out),
+      --color-ink var(--dur-base) var(--ease-out),
+      --color-ink-2 var(--dur-base) var(--ease-out),
+      --color-driftwood var(--dur-base) var(--ease-out),
+      --color-fog var(--dur-base) var(--ease-out),
+      --color-mist var(--dur-base) var(--ease-out),
+      --color-white var(--dur-base) var(--ease-out);
   }
 
 
   .landing {
     transition:
-      --color-night var(--dur-base) var(--ease-in-out),
-      --color-night-2 var(--dur-base) var(--ease-in-out),
-      --color-night-3 var(--dur-base) var(--ease-in-out),
-      --color-seam var(--dur-base) var(--ease-in-out),
-      --color-linen var(--dur-base) var(--ease-in-out),
-      --color-linen-2 var(--dur-base) var(--ease-in-out),
-      --color-moth var(--dur-base) var(--ease-in-out),
-      --color-dusk var(--dur-base) var(--ease-in-out),
-      --color-glint var(--dur-base) var(--ease-in-out);
+      --color-night var(--dur-base) var(--ease-out),
+      --color-night-2 var(--dur-base) var(--ease-out),
+      --color-night-3 var(--dur-base) var(--ease-out),
+      --color-seam var(--dur-base) var(--ease-out),
+      --color-linen var(--dur-base) var(--ease-out),
+      --color-linen-2 var(--dur-base) var(--ease-out),
+      --color-moth var(--dur-base) var(--ease-out),
+      --color-dusk var(--dur-base) var(--ease-out),
+      --color-glint var(--dur-base) var(--ease-out);
   }
 }
 

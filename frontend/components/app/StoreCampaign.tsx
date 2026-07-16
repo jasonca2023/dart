@@ -50,17 +50,6 @@ export function StoreCampaign() {
   const [duration, setDuration] = useState<Duration>(10);
   const [storeLogo, setStoreLogo] = useState<PreparedLogo | null>(null);
 
-  // Background-removed versions of the picker thumbnails, keyed by product
-  // index. Scraped catalogue photos almost always sit on an opaque white
-  // studio backdrop, which reads as a jarring block against a dark canvas —
-  // cleaning them lazily (as each tile scrolls into view, same trigger as the
-  // reveal animation below) instead of all ~100 up front keeps this cheap.
-  // The original always renders underneath, so a slow/failed cleanup never
-  // leaves a tile blank.
-  const [cleanedImages, setCleanedImages] = useState<Record<number, string>>({});
-  const cleanedUrlsRef = useRef<string[]>([]);
-  const cleanupStateRef = useRef<Set<number>>(new Set()); // in-flight or done
-
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,72 +64,18 @@ export function StoreCampaign() {
   const [safari, setSafari] = useState(false);
   useEffect(() => setSafari(isLikelySafari()), []);
 
-  // Cap concurrent background-removal jobs — it's a real WASM inference per
-  // image, and revealing a dozen tiles in one scroll shouldn't fire a dozen
-  // of them at once. A tiny job queue instead of a library: push and drain.
-  const bgActiveRef = useRef(0);
-  const bgQueueRef = useRef<(() => void)[]>([]);
-  const BG_CONCURRENCY = 2;
-  function scheduleBgJob(job: () => Promise<void>) {
-    const run = () => {
-      bgActiveRef.current++;
-      job().finally(() => {
-        bgActiveRef.current--;
-        bgQueueRef.current.shift()?.();
-      });
-    };
-    if (bgActiveRef.current < BG_CONCURRENCY) run();
-    else bgQueueRef.current.push(run);
-  }
-
-  // Clean one tile's photo through the proxy (CORS-safe pixels) then the
-  // in-browser background remover, same utility the render step already
-  // uses. Best-effort: any failure just leaves the original photo showing —
-  // browsing the picker must never block or error on a bad cutout.
-  function cleanTile(i: number) {
-    if (cleanupStateRef.current.has(i)) return;
-    cleanupStateRef.current.add(i);
-    scheduleBgJob(async () => {
-      const p = products?.[i];
-      if (!p) return;
-      try {
-        const resp = await fetch(`${API_BASE}/proxy-image?url=${encodeURIComponent(p.image)}`);
-        if (!resp.ok) return;
-        const blob = await resp.blob();
-        const cleaned = await removeProductBackground(blob);
-        if (!cleaned) return;
-        const url = URL.createObjectURL(cleaned);
-        cleanedUrlsRef.current.push(url);
-        setCleanedImages((prev) => ({ ...prev, [i]: url }));
-      } catch {
-        /* keep the original photo — never block browsing over a bad cutout */
-      }
-    });
-  }
-
   // Pop each tile in as it scrolls into the picker's own scroll area. The tiles
   // live in an overflow container, so the observer's root is that container (not
   // the page) or nothing below the fold would ever count as "in view". One-shot
-  // per tile; re-runs (and re-hides) when the product set changes. Background
-  // removal for a tile's photo piggybacks on the same "now visible" signal.
+  // per tile; re-runs (and re-hides) when the product set changes.
   const gridRef = useRef<HTMLUListElement | null>(null);
   useEffect(() => {
-    // A fresh import: drop the previous batch's cutouts and start clean.
-    cleanedUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
-    cleanedUrlsRef.current = [];
-    cleanupStateRef.current.clear();
-    setCleanedImages({});
-
     const grid = gridRef.current;
     if (!grid) return;
     const tiles = Array.from(grid.querySelectorAll<HTMLElement>(":scope > li"));
     tiles.forEach((t) => delete t.dataset.revealed);
     if (typeof IntersectionObserver === "undefined") {
       tiles.forEach((t) => (t.dataset.revealed = "true"));
-      tiles.forEach((t) => {
-        const idx = Number(t.dataset.index);
-        if (Number.isFinite(idx)) cleanTile(idx);
-      });
       return;
     }
     const io = new IntersectionObserver(
@@ -155,23 +90,13 @@ export function StoreCampaign() {
             el.style.animationDelay = `${Math.min(idx * 45, 180)}ms`;
             el.dataset.revealed = "true";
             io.unobserve(el);
-            const productIdx = Number(el.dataset.index);
-            if (Number.isFinite(productIdx)) cleanTile(productIdx);
           });
       },
       { root: grid, rootMargin: "0px 0px -6% 0px", threshold: 0.1 },
     );
     tiles.forEach((t) => io.observe(t));
     return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
-
-  // Belt-and-suspenders: revoke any remaining cutout URLs on unmount.
-  useEffect(() => {
-    return () => {
-      cleanedUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
-    };
-  }, []);
 
   const importSeq = useRef(0);
 
@@ -559,22 +484,21 @@ export function StoreCampaign() {
                       title={p.title}
                       className="group block w-full text-left transition-transform duration-200 ease-out hover:-translate-y-1 focus:outline-none"
                     >
-                      {/* No card frame — just the photo on a soft rounded ground.
-                          Selection reads as an ink ring on the image itself. */}
+                      {/* Photo on a fixed light mat (NOT the theme token) — scraped
+                          catalogue shots almost all sit on a white studio backdrop,
+                          which reads as a harsh white block against the dark canvas.
+                          A constant near-white ground means a white-bg photo blends
+                          into the mat and the tile reads as a deliberate catalogue
+                          card in either theme, no per-image ML needed. Selection is
+                          the ink ring on the mat itself. */}
                       <div
                         className={
-                          "relative aspect-square overflow-hidden rounded-[14px] bg-sand ring-2 transition-shadow duration-200 ease-out " +
+                          "relative aspect-square overflow-hidden rounded-[14px] bg-[#f4f2ee] ring-2 transition-shadow duration-200 ease-out " +
                           (on
                             ? "ring-ink"
                             : "ring-transparent group-hover:ring-ash group-focus-visible:ring-ink")
                         }
                       >
-                        {/* Original photo underneath (visible instantly, so a slow
-                            or failed cutout never leaves a blank tile); the
-                            background-removed cutout fades in on top once ready,
-                            so the white studio backdrop dissolves rather than
-                            popping. Same img classes on both so hover-zoom and
-                            selection-scale stay identical whichever is on top. */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={p.image}
@@ -585,20 +509,6 @@ export function StoreCampaign() {
                             (on ? "scale-[1.02]" : "")
                           }
                         />
-                        {cleanedImages[i] && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={cleanedImages[i]}
-                            alt=""
-                            className={
-                              "absolute inset-0 size-full object-contain p-3 opacity-0 transition-[opacity,transform] duration-300 ease-out group-hover:scale-[1.05] " +
-                              (on ? "scale-[1.02]" : "")
-                            }
-                            onLoad={(e) => {
-                              e.currentTarget.style.opacity = "1";
-                            }}
-                          />
-                        )}
                         {/* Selection check — a hollow ink ring at rest (so tiles read
                             as selectable), filled ink when chosen. */}
                         <span
