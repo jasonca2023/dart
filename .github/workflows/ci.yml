@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   frontend:
-    name: Frontend (vitest)
+    name: Frontend (typecheck + vitest + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,7 +24,12 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run typecheck
       - run: npm test
+      # Catches what tsc/vitest can't: minifier-only issues (a CSS bug in this
+      # repo once compiled fine in dev and only broke in the production
+      # bundle) and any build-time error in the actual deploy artifact.
+      - run: npm run build
 
   backend:
     name: Backend (pytest)
