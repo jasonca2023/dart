@@ -27,6 +27,7 @@ from .authcodes import email_ready as authcodes_email_ready
 from .auth import verify_token
 from .config import Settings, get_settings, media_root
 from .errors import (
+    INVALID_INPUT,
     INVALID_URL,
     SCRAPE_FAILED,
     UNAUTHORIZED,
@@ -201,18 +202,90 @@ async def _fetch_product_page(url: str) -> dict | None:
 VIDEO_BUCKET = "dart-videos"
 
 
+_VISUAL_SAMPLE_ENTRY_TYPES = {b"avc1", b"avc3", b"hev1", b"hvc1", b"av01", b"vp08", b"vp09", b"mp4v"}
+
+
+def _iter_boxes(data: bytes, start: int, end: int):
+    """Yield (type, box_start, payload_start, box_end) for each ISO-BMFF box in
+    data[start:end], following each box's own declared size field (handling the
+    size==0 "to EOF" and size==1 64-bit largesize cases) rather than scanning for
+    byte patterns."""
+    pos = start
+    while pos + 8 <= end:
+        size = int.from_bytes(data[pos : pos + 4], "big")
+        btype = data[pos + 4 : pos + 8]
+        header_len = 8
+        if size == 1:
+            if pos + 16 > end:
+                return
+            size = int.from_bytes(data[pos + 8 : pos + 16], "big")
+            header_len = 16
+        elif size == 0:
+            size = end - pos
+        if size < header_len or pos + size > end:
+            return
+        yield btype, pos, pos + header_len, pos + size
+        pos += size
+
+
+def _find_box(data: bytes, start: int, end: int, box_type: bytes):
+    for btype, box_start, payload_start, box_end in _iter_boxes(data, start, end):
+        if btype == box_type:
+            return box_start, payload_start, box_end
+    return None
+
+
 def _mp4_transfer_characteristic(data: bytes) -> int | None:
-    """Read the transfer tag from an mp4's `colr` (nclx) box, or None."""
-    i = data.find(b"colr")
-    if i < 4:
+    """Read the transfer tag from an mp4's `colr` (nclx/nclc) box inside
+    moov > trak > mdia > minf > stbl > stsd > <video sample entry>, or None.
+
+    Walks the real box tree via each box's declared size, rather than searching
+    for the byte sequence "colr" anywhere in the file: a non-faststarted mp4
+    (mdat — raw H.264 sample data — written before moov, common for
+    browser-side muxers) can coincidentally contain those bytes inside encoded
+    video data, which a blind substring search would misread as a real tag.
+    """
+    moov = _find_box(data, 0, len(data), b"moov")
+    if moov is None:
         return None
-    box_start = i - 4
-    if data[box_start + 8 : box_start + 12] not in (b"nclx", b"nclc"):
-        return None
-    try:
-        return int.from_bytes(data[box_start + 14 : box_start + 16], "big")
-    except Exception:
-        return None
+    _, moov_payload, moov_end = moov
+    for ttype, _, tpayload, tend in _iter_boxes(data, moov_payload, moov_end):
+        if ttype != b"trak":
+            continue
+        mdia = _find_box(data, tpayload, tend, b"mdia")
+        if mdia is None:
+            continue
+        minf = _find_box(data, mdia[1], mdia[2], b"minf")
+        if minf is None:
+            continue
+        stbl = _find_box(data, minf[1], minf[2], b"stbl")
+        if stbl is None:
+            continue
+        stsd = _find_box(data, stbl[1], stbl[2], b"stsd")
+        if stsd is None:
+            continue
+        _, stsd_payload, stsd_end = stsd
+        entries_start = stsd_payload + 8  # FullBox header(4) + entry_count(4)
+        if entries_start > stsd_end:
+            continue
+        for etype, ebox_start, _, ebox_end in _iter_boxes(data, entries_start, stsd_end):
+            if etype not in _VISUAL_SAMPLE_ENTRY_TYPES:
+                continue
+            # box header(8) + SampleEntry fields(8) + VisualSampleEntry fields(70)
+            children_start = ebox_start + 86
+            colr = _find_box(data, children_start, ebox_end, b"colr")
+            if colr is None:
+                continue
+            _, colr_payload, colr_end = colr
+            if data[colr_payload : colr_payload + 4] not in (b"nclx", b"nclc"):
+                continue
+            if colr_payload + 8 > colr_end:
+                continue
+            try:
+                return int.from_bytes(data[colr_payload + 6 : colr_payload + 8], "big")
+            except Exception:
+                return None
+    return None
 
 
 def _retag_bt709(data: bytes) -> bytes:
@@ -421,8 +494,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         # The id is a client-generated UUID, but never trust it: it flows into
         # Storage object keys and the row id. Strip to UUID-safe chars so it can't
-        # carry "/" or ".." into a path (a legit UUID is unchanged).
-        safe_id = "".join(c for c in id if c.isalnum() or c in "-_") or "ad"
+        # carry "/" or ".." into a path (a legit UUID is unchanged). Reject outright
+        # if nothing safe survives — falling back to a fixed placeholder would let
+        # the first caller to hit this permanently squat that id for everyone else.
+        safe_id = "".join(c for c in id if c.isalnum() or c in "-_")
+        if not safe_id:
+            raise DartError(INVALID_INPUT, "Invalid ad id.", status=400)
 
         base = settings.supabase_url.rstrip("/")
         key = settings.supabase_service_key

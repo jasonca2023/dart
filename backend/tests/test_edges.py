@@ -237,6 +237,16 @@ def test_save_ad_sanitizes_hostile_id(monkeypatch):
     assert r.json()["video_url"].endswith("/user-b/evilpath.mp4")
 
 
+def test_save_ad_rejects_id_that_sanitizes_to_empty(monkeypatch):
+    # An id with no alnum/-/_ characters must be rejected outright, not silently
+    # collapsed to a shared placeholder id that the first caller permanently
+    # squats and every later caller is then locked out of.
+    monkeypatch.setattr(httpx, "AsyncClient", _fake_httpx_client(row_owner=None))
+    r = _save_ad(_supabase_client(), "!!!///???")
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_input"
+
+
 def test_save_ad_caps_video_size(monkeypatch):
     monkeypatch.setattr(httpx, "AsyncClient", _fake_httpx_client(row_owner=None))
     monkeypatch.setattr("app.main.MAX_VIDEO_UPLOAD_BYTES", 10)
@@ -391,10 +401,14 @@ def test_get_job_requires_auth_when_supabase_configured():
 # --- Safari colour re-tag ------------------------------------------------------
 
 
-def _colr_box(transfer: int) -> bytes:
-    # [size4]['colr']['nclx'][primaries2][transfer2][matrix2][flags1]
+def _box(btype: bytes, payload: bytes) -> bytes:
+    return (8 + len(payload)).to_bytes(4, "big") + btype + payload
+
+
+def _colr_payload(transfer: int) -> bytes:
+    # ['nclx'][primaries2][transfer2][matrix2][full_range1]
     return (
-        b"\x00\x00\x00\x13colrnclx"
+        b"nclx"
         + (1).to_bytes(2, "big")
         + transfer.to_bytes(2, "big")
         + (1).to_bytes(2, "big")
@@ -402,19 +416,56 @@ def _colr_box(transfer: int) -> bytes:
     )
 
 
+def _visual_sample_entry(codec: bytes, transfer: int) -> bytes:
+    sample_entry_fields = b"\x00" * 6 + b"\x00\x01"  # reserved(6) + data_reference_index(2)
+    visual_fields = b"\x00" * 70  # fixed VisualSampleEntry fields (values unused by the reader)
+    colr = _box(b"colr", _colr_payload(transfer))
+    return _box(codec, sample_entry_fields + visual_fields + colr)
+
+
+def _mp4_with_transfer(transfer: int, mdat_prefix: bytes = b"") -> bytes:
+    """A minimal but structurally real mp4: ftyp, then mdat, then moov (mdat
+    BEFORE moov — the common non-faststarted layout browser-side muxers
+    produce, and the exact layout the false-positive bug depended on)."""
+    stsd_entries = (0).to_bytes(4, "big") + (1).to_bytes(4, "big")  # FullBox header + entry_count=1
+    stsd = _box(b"stsd", stsd_entries + _visual_sample_entry(b"avc1", transfer))
+    stbl = _box(b"stbl", stsd)
+    minf = _box(b"minf", stbl)
+    mdia = _box(b"mdia", minf)
+    trak = _box(b"trak", mdia)
+    moov = _box(b"moov", trak)
+    ftyp = _box(b"ftyp", b"isom" + b"\x00\x00\x02\x00" + b"isomiso2avc1mp41")
+    mdat = _box(b"mdat", mdat_prefix)
+    return ftyp + mdat + moov
+
+
 def test_mp4_transfer_detection():
     from app.main import _mp4_transfer_characteristic
 
-    assert _mp4_transfer_characteristic(b"ftyp" + _colr_box(13)) == 13
-    assert _mp4_transfer_characteristic(b"ftyp" + _colr_box(1)) == 1
+    assert _mp4_transfer_characteristic(_mp4_with_transfer(13)) == 13
+    assert _mp4_transfer_characteristic(_mp4_with_transfer(1)) == 1
     assert _mp4_transfer_characteristic(b"no colr here") is None
+
+
+def test_mp4_transfer_detection_ignores_colr_bytes_in_sample_data():
+    # Regression: raw H.264 sample data inside mdat (which sits BEFORE moov in a
+    # non-faststarted, browser-muxed mp4 — see _mp4_with_transfer) can
+    # coincidentally contain the literal bytes "colr"+"nclx", which the old
+    # blind-substring-search implementation would misread as a real colour tag.
+    # The real tag here is 1 (Chrome/BT.709); a coincidental match in mdat must
+    # not override it.
+    fake_match_in_sample_data = b"colrnclx" + b"\x00" * 40
+    data = _mp4_with_transfer(1, mdat_prefix=fake_match_in_sample_data)
+    from app.main import _mp4_transfer_characteristic
+
+    assert _mp4_transfer_characteristic(data) == 1
 
 
 def test_retag_passes_through_non_safari():
     from app.main import _retag_bt709
 
     # transfer != 13 (Chrome) and no-colr both come back byte-identical, untouched.
-    chrome = b"ftyp" + _colr_box(1)
+    chrome = _mp4_with_transfer(1)
     assert _retag_bt709(chrome) == chrome
     assert _retag_bt709(b"not an mp4") == b"not an mp4"
 
@@ -422,8 +473,9 @@ def test_retag_passes_through_non_safari():
 def test_retag_degrades_gracefully_on_bad_input():
     from app.main import _retag_bt709
 
-    # Tagged 13 but not a real mp4 → ffmpeg fails (or is absent) → original bytes.
-    garbage13 = b"ftyp" + _colr_box(13) + b"\x00" * 32
+    # Tagged 13 but not a real mp4 (no decodable bitstream) → ffmpeg fails (or
+    # is absent) → original bytes.
+    garbage13 = _mp4_with_transfer(13) + b"\x00" * 32
     assert _retag_bt709(garbage13) == garbage13
 
 

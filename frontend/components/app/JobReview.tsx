@@ -23,6 +23,8 @@ import { downloadUrl, adFileName } from "@/lib/download";
 import { Button } from "../ui/Button";
 import { ArrowRight, Alert, Download, Refresh, Spinner, Wand } from "../icons";
 
+const clampDuration = (n: number) => Math.min(20, Math.max(3, Math.round(n) || 10));
+
 function title(job: Job): string {
   if (job.product?.title) return job.product.title;
   try {
@@ -351,7 +353,7 @@ export function JobReview({ id }: { id: string }) {
       productImage: proxied,
       price: job.product.price ? `$${(job.product.price / 100).toFixed(2)}` : "",
       audience: job.target_audience || "everyone",
-      durationInSeconds: job.duration_sec,
+      durationInSeconds: clampDuration(job.duration_sec),
       aspectRatio: job.aspect_ratio === "9:16" ? "9:16" : "16:9",
       accent: "#0447ff",
     })
@@ -380,7 +382,7 @@ export function JobReview({ id }: { id: string }) {
         </div>
       );
     }
-    if (saved) return <SavedAdView ad={saved} />;
+    if (saved) return <SavedAdView key={saved.id} ad={saved} />;
     return (
       <div className="mx-auto max-w-md rounded-card bg-sand px-6 py-14 text-center">
         <Alert className="mx-auto text-[28px] text-driftwood" />
