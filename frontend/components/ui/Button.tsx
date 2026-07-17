@@ -26,7 +26,11 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-[13px]",
+  // h-8 (32px) was under a comfortable mobile touch-target height; "sm" is
+  // only ever used for two standalone tap targets (the "Log in"/"Start free"
+  // CTAs), never packed tightly enough with siblings for the extra 4px to
+  // matter, so bumping height doesn't cost anything and helps mobile.
+  sm: "h-9 px-3 text-[13px]",
   md: "h-9 px-4 text-[15px]",
   lg: "h-11 px-5 text-[15px]",
 };

@@ -284,7 +284,7 @@ export function MoodDemo() {
 
           {/* The stage */}
           <div ref={stageRef} className="mx-auto mt-4 max-w-3xl">
-            <div className="overflow-hidden rounded-[14px] bg-ink">
+            <div className="overflow-hidden rounded-[14px] bg-stage">
               {live ? (
                 <AdPreview
                   key={mood.tone}

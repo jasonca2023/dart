@@ -85,7 +85,7 @@ export function ThemeToggle({
         theme === "night" ? "Switch to light theme" : "Switch to dark theme"
       }
       className={
-        "theme-toggle grid size-9 place-items-center rounded-full transition-colors duration-150 ease-out active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 " +
+        "theme-toggle grid size-10 place-items-center rounded-full transition-colors duration-150 ease-out active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 " +
         className
       }
     >

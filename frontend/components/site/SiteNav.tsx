@@ -16,7 +16,7 @@ export function SiteNav() {
     <header className="relative z-50 px-5 pt-5 sm:px-8 sm:pt-6">
       <nav className="mx-auto flex max-w-[var(--page-max)] items-center justify-between">
         <Logo className="text-linen" />
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3 sm:gap-5">
           <Link
             href="/auth"
             className="text-[14px] text-moth transition-colors duration-150 ease-out hover:text-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-linen"
@@ -26,7 +26,7 @@ export function SiteNav() {
           <ButtonLink href="/auth?mode=signup" variant="moon" size="sm">
             Start free
           </ButtonLink>
-          <div className="ml-1 border-l border-seam pl-4">
+          <div className="ml-0.5 border-l border-seam pl-2 sm:ml-1 sm:pl-4">
             <ThemeToggle className="text-moth hover:text-linen" />
           </div>
         </div>

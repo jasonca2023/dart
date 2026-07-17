@@ -18,6 +18,16 @@ function Svg({ children, ...p }: IconProps) {
   );
 }
 
+export function Menu(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <g {...stroke}>
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </g>
+    </Svg>
+  );
+}
+
 export function ChevronDown(p: IconProps) {
   return (
     <Svg {...p}>

@@ -45,7 +45,7 @@ export function AccountMenu() {
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative min-w-0">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -57,7 +57,7 @@ export function AccountMenu() {
           (open ? "bg-sand text-ink" : "text-driftwood hover:text-ink")
         }
       >
-        <span className="max-w-[160px] truncate" title={user.email ?? undefined}>
+        <span className="max-w-[64px] truncate sm:max-w-[160px]" title={user.email ?? undefined}>
           {user.email}
         </span>
         <ChevronDown

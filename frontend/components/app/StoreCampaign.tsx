@@ -490,13 +490,16 @@ export function StoreCampaign() {
                           A constant near-white ground means a white-bg photo blends
                           into the mat and the tile reads as a deliberate catalogue
                           card in either theme, no per-image ML needed. Selection is
-                          the ink ring on the mat itself. */}
+                          the ink ring on the mat itself — drawn with the fixed
+                          --color-stage/--color-paper pair, not --color-ink/
+                          --color-white: those flip for the app's dark mode, which
+                          would invert the ring/badge against a mat that never flips. */}
                       <div
                         className={
                           "relative aspect-square overflow-hidden rounded-[14px] bg-[#f4f2ee] ring-2 transition-shadow duration-200 ease-out " +
                           (on
-                            ? "ring-ink"
-                            : "ring-transparent group-hover:ring-ash group-focus-visible:ring-ink")
+                            ? "ring-stage"
+                            : "ring-transparent group-hover:ring-ash group-focus-visible:ring-stage")
                         }
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -509,15 +512,15 @@ export function StoreCampaign() {
                             (on ? "scale-[1.02]" : "")
                           }
                         />
-                        {/* Selection check — a hollow ink ring at rest (so tiles read
-                            as selectable), filled ink when chosen. */}
+                        {/* Selection check — a hollow ring at rest (so tiles read
+                            as selectable), filled when chosen. */}
                         <span
                           aria-hidden
                           className={
                             "absolute right-2.5 top-2.5 grid size-6 place-items-center rounded-full border backdrop-blur-sm transition-all duration-150 ease-out " +
                             (on
-                              ? "border-ink bg-ink text-white"
-                              : "border-mist bg-white/80 text-transparent group-hover:border-driftwood")
+                              ? "border-stage bg-stage text-paper"
+                              : "border-mist bg-paper/80 text-transparent group-hover:border-driftwood")
                           }
                         >
                           <Check className="text-[13px]" />

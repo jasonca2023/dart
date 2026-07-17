@@ -39,6 +39,16 @@
   --color-violet: #0447ff; /* decorative orb only */
   --color-ember: #ff4704; /* decorative orb only */
   --color-white: #ffffff; /* elevated card */
+  /* Fixed, theme-independent pair — for chrome drawn on a surface that is
+   * ITSELF fixed regardless of theme (MoodDemo's video stage, the store-import
+   * picker's #f4f2ee photo mat), so glyphs on that surface can't use --color-ink
+   * / --color-white: both of those get re-valued for the app's dark mode (ink
+   * -> light cream, white -> near-black), which is correct for surfaces that
+   * flip with the theme but wrong here — it would invert against a mat/stage
+   * that never flips. --color-stage stands in for "always-dark ink here",
+   * --color-paper for "always-light ground here". */
+  --color-stage: #000000;
+  --color-paper: #ffffff;
 
   /* ── Night set (landing only — the app keeps parchment) ──── */
   /* Broadsheet — dark newsprint, hue 82 (warm kraft-paper grey, not
