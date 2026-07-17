@@ -7,6 +7,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
+import { Monitoring } from "@/components/Monitoring";
 import { createSupabaseServer } from "@/lib/supabase-server";
 
 // Display — a characterful modern grotesque (varied terminals + width) so
@@ -113,6 +114,7 @@ export default async function RootLayout({
         />
       </head>
       <body>
+        <Monitoring />
         <AuthProvider initialUser={data.user}>{children}</AuthProvider>
       </body>
     </html>

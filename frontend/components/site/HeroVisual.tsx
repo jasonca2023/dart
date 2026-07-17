@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { Component, type ReactNode } from "react";
 import { useReducedMotion } from "@/lib/hooks";
+import { reportError } from "@/lib/monitoring";
 import { Orb } from "../ui/Orb";
 import { TONE_ACCENTS } from "@/lib/adSpec";
 
@@ -38,6 +39,12 @@ class HeroErrorBoundary extends Component<
 
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+
+  componentDidCatch(error: Error) {
+    // The fallback keeps the page usable; report so a spike in WebGL failures
+    // (a bad GPU driver, a browser regression) is visible instead of silent.
+    reportError(error);
   }
 
   render() {

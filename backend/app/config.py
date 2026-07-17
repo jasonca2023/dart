@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     # so a user login must never be enough to reach them.
     settings_admin_key: str | None = None
 
+    # --- Error monitoring (Sentry) ---
+    # Unset (default) → monitoring is fully inert (no init, no network, no cost).
+    # Set SENTRY_DSN in the deploy env to turn it on. traces_sample_rate stays
+    # 0 by default (errors only, no performance tracing) to keep quota/cost low.
+    sentry_dsn: str | None = None
+    sentry_environment: str = "production"
+    sentry_traces_sample_rate: float = 0.0
+
     # --- LLM (script generation) ---
     anthropic_api_key: str | None = None
     # Model id is configurable per the PRD; never hard-code in source.

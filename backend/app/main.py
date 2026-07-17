@@ -34,6 +34,7 @@ from .errors import (
     DartError,
     dart_error_handler,
 )
+from .monitoring import init_sentry
 from .netguard import is_public_host, ssrf_safe_get
 from .pipeline import Orchestrator
 from .providers.factory import build_providers
@@ -334,6 +335,10 @@ MAX_VIDEO_UPLOAD_BYTES = 300 * 1024 * 1024
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     logging.basicConfig(level=logging.INFO)
+
+    # Before the app is built so Sentry's FastAPI/ASGI integration wraps it.
+    # No-op unless SENTRY_DSN is configured.
+    init_sentry(settings)
 
     app = FastAPI(title="Dart Backend", version="0.1.0")
     app.add_middleware(
@@ -688,6 +693,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ),
             # Whether signup codes can actually be emailed (Brevo configured).
             "signup_email_ready": authcodes_email_ready(settings),
+            # Whether error monitoring is active (SENTRY_DSN configured).
+            "monitoring_ready": bool(settings.sentry_dsn),
             "providers": {
                 "scraper": type(scraper).__name__,
                 "script": type(scripter).__name__,

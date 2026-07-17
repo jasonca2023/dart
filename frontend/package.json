@@ -21,6 +21,7 @@
     "@remotion/google-fonts": "4.0.481",
     "@remotion/player": "4.0.481",
     "@remotion/web-renderer": "4.0.481",
+    "@sentry/react": "^10.66.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "next": "^15.5.19",

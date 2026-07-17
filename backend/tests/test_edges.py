@@ -1135,3 +1135,60 @@ def test_email_change_flow_with_fakes(monkeypatch):
     assert r.status_code == 200 and r.json()["updated"] is True
     assert emails["uid-1"] == "new@x.com"
     assert "new@x.com" not in store
+
+
+# --- error monitoring (Sentry) gating -----------------------------------------
+
+
+def test_monitoring_inert_without_dsn(monkeypatch):
+    # No DSN → init is a no-op and reports inactive. This is the default for
+    # local dev and CI, so nothing ever phones home there. Guard sentry_sdk.init
+    # so a regression that inits anyway would fail loudly instead of hitting the
+    # network.
+    import app.monitoring as monitoring
+
+    monkeypatch.setattr(monitoring, "_initialized", False)
+
+    def _fail_init(*a, **k):  # pragma: no cover - only runs on regression
+        raise AssertionError("sentry_sdk.init must not run without a DSN")
+
+    monkeypatch.setattr("sentry_sdk.init", _fail_init)
+    settings = Settings(_env_file=None, sentry_dsn=None)
+    assert monitoring.init_sentry(settings) is False
+
+
+def test_monitoring_health_flag_reflects_dsn(monkeypatch):
+    # /health advertises whether monitoring is wired, without leaking the DSN.
+    # sentry_sdk.init is stubbed so no real client/transport is created.
+    import app.monitoring as monitoring
+
+    monkeypatch.setattr(monitoring, "_initialized", False)
+    inits: list[dict] = []
+    monkeypatch.setattr("sentry_sdk.init", lambda **kw: inits.append(kw))
+
+    off = make_client()
+    assert off.get("/health").json()["monitoring_ready"] is False
+    assert inits == []  # no DSN → init never called
+
+    monkeypatch.setattr(monitoring, "_initialized", False)
+    on = make_client(sentry_dsn="https://k@o0.ingest.sentry.io/1")
+    body = on.get("/health").json()
+    assert body["monitoring_ready"] is True
+    # The DSN itself must never appear in the health payload.
+    assert "o0.ingest.sentry.io" not in str(body)
+    assert len(inits) == 1 and inits[0]["send_default_pii"] is False
+
+
+def test_monitoring_before_send_drops_dart_errors():
+    # Handled domain errors (4xx) must never reach Sentry — only real faults do.
+    import app.monitoring as monitoring
+    from app.errors import INVALID_INPUT, DartError
+
+    dropped = monitoring._before_send(
+        {"event": "x"}, {"exc_info": (DartError, DartError(INVALID_INPUT, "bad"), None)}
+    )
+    assert dropped is None
+    kept = monitoring._before_send(
+        {"event": "x"}, {"exc_info": (ValueError, ValueError("boom"), None)}
+    )
+    assert kept == {"event": "x"}
