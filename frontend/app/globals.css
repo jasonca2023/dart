@@ -658,22 +658,32 @@ h3 {
  * shadows. */
 :root[data-theme="night"] {
   color-scheme: dark;
+  /* Surface tiers (sand/sand-2/white/ash) carry half the chroma the landing's
+   * matching night-2/night-3/seam tokens use. On the landing page those tones
+   * only ever show up as small accents (a segmented control, a pill), so the
+   * full chroma read as intentional "kraft paper." In the app, --color-white
+   * is the fill for every input/dropzone/preview box — large flat fields at
+   * that chroma read as distinctly brown rather than a restrained warm dark.
+   * Halving chroma here (app-only; .landing's night-set is untouched) keeps
+   * the same warm identity at a weight that matches how tan the app actually
+   * *feels* relative to the landing page. --color-white also drops 4pts of
+   * lightness so it recedes into --color-sand instead of jumping off canvas. */
   --color-parchment: oklch(13% 0.012 82);
-  --color-sand: oklch(17% 0.014 82);
-  --color-sand-2: oklch(22% 0.016 82);
-  --color-ash: oklch(34% 0.02 82);
+  --color-sand: oklch(16% 0.007 82);
+  --color-sand-2: oklch(20% 0.008 82);
+  --color-ash: oklch(32% 0.011 82);
   --color-ink: oklch(93% 0.012 82);
   --color-ink-2: oklch(87% 0.014 82); /* filled-control hover on night */
   --color-driftwood: oklch(74% 0.016 82);
   --color-fog: oklch(60% 0.018 82);
   --color-mist: oklch(60% 0.018 82);
-  --color-white: oklch(22% 0.016 82);
+  --color-white: oklch(18% 0.007 82);
   --shadow-ring: rgba(255, 255, 255, 0.07) 0px 0px 0px 1px,
     rgba(0, 0, 0, 0.35) 0px 1px 2px 0px;
   --shadow-elevated: rgba(255, 255, 255, 0.09) 0px 0px 0px 1px,
     rgba(0, 0, 0, 0.45) 0px 2px 6px 0px;
   --shadow-inset: rgba(255, 255, 255, 0.12) 0px 0px 0px 0.5px inset;
-  --shadow-inset-warm: oklch(34% 0.02 82) 0px 0px 0px 0.5px inset;
+  --shadow-inset-warm: oklch(32% 0.011 82) 0px 0px 0px 0.5px inset;
 }
 
 /* Broadsheet grain for the app's dark mode — the same halftone dot-screen
