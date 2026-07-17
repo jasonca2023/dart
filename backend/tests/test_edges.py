@@ -118,10 +118,21 @@ class _FakeResponse:
         return self._json
 
 
-def _fake_httpx_client(row_owner: str | None):
-    """An httpx.AsyncClient stand-in: token belongs to 'user-b'; the dart_ads
-    row for any id belongs to `row_owner` (None = no existing row); every
-    storage/REST write succeeds."""
+def _fake_httpx_client(
+    row_owner: str | None,
+    *,
+    insert_conflict: bool = False,
+    race_winner: str | None = None,
+):
+    """An httpx.AsyncClient stand-in: token belongs to 'user-b'; the fast-path
+    GET reports the dart_ads row for any id as belonging to `row_owner` (None =
+    no existing row); every storage upload succeeds.
+
+    `insert_conflict` simulates the race the atomic-insert fix closes: the
+    plain INSERT at the end returns 409 (as if another request's INSERT won
+    the race between our fast-path read and our own write), and the
+    re-check GET that follows reports the row now belongs to `race_winner`.
+    """
 
     class FakeAsyncClient:
         def __init__(self, *args, **kwargs):
@@ -137,11 +148,20 @@ def _fake_httpx_client(row_owner: str | None):
             if "/auth/v1/user" in url:
                 return _FakeResponse(200, {"id": "user-b"})
             if "/rest/v1/dart_ads" in url:
-                rows = [] if row_owner is None else [{"user_id": row_owner}]
+                # First GET is the fast-path (row_owner); once the INSERT has
+                # reported a conflict, the re-check GET reports race_winner.
+                owner = race_winner if getattr(self, "_conflicted", False) else row_owner
+                rows = [] if owner is None else [{"user_id": owner}]
                 return _FakeResponse(200, rows)
             return _FakeResponse(404, {})
 
         async def post(self, url, **kwargs):
+            if "/rest/v1/dart_ads" in url and insert_conflict:
+                self._conflicted = True
+                return _FakeResponse(409, {})
+            return _FakeResponse(200, {})
+
+        async def patch(self, url, **kwargs):
             return _FakeResponse(200, {})
 
     return FakeAsyncClient
@@ -166,6 +186,36 @@ def test_save_ad_rejects_id_owned_by_another_user(monkeypatch):
     r = _save_ad(_supabase_client(), "victim-ad")
     assert r.status_code == 403
     assert r.json()["error"]["code"] == "unauthorized"
+
+
+def test_save_ad_insert_race_loser_gets_403_not_a_silent_overwrite(monkeypatch):
+    # The exact race the atomic-insert fix closes: the fast-path GET sees no
+    # row yet (row_owner=None, so it passes), but by the time this request's
+    # own INSERT lands, a concurrent request from "user-a" has already
+    # claimed the id — the INSERT conflicts, and re-checking the NOW-current
+    # owner (not the stale fast-path read) must reject this request rather
+    # than silently overwrite user-a's row.
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        _fake_httpx_client(row_owner=None, insert_conflict=True, race_winner="user-a"),
+    )
+    r = _save_ad(_supabase_client(), "contested-ad")
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "unauthorized"
+
+
+def test_save_ad_insert_conflict_against_own_row_falls_back_to_update(monkeypatch):
+    # A double-submit (or a race against yourself, e.g. two tabs) still has to
+    # work: if the row that won the INSERT race is actually the caller's own,
+    # this must fall through to the ownership-scoped PATCH and succeed.
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        _fake_httpx_client(row_owner=None, insert_conflict=True, race_winner="user-b"),
+    )
+    r = _save_ad(_supabase_client(), "my-own-race")
+    assert r.status_code == 200
 
 
 def test_save_ad_allows_own_id_and_fresh_id(monkeypatch):
@@ -265,6 +315,7 @@ def test_job_store_is_bounded():
 
     store = JobStore()
     first = store.create(
+        user_id="u",
         product_url="u0",
         target_audience="a",
         aspect_ratio="16:9",
@@ -273,19 +324,57 @@ def test_job_store_is_bounded():
     )
     for i in range(_MAX_JOBS + 50):
         store.create(
+            user_id="u",
             product_url=f"u{i}",
             target_audience="a",
             aspect_ratio="16:9",
             duration_sec=10,
             resolution="1080p",
         )
-    assert len(store.list()) == _MAX_JOBS  # capped
+    assert len(store.list("u")) == _MAX_JOBS  # capped
     # The oldest job was evicted.
     from app.errors import DartError
 
     try:
-        store.get(first.id)
+        store.get(first.id, "u")
         assert False, "expected the oldest job to be evicted"
+    except DartError as e:
+        assert e.status == 404
+
+
+def test_job_store_scopes_to_owner():
+    from app.store import JobStore
+
+    store = JobStore()
+    mine = store.create(
+        user_id="alice",
+        product_url="u0",
+        target_audience="a",
+        aspect_ratio="16:9",
+        duration_sec=10,
+        resolution="1080p",
+    )
+    store.create(
+        user_id="bob",
+        product_url="u1",
+        target_audience="a",
+        aspect_ratio="16:9",
+        duration_sec=10,
+        resolution="1080p",
+    )
+
+    # Alice sees only her own job in the list — not Bob's.
+    assert [j.id for j in store.list("alice")] == [mine.id]
+
+    # Alice can fetch her own job by id...
+    assert store.get(mine.id, "alice").id == mine.id
+
+    # ...but Bob gets a 404, not Alice's data, when he tries the same id.
+    from app.errors import DartError
+
+    try:
+        store.get(mine.id, "bob")
+        assert False, "expected Bob to be denied Alice's job"
     except DartError as e:
         assert e.status == 404
 

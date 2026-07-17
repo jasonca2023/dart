@@ -18,9 +18,28 @@ export function ThemeToggle({
   const [theme, setTheme] = useState<Theme>("bloom");
 
   // The no-FOUC script in layout.tsx stamps <html data-theme> before paint;
-  // the server render can't know it, so sync local state after mount.
+  // the server render can't know it, so sync local state after mount. Kept
+  // watching (not a one-shot check) because that same script's self-healing
+  // MutationObserver can correct <html data-theme> slightly after mount (a
+  // ~200ms window on the signed-in app where something clears the attribute
+  // and the script restores it) — a one-shot read here could land inside
+  // that window, read the wrong value, and never notice the DOM self-heal
+  // afterward: the icon would then permanently show the wrong state, and a
+  // click would silently do nothing (setting the theme to what it already
+  // visually is) before starting to work "backwards" on the next click.
+  // Watching data-theme directly makes this component's own state a pure
+  // reflection of the DOM, so it can't diverge no matter what changed it.
   useEffect(() => {
-    if (document.documentElement.dataset.theme === "night") setTheme("night");
+    const sync = () => {
+      setTheme(document.documentElement.dataset.theme === "night" ? "night" : "bloom");
+    };
+    sync();
+    const mo = new MutationObserver(sync);
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => mo.disconnect();
   }, []);
 
   const toggle = () => {
@@ -32,7 +51,9 @@ export function ThemeToggle({
       } catch {
         // Blocked storage just loses persistence, not the toggle itself.
       }
-      setTheme(next);
+      // No setTheme here — the MutationObserver above is now the single
+      // source of truth for this component's state, so it'll pick up this
+      // exact change (and nothing can leave it stale after).
     };
     // View Transition: snapshot the page before/after and crossfade the WHOLE
     // viewport as one image. Per-element CSS transitions fundamentally can't

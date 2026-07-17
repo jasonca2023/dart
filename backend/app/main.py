@@ -434,10 +434,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return f"{base}/storage/v1/object/public/{VIDEO_BUCKET}/{path}"
 
         async with httpx.AsyncClient(timeout=120.0) as client:
-            # The row id is client-chosen and the write below runs with the
-            # service-role key (bypasses RLS) as an upsert — so before touching
-            # anything, make sure the id doesn't already belong to ANOTHER user,
-            # or one user could overwrite someone else's library entry.
+            # Fast-path only: this check-then-act has a real gap (two concurrent
+            # saves with the same client-chosen id can both read "doesn't exist
+            # yet" and race to write). It just avoids wasting an upload on an id
+            # that's obviously already someone else's; the write at the bottom
+            # is what actually enforces ownership atomically.
             r = await client.get(
                 f"{base}/rest/v1/dart_ads",
                 headers=auth,
@@ -533,15 +534,47 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "logo_url": logo_url,
                 "logo_knockout": logo_knockout if logo_url else None,
             }
+            # Plain INSERT first, not an upsert: Postgres's own primary-key
+            # constraint is what makes first-claim-on-an-id atomic, closing the
+            # race the fast-path check above can't. Two concurrent saves with
+            # the same fresh id can no longer both "win" — exactly one INSERT
+            # succeeds, the other gets a conflict and falls into the branch
+            # below, which re-checks the CURRENT owner (not the stale
+            # fast-path read) before ever touching an existing row.
             r = await client.post(
                 f"{base}/rest/v1/dart_ads",
                 headers={
                     **auth,
                     "Content-Type": "application/json",
-                    "Prefer": "resolution=merge-duplicates",
+                    "Prefer": "return=minimal",
                 },
                 json=row,
             )
+            if r.status_code == 409:
+                owner = await client.get(
+                    f"{base}/rest/v1/dart_ads",
+                    headers=auth,
+                    params={"id": f"eq.{safe_id}", "select": "user_id", "limit": "1"},
+                )
+                current = owner.json() if owner.status_code == 200 else []
+                if not current or current[0].get("user_id") != user_id:
+                    raise DartError(
+                        UNAUTHORIZED, "That ad id belongs to another user.", status=403
+                    )
+                # It's genuinely ours (an update, or we lost a race against our
+                # own double-submit) — update, scoped by id AND user_id so this
+                # write still can't touch a row it doesn't own even if the
+                # owner somehow changed between the check above and now.
+                r = await client.patch(
+                    f"{base}/rest/v1/dart_ads",
+                    headers={
+                        **auth,
+                        "Content-Type": "application/json",
+                        "Prefer": "return=minimal",
+                    },
+                    params={"id": f"eq.{safe_id}", "user_id": f"eq.{user_id}"},
+                    json=row,
+                )
             if r.status_code >= 300:
                 raise DartError(SCRAPE_FAILED, f"Saving the ad failed: {r.text}", status=502)
 

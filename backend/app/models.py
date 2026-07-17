@@ -62,6 +62,7 @@ class ApiError(BaseModel):
 
 class Job(BaseModel):
     id: str
+    user_id: str
     status: JobStatus = JobStatus.queued
     product_url: str
     target_audience: str

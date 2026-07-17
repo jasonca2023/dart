@@ -54,6 +54,7 @@ async def create_job(
     body: CreateJobRequest, request: Request, user: str = Depends(require_user)
 ) -> Job:
     job = _store(request).create(
+        user_id=user,
         product_url=body.product_url,
         target_audience=body.target_audience,
         aspect_ratio=body.aspect_ratio,
@@ -66,18 +67,20 @@ async def create_job(
 
 @router.get("/jobs", response_model=JobListResponse)
 async def list_jobs(request: Request, user: str = Depends(require_user)) -> JobListResponse:
-    # Auth-gated: the in-memory store is global, so don't let anonymous callers
-    # enumerate everyone's jobs. (The signed-in dashboard reads from Supabase.)
-    return JobListResponse(jobs=_store(request).list())
+    # The in-memory store is global (every caller's jobs live in the same
+    # process), so this must filter to the caller's own jobs — being signed in
+    # only proves *someone* is logged in, not that they own what they're
+    # asking for. (The signed-in dashboard reads from Supabase separately.)
+    return JobListResponse(jobs=_store(request).list(user))
 
 
 @router.get("/jobs/{job_id}", response_model=Job)
 async def get_job(
     job_id: str, request: Request, user: str = Depends(require_user)
 ) -> Job:
-    # Auth-gated like the other job routes — the in-memory store is global, so an
-    # anonymous caller shouldn't be able to read arbitrary jobs by id.
-    return _store(request).get(job_id)
+    # Same reasoning as list_jobs: the store is global, so ownership has to be
+    # checked per-job, not just "is someone logged in."
+    return _store(request).get(job_id, user)
 
 
 @router.post(
@@ -89,8 +92,9 @@ async def get_job(
 async def regenerate_job(
     job_id: str, request: Request, user: str = Depends(require_user)
 ) -> Job:
-    src = _store(request).get(job_id)
+    src = _store(request).get(job_id, user)
     job = _store(request).create(
+        user_id=user,
         product_url=src.product_url,
         target_audience=src.target_audience,
         aspect_ratio=src.aspect_ratio,
@@ -109,7 +113,7 @@ async def regenerate_job(
 async def export_job(
     job_id: str, body: ExportRequest, request: Request, user: str = Depends(require_user)
 ) -> ExportResponse:
-    job = _store(request).get(job_id)
+    job = _store(request).get(job_id, user)
     if job.status != JobStatus.ready or not job.video_url:
         raise DartError(CONFLICT, "Job is not ready to export.", status=409)
     handoff_url = (

@@ -42,7 +42,7 @@ class Orchestrator:
         self.store.touch(job)
 
     async def _run(self, job_id: str) -> None:
-        job = self.store.get(job_id)
+        job = self.store.get_internal(job_id)
         try:
             self._advance(job, JobStatus.scraping)
             product = await self.scraper.scrape(job.product_url)
