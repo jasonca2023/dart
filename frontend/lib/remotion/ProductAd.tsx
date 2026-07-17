@@ -782,7 +782,14 @@ const SceneView: React.FC<SceneProps> = (props) => {
 
 // Derive a clean banded spec when none is supplied (keeps old callers working).
 function fallbackSpec(props: ProductAdProps): AdSpec {
-  const total = Math.max(1, Math.round(props.durationInSeconds * 30));
+  // Same NaN/short-duration guard buildAdSpec carries: NaN propagates through
+  // Math.max/round into every scene's frames, and a sub-second duration
+  // rounds a scene to 0 frames — <Sequence durationInFrames={0}> throws.
+  const seconds =
+    Number.isFinite(props.durationInSeconds) && props.durationInSeconds >= 3
+      ? props.durationInSeconds
+      : 10;
+  const total = Math.max(1, Math.round(seconds * 30));
   const hook = Math.round(total * 0.18);
   const outro = Math.round(total * 0.2);
   return {

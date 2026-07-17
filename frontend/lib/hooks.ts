@@ -40,6 +40,13 @@ export function useJobPolling(id: string | null, intervalMs = 2000) {
 
   useEffect(() => {
     if (!id) return;
+    // A new id means a different job: wipe the previous one's state so no
+    // consumer renders job A's content under job B's URL while the first
+    // poll of B is still in flight (this hook's consumer may render in
+    // place across /jobs/[id] navigations rather than remounting).
+    setJob(null);
+    setError(null);
+    setLoading(true);
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     let fails = 0; // tolerate transient network blips before giving up

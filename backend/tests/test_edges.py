@@ -134,6 +134,8 @@ def _fake_httpx_client(
     re-check GET that follows reports the row now belongs to `race_winner`.
     """
 
+    deleted: list[str] = []
+
     class FakeAsyncClient:
         def __init__(self, *args, **kwargs):
             pass
@@ -164,6 +166,11 @@ def _fake_httpx_client(
         async def patch(self, url, **kwargs):
             return _FakeResponse(200, {})
 
+        async def delete(self, url, **kwargs):
+            deleted.append(url)
+            return _FakeResponse(200, {})
+
+    FakeAsyncClient.deleted = deleted
     return FakeAsyncClient
 
 
@@ -195,14 +202,14 @@ def test_save_ad_insert_race_loser_gets_403_not_a_silent_overwrite(monkeypatch):
     # claimed the id — the INSERT conflicts, and re-checking the NOW-current
     # owner (not the stale fast-path read) must reject this request rather
     # than silently overwrite user-a's row.
-    monkeypatch.setattr(
-        httpx,
-        "AsyncClient",
-        _fake_httpx_client(row_owner=None, insert_conflict=True, race_winner="user-a"),
-    )
+    fake = _fake_httpx_client(row_owner=None, insert_conflict=True, race_winner="user-a")
+    monkeypatch.setattr(httpx, "AsyncClient", fake)
     r = _save_ad(_supabase_client(), "contested-ad")
     assert r.status_code == 403
     assert r.json()["error"]["code"] == "unauthorized"
+    # The loser's already-uploaded video must be cleaned up, not left as an
+    # unreferenced storage orphan inflating its owner's usage forever.
+    assert any("contested-ad" in url for url in fake.deleted)
 
 
 def test_save_ad_insert_conflict_against_own_row_falls_back_to_update(monkeypatch):
@@ -261,6 +268,42 @@ def test_save_ad_caps_video_size(monkeypatch):
     assert r.status_code == 413
 
 
+# --- /settings admin gate -------------------------------------------------------
+
+
+def test_settings_routes_disabled_without_admin_key():
+    # No SETTINGS_ADMIN_KEY configured → the runtime-settings surface doesn't
+    # exist, even for authenticated users. 404, not 401/403, so probes can't
+    # tell "disabled" apart from "absent".
+    client = make_client()
+    assert client.get("/settings").status_code == 404
+    assert (
+        client.post("/settings/ltx-key", json={"api_key": "sk-x"}).status_code == 404
+    )
+
+
+def test_settings_routes_require_matching_admin_key():
+    client = make_client(settings_admin_key="op-secret")
+    # Wrong or missing key → 401. A plain user login is NOT enough: these
+    # routes mutate global provider config.
+    assert client.get("/settings").status_code == 401
+    assert (
+        client.get("/settings", headers={"X-Admin-Key": "nope"}).status_code == 401
+    )
+    r = client.get("/settings", headers={"X-Admin-Key": "op-secret"})
+    assert r.status_code == 200
+    assert r.json()["ltx_key_set"] is False
+
+    r = client.post(
+        "/settings/ltx-key",
+        json={"api_key": "sk-test"},
+        headers={"X-Admin-Key": "op-secret"},
+    )
+    assert r.status_code == 200
+    assert r.json()["ltx_key_set"] is True
+    assert r.json()["video_provider"] == "ltx"
+
+
 # --- legacy /jobs contract bounds ---------------------------------------------
 
 
@@ -289,6 +332,37 @@ def test_export_destination_validated():
     job = client.post("/jobs", json={"product_url": "https://x.com/p"}).json()
     r = client.post(f"/jobs/{job['id']}/export", json={"destination": "myspace"})
     assert r.status_code == 422
+
+
+# --- mock script scenes ----------------------------------------------------------
+
+
+@pytest.mark.parametrize("duration", [3, 4, 5, 10, 20])
+def test_mock_script_scenes_tile_duration_with_no_zero_length(duration):
+    # The contract accepts duration >= 3; every scene must have t_end > t_start
+    # and the set must tile [0, duration] (the old max(2, d//3) first cut
+    # collided with 2*d//3 at d=3-4, emitting a zero-length middle scene).
+    import asyncio
+
+    from app.models import Product
+    from app.providers.script import MockScriptGenerator
+
+    product = Product(title="Thing", price=100, currency="USD", images=[], source="web")
+    result = asyncio.run(
+        MockScriptGenerator().generate(
+            product=product,
+            target_audience="testers",
+            aspect_ratio="16:9",
+            duration_sec=duration,
+        )
+    )
+    scenes = result.script.scenes
+    assert scenes[0].t_start == 0
+    assert scenes[-1].t_end == duration
+    for s in scenes:
+        assert s.t_end > s.t_start
+    for prev, nxt in zip(scenes, scenes[1:]):
+        assert prev.t_end == nxt.t_start
 
 
 # --- rate limiting -------------------------------------------------------------

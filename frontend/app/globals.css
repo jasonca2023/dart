@@ -54,8 +54,8 @@
   /* Broadsheet — dark newsprint, hue 82 (warm kraft-paper grey, not
    * Afterglow's ember-adjacent hue 55). --color-glint moves from the fixed
    * violet(275) to a masthead red (25) here: it's the dark mode's own
-   * accent flourish (hero-accent word, live-dot), a separate concept from
-   * the orb's own --color-violet/--color-ember, which stay untouched. */
+   * accent flourish (the hero's live-dot), a separate concept from the
+   * orb's own --color-violet/--color-ember, which stay untouched. */
   --color-night: oklch(13% 0.012 82); /* canvas */
   --color-night-2: oklch(17% 0.014 82); /* elevated card */
   --color-night-3: oklch(22% 0.016 82); /* higher elevation / pill */
@@ -81,7 +81,6 @@
   /* ── Radius ─────────────────────────────────────────────── */
   --radius-input: 4px;
   --radius-tooltip: 8px;
-  --radius-tag: 14px;
   --radius-badge: 18px;
   --radius-card: 20px;
   --radius-card-lg: 24px;
@@ -90,7 +89,6 @@
   /* ── Easing (Emil's strong curves) ──────────────────────── */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* ── Theme role tokens — never animated; theme switches crossfade ──
@@ -112,19 +110,11 @@
  * hover/press transitions for their real purpose. */
 
 :root {
-  /* ── Type scale ─────────────────────────────────────────── */
+  /* ── Type scale (only the sizes the .t-* roles below consume) ── */
   --text-caption: 0.625rem; /* 10 */
-  --text-micro: 0.75rem; /* 12 */
-  --text-fine: 0.8125rem; /* 13 */
-  --text-ui: 0.875rem; /* 14 */
-  --text-ui-lg: 0.9375rem; /* 15 */
   --text-body: 1rem; /* 16 */
-  --text-subheading: 1.125rem; /* 18 */
-  --text-heading-sm: 1.25rem; /* 20 */
   --text-heading: 2rem; /* 32 */
   --text-heading-lg: 2.25rem; /* 36 */
-  --text-display: 3rem; /* 48 */
-  --text-display-lg: 4rem; /* 64 */
 
   /* ── Elevation (hairline only — no soft blurs) ──────────── */
   /* Exactly 2 layers each, matching the dark-mode pair below. box-shadow
@@ -146,7 +136,6 @@
   --page-max: 1200px;
 
   /* ── Motion durations ───────────────────────────────────── */
-  --dur-press: 140ms;
   --dur-fast: 180ms;
   --dur-base: 240ms;
   --dur-slow: 420ms;
@@ -228,20 +217,8 @@ h3 {
 }
 
 /* ── Type role utilities ──────────────────────────────────── */
-.t-display {
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: var(--text-display);
-  line-height: 1.08;
-  letter-spacing: -0.02em;
-}
-.t-display-lg {
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: var(--text-display-lg);
-  line-height: 1.04;
-  letter-spacing: -0.025em;
-}
+/* (Only the roles components actually reference — dead roles get deleted,
+ * not kept "just in case", so grep for a class before assuming it exists.) */
 .t-heading-lg {
   font-family: var(--font-display);
   font-weight: 300;
@@ -256,28 +233,12 @@ h3 {
   line-height: 1.17;
   letter-spacing: -0.02em;
 }
-.t-subheading {
-  font-size: var(--text-subheading);
-  line-height: 1.44;
-  letter-spacing: 0.01em;
-}
 .t-caption {
   font-size: var(--text-caption);
   line-height: 1.4;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.t-mono {
-  font-family: var(--font-mono);
-  font-size: var(--text-fine);
-  line-height: 1.69;
-}
-
-/* ── Reusable surfaces ────────────────────────────────────── */
-.hairline {
-  border: 1px solid var(--color-ash);
-}
-
 /* ── Spinner ──────────────────────────────────────────────── */
 .dart-spin {
   transform-origin: center;
@@ -350,13 +311,6 @@ h3 {
 }
 
 /* ── Hero copy — liveliness without slop ──────────────────── */
-/* Payoff phrase carries a single solid brand hue (violet = the primary
- * chromatic, "ad energy made visible") — nudged a touch deeper than the orb's
- * violet so the headline reads richer without dimming the 3D scene. */
-.hero-accent {
-  color: color-mix(in oklab, var(--color-violet) 85%, #000);
-}
-
 /* Key phrases lift out of the secondary-grey subhead into full ink. */
 .hero-em {
   color: var(--color-ink);
@@ -386,25 +340,6 @@ h3 {
   50% {
     box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-violet) 0%, transparent);
     opacity: 0.65;
-  }
-}
-
-/* One-shot staggered entrance for the hero stack (eyebrow → head → sub → CTA). */
-@media (prefers-reduced-motion: no-preference) {
-  .hero-rise {
-    opacity: 0;
-    animation: hero-rise var(--dur-slow) var(--ease-out) forwards;
-    animation-delay: var(--d, 0ms);
-  }
-}
-@keyframes hero-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
   }
 }
 
@@ -561,8 +496,9 @@ h3 {
 /* The landing components consume the night-set tokens as ROLES: night=canvas,
  * night-2=surface, night-3=elevated, seam=border, linen=primary text,
  * moth=secondary, dusk=tertiary, glint=accent. `.landing` carries the shared
- * behaviour; the mode class (`landing-light` today, `landing-night` when dark
- * mode ships) sets the values and the canvas blooms. */
+ * behaviour; the theme rides <html data-theme> — Bloom values under
+ * :root:not([data-theme="night"]), Broadsheet under [data-theme="night"]
+ * (both below). */
 .landing {
   color: var(--color-linen);
 }
@@ -577,9 +513,6 @@ h3 {
 .landing .hero-em {
   color: var(--color-linen);
   font-weight: 500;
-}
-.landing .hero-accent {
-  color: var(--color-glint);
 }
 .landing .hero-live-dot {
   background: var(--color-glint);

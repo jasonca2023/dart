@@ -52,11 +52,18 @@ class _SlidingWindow:
         dq = self._hits[key]
         while dq and dq[0] <= cutoff:
             dq.popleft()
-        # Keep the table from growing unbounded across many distinct IPs.
-        if not dq and len(self._hits) > _PRUNE_AT:
-            for k in [k for k, d in self._hits.items() if not d]:
-                del self._hits[k]
-            dq = self._hits[key]
+        # Keep the table from growing unbounded across many distinct IPs. The
+        # sweep must judge each bucket by its own timestamps, not by emptiness:
+        # a one-hit IP that never returns leaves a deque holding one stale
+        # entry forever (popleft above only runs for the key being served), so
+        # an empties-only sweep would never remove exactly the buckets that
+        # accumulate.
+        if len(self._hits) > _PRUNE_AT:
+            for k in [
+                k for k, d in self._hits.items() if not d or d[-1] <= cutoff
+            ]:
+                if k != key:
+                    del self._hits[k]
         if len(dq) >= limit:
             return False
         dq.append(now)

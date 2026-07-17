@@ -25,7 +25,9 @@ export function VideoPlayer({
           controls
           playsInline
           preload="metadata"
-          className="rounded-[14px] bg-ink"
+          // bg-stage, not bg-ink: a video letterbox stays dark in both themes
+          // (ink flips to near-white cream in the app's dark mode).
+          className="rounded-[14px] bg-stage"
           style={{
             aspectRatio: RATIO[aspect],
             width: tall ? "auto" : "100%",

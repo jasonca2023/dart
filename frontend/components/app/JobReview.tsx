@@ -82,7 +82,13 @@ function ScanningCard() {
 // View of an ad loaded from the user's saved library (all browser-rendered ads
 // land here — the backend has no live job for them). Supports editing in place:
 // re-render with tweaked copy/look/format and overwrite the same entry.
-function SavedAdView({ ad }: { ad: SavedAd }) {
+function SavedAdView({ ad: initialAd }: { ad: SavedAd }) {
+  // The prop is the row as loaded with the page; editing overwrites the row
+  // server-side, so after a save the fresh copy is refetched into this state —
+  // otherwise the player would show the new video while MetaCard/ProductCard
+  // kept quoting the pre-edit format/duration/price until a full reload.
+  // (Local state is safe here: this component is keyed by ad.id upstream.)
+  const [ad, setAd] = useState(initialAd);
   const job = savedAdToJob(ad);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
@@ -149,8 +155,9 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
       URL.revokeObjectURL(u);
       flash("Downloaded");
     } catch {
-      window.open(videoUrl, "_blank", "noopener");
-      flash("Opened in new tab");
+      // Post-await window.open is popup-blocker bait — verify it opened.
+      const win = window.open(videoUrl, "_blank", "noopener");
+      flash(win ? "Opened in new tab" : "Pop-up blocked — allow pop-ups to download.");
     } finally {
       setBusy(false);
     }
@@ -192,6 +199,11 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
             setEditedAspect(asp);
             setEditing(false);
             flash("Saved");
+            // Pull the updated row so the sidebar metadata (format, length,
+            // price) reflects the edit, not the pre-edit values.
+            void getAd(ad.id).then((fresh) => {
+              if (fresh) setAd(fresh);
+            });
           }}
           onCancel={() => setEditing(false)}
         />
@@ -244,6 +256,12 @@ function SavedAdView({ ad }: { ad: SavedAd }) {
 function ClientActions({ src, jobId }: { src: string; jobId: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState<null | "dl" | "regen">(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setNote(msg);
+    setTimeout(() => setNote(null), 2400);
+  }
 
   async function download() {
     setBusy("dl");
@@ -260,7 +278,9 @@ function ClientActions({ src, jobId }: { src: string; jobId: string }) {
       a.remove();
       URL.revokeObjectURL(u);
     } catch {
-      window.open(src, "_blank", "noopener");
+      // Post-await window.open is popup-blocker bait — verify it opened.
+      const win = window.open(src, "_blank", "noopener");
+      if (!win) flash("Pop-up blocked — allow pop-ups to download.");
     } finally {
       setBusy(null);
     }
@@ -271,7 +291,10 @@ function ClientActions({ src, jobId }: { src: string; jobId: string }) {
     try {
       const job = await api.regenerate(jobId);
       router.push(`/jobs/${job.id}`);
-    } catch {
+    } catch (e) {
+      // Silence here left the user staring at a stopped spinner with no clue
+      // anything failed.
+      flash(e instanceof Error ? e.message : "Couldn’t regenerate.");
       setBusy(null);
     }
   }
@@ -286,6 +309,7 @@ function ClientActions({ src, jobId }: { src: string; jobId: string }) {
         <Refresh className="text-[18px]" />
         Regenerate
       </Button>
+      {note && <span className="text-[13px] text-driftwood">{note}</span>}
     </div>
   );
 }

@@ -635,6 +635,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
                 current = owner.json() if owner.status_code == 200 else []
                 if not current or current[0].get("user_id") != user_id:
+                    # This request lost the id race, but its uploads already
+                    # landed (under this user's own prefix — no cross-user
+                    # overwrite, just unreferenced files). Best-effort delete so
+                    # the rejected save doesn't permanently inflate the loser's
+                    # storage usage; a failed delete only leaves the same
+                    # orphan we'd otherwise have kept.
+                    orphans = [vid_path]
+                    if image_url:
+                        orphans.append(img_path)
+                    if logo_url:
+                        orphans.append(logo_path)
+                    for path in orphans:
+                        try:
+                            await client.delete(
+                                f"{base}/storage/v1/object/{VIDEO_BUCKET}/{path}",
+                                headers=auth,
+                            )
+                        except Exception:
+                            pass
                     raise DartError(
                         UNAUTHORIZED, "That ad id belongs to another user.", status=403
                     )

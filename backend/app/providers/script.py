@@ -69,10 +69,15 @@ class MockScriptGenerator(ScriptGenerator):
             f"Audio: upbeat modern background music with a gentle whoosh on the push-in and "
             f"crisp product sound design; no spoken voiceover."
         )
+        # Split points tile the full duration with strictly increasing bounds.
+        # (The old `max(2, d//3)` first cut collided with `2*d//3` at d=3–4,
+        # emitting a zero-length middle scene — the contract accepts d>=3.)
+        first = max(1, d // 3)
+        second = max(first + 1, 2 * d // 3)
         scenes = [
-            Scene(t_start=0, t_end=max(2, d // 3), description=f"Hero reveal of {product.title}", camera="slow push-in"),
-            Scene(t_start=max(2, d // 3), t_end=2 * d // 3, description=f"{target_audience} using {product.title}", camera="orbit right"),
-            Scene(t_start=2 * d // 3, t_end=d, description="Macro detail and brand beauty shot", camera="macro pan"),
+            Scene(t_start=0, t_end=first, description=f"Hero reveal of {product.title}", camera="slow push-in"),
+            Scene(t_start=first, t_end=second, description=f"{target_audience} using {product.title}", camera="orbit right"),
+            Scene(t_start=second, t_end=d, description="Macro detail and brand beauty shot", camera="macro pan"),
         ]
         return ScriptResult(script=Script(video_prompt=prompt, scenes=scenes), cost_cents=0)
 
@@ -90,7 +95,6 @@ class AnthropicScriptGenerator(ScriptGenerator):
         except ImportError as e:  # pragma: no cover - dependency guard
             raise DartError(SCRIPT_FAILED, "anthropic SDK is not installed.", status=500) from e
 
-        client = anthropic.AsyncAnthropic(api_key=self.api_key)
         content: list[dict] = [
             {"type": "text", "text": _user_prompt(product, target_audience, aspect_ratio, duration_sec)}
         ]
@@ -98,13 +102,16 @@ class AnthropicScriptGenerator(ScriptGenerator):
             content.append({"type": "image", "source": {"type": "url", "url": product.images[0]}})
 
         try:
-            resp = await client.messages.parse(
-                model=self.model,
-                max_tokens=2000,
-                system=_SYSTEM,
-                messages=[{"role": "user", "content": content}],
-                output_format=Script,
-            )
+            # Context-managed so the SDK's connection pool is closed per call
+            # instead of leaking one pool per job.
+            async with anthropic.AsyncAnthropic(api_key=self.api_key) as client:
+                resp = await client.messages.parse(
+                    model=self.model,
+                    max_tokens=2000,
+                    system=_SYSTEM,
+                    messages=[{"role": "user", "content": content}],
+                    output_format=Script,
+                )
         except Exception as e:
             raise DartError(
                 SCRIPT_FAILED, "Script generation failed.", status=502, retryable=True

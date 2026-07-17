@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Orb } from "../ui/Orb";
 import { TONE_ACCENTS } from "@/lib/adSpec";
 import { useSlidingPill } from "@/lib/useSlidingPill";
@@ -130,10 +130,33 @@ const STAGES: Stage[] = [
 export function PipelineSwitcher() {
   const [active, setActive] = useState(0);
   const stage = STAGES[active];
+  const baseId = useId();
+  const tabId = (i: number) => `${baseId}-tab-${i}`;
+  const panelId = `${baseId}-panel`;
 
   // The elevated pill is one element that slides to the active tab (instead of
   // each tab toggling its own background), measured off the real buttons.
   const { listRef, btnRefs: tabRefs, pill } = useSlidingPill<HTMLDivElement>(active);
+
+  // The ARIA tabs pattern requires roving focus: arrow keys move between tabs
+  // (activating as they go — there are no side effects to defer), Home/End
+  // jump to the extremes, and only the active tab is in the tab order.
+  const onTablistKeyDown = (e: React.KeyboardEvent) => {
+    let next: number | null = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      next = (active + 1) % STAGES.length;
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      next = (active - 1 + STAGES.length) % STAGES.length;
+    } else if (e.key === "Home") {
+      next = 0;
+    } else if (e.key === "End") {
+      next = STAGES.length - 1;
+    }
+    if (next === null) return;
+    e.preventDefault();
+    setActive(next);
+    tabRefs.current[next]?.focus();
+  };
 
   return (
     <section
@@ -150,6 +173,7 @@ export function PipelineSwitcher() {
           ref={listRef}
           role="tablist"
           aria-label="Pipeline stages"
+          onKeyDown={onTablistKeyDown}
           className="relative flex flex-wrap gap-1"
         >
           {pill && (
@@ -172,7 +196,10 @@ export function PipelineSwitcher() {
                   tabRefs.current[i] = el;
                 }}
                 role="tab"
+                id={tabId(i)}
                 aria-selected={on}
+                aria-controls={panelId}
+                tabIndex={on ? 0 : -1}
                 onClick={() => setActive(i)}
                 className={
                   "relative z-[1] rounded-badge px-3.5 py-2 text-[14px] font-medium transition-[color,transform] " +
@@ -192,7 +219,11 @@ export function PipelineSwitcher() {
         {/* Panel */}
         <div
           key={stage.key}
-          className="dart-fade mt-3 grid gap-6 rounded-card bg-night-3 p-6 sm:grid-cols-2 sm:p-8"
+          role="tabpanel"
+          id={panelId}
+          aria-labelledby={tabId(active)}
+          tabIndex={0}
+          className="dart-fade mt-3 grid gap-6 rounded-card bg-night-3 p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-linen sm:grid-cols-2 sm:p-8"
         >
           <div className="flex flex-col justify-center">
             <h3 className="font-display text-[24px] font-light leading-tight tracking-tight text-linen">

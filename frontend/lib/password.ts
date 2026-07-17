@@ -1,7 +1,11 @@
 // The one password policy, shared by signup, reset and account settings.
 
+// Must state the actual policy below exactly: the capital letter is required
+// in BOTH branches (a previous wording — "or 12+ characters" — implied length
+// alone was enough, then the validator rejected a 12-char all-lowercase
+// password anyway).
 export const PASSWORD_REQ =
-  "8+ characters with a capital letter and a special character (or 12+ characters).";
+  "A capital letter, plus a special character (8+ characters) or 12+ characters.";
 
 // Policy: a capital letter always; 8+ chars when a special character is present,
 // otherwise 12+ chars. Returns an error string, or null when the password is OK.

@@ -58,12 +58,29 @@ function clip(s: unknown, max: number): string | undefined {
 // Return the FIRST balanced {...} block that parses as an object. The model can
 // be chatty (prose, self-critique, a second attempt) — a naive first-{ to last-}
 // slice would span multiple objects and fail, so walk brace depth instead.
+// Braces inside JSON STRING values must not count ("hook": "smile :}" would
+// otherwise close depth early, truncate the slice, and drop the whole
+// response), so the walk tracks string state and backslash escapes.
 function firstJsonObject(raw: string): Record<string, unknown> | null {
   let depth = 0;
   let start = -1;
+  let inString = false;
+  let escaped = false;
   for (let i = 0; i < raw.length; i++) {
     const ch = raw[i];
-    if (ch === "{") {
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"' && depth > 0) {
+      inString = true;
+    } else if (ch === "{") {
       if (depth === 0) start = i;
       depth++;
     } else if (ch === "}" && depth > 0) {

@@ -63,11 +63,13 @@ export const metadata: Metadata = {
 };
 
 // Browser-chrome color follows the OS scheme; the in-app toggle can diverge
-// from it (meta themeColor can't react to a data attribute), which is fine —
-// first paint matches the no-FOUC script's own OS fallback.
+// from it (meta themeColor can't react to a data attribute), which is fine.
+// The dark value is the Broadsheet night canvas (oklch(13% 0.012 82) ≈
+// #090703) — the old #16161f was the retired Midnight build's blue-grey,
+// which matched nothing in the shipped theme.
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#16161f" },
+    { media: "(prefers-color-scheme: dark)", color: "#090703" },
     { media: "(prefers-color-scheme: light)", color: "#fdfcfc" },
   ],
 };

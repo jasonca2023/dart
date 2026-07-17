@@ -13,7 +13,12 @@ export default async function JobPage({
   const { id } = await params;
   return (
     <AppShell>
-      <JobReview id={id} />
+      {/* Keyed on the id: pager/regenerate navigation between /jobs/[id]
+          pages re-renders this component in place (same position, only the
+          route param changes), and JobReview holds a pile of per-ad state
+          (saved row, render refs, client-video blob) that must not leak from
+          one ad onto the next. The key forces a clean remount per ad. */}
+      <JobReview key={id} id={id} />
     </AppShell>
   );
 }

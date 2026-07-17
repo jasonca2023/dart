@@ -12,6 +12,7 @@ from app.main import create_app
 
 def make_client() -> TestClient:
     settings = Settings(
+        _env_file=None,  # hermetic: a developer's local .env must not leak in
         mock_stage_delay_sec=0.0,
         scraper_provider="mock",
         script_provider="mock",

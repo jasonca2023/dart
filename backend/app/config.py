@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     # Used by /save-ad to persist browser-rendered ads on the user's behalf.
     supabase_service_key: str | None = None
 
+    # --- Operator admin (runtime /settings routes) ---
+    # Shared secret required by the /settings endpoints. Unset (default) →
+    # those routes are disabled entirely. They mutate GLOBAL provider config,
+    # so a user login must never be enough to reach them.
+    settings_admin_key: str | None = None
+
     # --- LLM (script generation) ---
     anthropic_api_key: str | None = None
     # Model id is configurable per the PRD; never hard-code in source.

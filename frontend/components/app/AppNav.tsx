@@ -6,8 +6,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Menu } from "../icons";
+
+// useLayoutEffect fires before paint in the browser but warns during SSR;
+// AppNav is server-rendered, so swap in useEffect there (it never runs
+// server-side anyway — this just silences the render-pass warning).
+const useBrowserLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const LINKS: { href: string; label: string }[] = [
   { href: "/", label: "Dashboard" },
@@ -102,7 +108,15 @@ function storedPill(): { left: number; width: number } | null {
 export function AppNav() {
   const pathname = usePathname();
   const navRef = useRef<HTMLElement | null>(null);
-  const [pill, setPill] = useState<{ left: number; width: number } | null>(storedPill);
+  // Starts null (matching the server render — sessionStorage doesn't exist
+  // there, and lazy-initializing from it made the client's hydration pass
+  // include a pill the SSR HTML never had: a guaranteed hydration mismatch).
+  // The stored position is applied below, before first paint.
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  useBrowserLayoutEffect(() => {
+    const stored = storedPill();
+    if (stored) setPill(stored);
+  }, []);
 
   const activeIndex = LINKS.findIndex(({ href }) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href),

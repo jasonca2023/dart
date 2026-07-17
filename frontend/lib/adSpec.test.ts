@@ -106,6 +106,17 @@ describe("clampSpec", () => {
   it("never leaves scenes empty", () => {
     expect(clampSpec({ ...DEFAULT_SPEC, scenes: [] }).scenes.length).toBeGreaterThan(0);
   });
+
+  it("expands 3-digit hex so alpha-suffix concatenation stays valid", () => {
+    // The renderer builds e.g. `${panel}e6` — a 3-digit palette value would
+    // produce an invalid 5-digit color and the browser would drop the rule.
+    const s = clampSpec({
+      ...DEFAULT_SPEC,
+      palette: { ...DEFAULT_SPEC.palette, panel: "#fff", text: "#0aF" },
+    });
+    expect(s.palette.panel).toBe("#ffffff");
+    expect(s.palette.text).toBe("#00aaFF");
+  });
 });
 
 describe("tone mapping — widened playful/bold triggers", () => {

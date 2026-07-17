@@ -66,8 +66,10 @@ export function JobActions({
         URL.revokeObjectURL(objUrl);
         flash("Downloaded");
       } catch {
-        window.open(res.handoff_url, "_blank", "noopener");
-        flash("Opened in new tab");
+        // window.open after an await counts as non-user-initiated to popup
+        // blockers — check the handle instead of assuming it worked.
+        const win = window.open(res.handoff_url, "_blank", "noopener");
+        flash(win ? "Opened in new tab" : "Pop-up blocked — allow pop-ups to download.");
       }
     } catch (e) {
       flash(e instanceof Error ? e.message : "Couldn’t prepare the download.");
@@ -81,8 +83,8 @@ export function JobActions({
     setOpen(false);
     try {
       const res = await api.exportJob(jobId, dest);
-      window.open(res.handoff_url, "_blank", "noopener");
-      flash(`Handoff opened`);
+      const win = window.open(res.handoff_url, "_blank", "noopener");
+      flash(win ? "Handoff opened" : "Pop-up blocked — allow pop-ups to open the handoff.");
     } catch (e) {
       flash(e instanceof Error ? e.message : "Export failed.");
     } finally {

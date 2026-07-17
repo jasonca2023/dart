@@ -397,7 +397,17 @@ const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 /** Guard a spec so the renderer can always trust it (valid colors, sane frames). */
 export function clampSpec(spec: AdSpec): AdSpec {
   const p = spec.palette;
-  const safe = (c: string, fallback: string) => (HEX.test(c) ? c : fallback);
+  // Expand #abc → #aabbcc: the renderer concatenates 2-digit alpha suffixes
+  // onto palette colors (e.g. `${panel}e6` for scrims), and a 3-digit token
+  // would turn those into invalid 5-digit colors — the browser drops the
+  // whole declaration and the text loses its legibility scrim.
+  const safe = (c: string, fallback: string) => {
+    if (!HEX.test(c)) return fallback;
+    if (c.length === 4) {
+      return `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`;
+    }
+    return c;
+  };
   const palette: Palette = {
     stage: safe(p.stage, "#ffffff"),
     panel: safe(p.panel, "#0b0b12"),

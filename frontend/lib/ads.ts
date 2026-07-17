@@ -25,32 +25,6 @@ export interface SavedAd {
   brand_accent: string | null;
 }
 
-const VIDEO_BUCKET = "dart-videos";
-
-// Copy the rendered video into Supabase Storage so a saved ad survives backend
-// restarts and plays on any device. Returns a durable public URL — or the
-// original URL if the copy fails, so we never lose the record.
-async function persistVideo(
-  client: NonNullable<typeof supabase>,
-  userId: string,
-  jobId: string,
-  sourceUrl: string,
-): Promise<string> {
-  try {
-    const res = await fetch(sourceUrl);
-    if (!res.ok) return sourceUrl;
-    const blob = await res.blob();
-    const path = `${userId}/${jobId}.mp4`;
-    const { error } = await client.storage
-      .from(VIDEO_BUCKET)
-      .upload(path, blob, { upsert: true, contentType: "video/mp4" });
-    if (error) return sourceUrl;
-    return client.storage.from(VIDEO_BUCKET).getPublicUrl(path).data.publicUrl;
-  } catch {
-    return sourceUrl;
-  }
-}
-
 // Upsert a finished job into the signed-in user's library (idempotent on id).
 // Best-effort and never throws — it's called fire-and-forget from the UI.
 export async function saveAd(job: Job): Promise<void> {
@@ -61,10 +35,28 @@ export async function saveAd(job: Job): Promise<void> {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const videoUrl = job.video_url
-      ? await persistVideo(supabase, user.id, job.id, job.video_url)
-      : null;
+    // Durable path: fetch the video and hand it to the backend, which uploads
+    // to Storage with the service-role key and writes the row. Uploading with
+    // the browser's user token doesn't work in this project (Storage rejects
+    // user JWTs — the whole reason /save-ad exists), so this is the only path
+    // that actually yields a video URL that survives backend restarts.
+    if (job.video_url && API_BASE) {
+      try {
+        const res = await fetch(job.video_url);
+        if (res.ok) {
+          const blob = await res.blob();
+          await saveRenderedAdViaBackend(job, blob, null);
+          return;
+        }
+      } catch {
+        // fall through to the metadata-only record below
+      }
+    }
 
+    // Fallback: keep the library record with whatever URL the job carries.
+    // NOTE: for a backend-served /media URL this is ephemeral (gone on the
+    // next Render restart) — an honest record beats losing the ad, but no
+    // durability is claimed here.
     await supabase.from("dart_ads").upsert(
       {
         id: job.id,
@@ -73,7 +65,7 @@ export async function saveAd(job: Job): Promise<void> {
         target_audience: job.target_audience,
         product_title: job.product?.title ?? null,
         product_image: job.product?.images?.[0] ?? null,
-        video_url: videoUrl,
+        video_url: job.video_url || null,
         aspect_ratio: job.aspect_ratio,
         duration_sec: job.duration_sec,
         resolution: job.resolution,

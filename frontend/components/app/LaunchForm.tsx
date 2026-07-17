@@ -105,7 +105,12 @@ function ImagePicker({
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          onChange(e.target.files?.[0] ?? null);
+          // Reset so re-picking the SAME filename (a re-exported/corrected
+          // file) still fires change — with a stale value it silently no-ops.
+          e.target.value = "";
+        }}
       />
     </label>
   );
@@ -263,6 +268,9 @@ export function LaunchForm() {
     // `duration` can be NaN/0 mid-edit (cleared field); never let that reach the
     // renderer as durationInFrames — fall back to 10s.
     const dur = clampDuration(duration) || 10;
+    // Outside the try so the catch can tell a total failure from a partial
+    // one — takes/formats that finished BEFORE the error are already saved.
+    const ids: string[] = [];
     try {
       // The "brain": inputs -> creative spec, then bespoke LLM copy + brand colour.
       const baseSpec = buildAdSpec({
@@ -326,7 +334,6 @@ export function LaunchForm() {
         return id;
       };
 
-      const ids: string[] = [];
       let labels: (string | null)[] | undefined;
       try {
         if (takes === 3) {
@@ -394,7 +401,16 @@ export function LaunchForm() {
       setBatch(ids, labels);
       router.push(`/jobs/${ids[0]}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not render the ad.");
+      const reason = err instanceof Error ? err.message : "Could not render the ad.";
+      // A partial batch failure must say so: the finished takes are already in
+      // the library, and a generic error invites a re-submit that duplicates
+      // them.
+      setError(
+        ids.length > 0
+          ? `Rendered ${ids.length} before the error — they’re saved in your Ads. ` +
+              `Fix the issue and generate the rest, or find the finished ones in your library. (${reason})`
+          : reason,
+      );
       setStatus(null);
       setSubmitting(false);
     }
@@ -552,7 +568,11 @@ export function LaunchForm() {
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => onLogo(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  onLogo(e.target.files?.[0] ?? null);
+                  // Reset so re-picking the same filename still fires change.
+                  e.target.value = "";
+                }}
               />
             </label>
             {brand.logo && (

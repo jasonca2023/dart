@@ -129,7 +129,7 @@ export function applyCopy(spec: AdSpec, copy: AdCopy | null): AdSpec {
   const eyebrow = clip(copy.eyebrow, 32) ?? spec.eyebrow;
   const subhead = clip(copy.subhead, 60) ?? spec.subhead;
   const cta = clip(copy.cta, 24) ?? spec.cta;
-  const hook = clip(copy.hook, 42);
+  const hook = clipWords(copy.hook, 8, 42);
   const headline = clip(copy.name, 48) ?? spec.headline;
   const scenes = spec.scenes.map((s) => {
     if (s.type === "hook" && hook) return { ...s, text: hook };
