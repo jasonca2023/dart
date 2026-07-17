@@ -29,6 +29,7 @@ from .config import Settings, get_settings, media_root
 from .errors import (
     INVALID_INPUT,
     INVALID_URL,
+    NOT_FOUND,
     SCRAPE_FAILED,
     UNAUTHORIZED,
     DartError,
@@ -680,6 +681,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 raise DartError(SCRAPE_FAILED, f"Saving the ad failed: {r.text}", status=502)
 
         return {"video_url": video_url, "image_url": image_url}
+
+    @app.get("/_debug/sentry-test")
+    async def _sentry_test(token: str = Query("")) -> dict:
+        # TEMPORARY: token-guarded one-shot to confirm Sentry receives real
+        # unhandled errors end-to-end. Remove after verifying.
+        if token != "f72b6b98ba0f7584":
+            raise DartError(NOT_FOUND, "Not found.", status=404)
+        raise RuntimeError("Sentry backend verification error — safe to ignore.")
 
     @app.get("/health")
     async def health() -> dict:
