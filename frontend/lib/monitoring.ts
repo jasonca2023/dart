@@ -16,23 +16,31 @@ const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 type SentryModule = typeof import("@sentry/react");
 
 let sentry: SentryModule | null = null;
-let started = false;
+// A single in-flight init promise shared by every caller: the layout mounts
+// <Monitoring/> which kicks this off, and other call sites can await the SAME
+// promise instead of racing a second init (or firing before the async import
+// + init has actually finished).
+let initPromise: Promise<void> | null = null;
 
-export async function initMonitoring(): Promise<void> {
-  if (started || !DSN || typeof window === "undefined") return;
-  started = true;
-  // Only now — with a DSN present — is the SDK actually fetched.
-  const Sentry = await import("@sentry/react");
-  Sentry.init({
-    dsn: DSN,
-    environment: process.env.NEXT_PUBLIC_SENTRY_ENV ?? "production",
-    // Errors only by default — no performance tracing, no session replay — to
-    // keep quota and payload weight low. Turn these up later if wanted.
-    tracesSampleRate: 0,
-    // Don't attach the user's IP or other default PII to events.
-    sendDefaultPii: false,
-  });
-  sentry = Sentry;
+export function initMonitoring(): Promise<void> {
+  if (!DSN || typeof window === "undefined") return Promise.resolve();
+  if (!initPromise) {
+    initPromise = (async () => {
+      // Only now — with a DSN present — is the SDK actually fetched.
+      const Sentry = await import("@sentry/react");
+      Sentry.init({
+        dsn: DSN,
+        environment: process.env.NEXT_PUBLIC_SENTRY_ENV ?? "production",
+        // Errors only by default — no performance tracing, no session replay —
+        // to keep quota and payload weight low. Turn these up later if wanted.
+        tracesSampleRate: 0,
+        // Don't attach the user's IP or other default PII to events.
+        sendDefaultPii: false,
+      });
+      sentry = Sentry;
+    })();
+  }
+  return initPromise;
 }
 
 // Report a caught exception (e.g. from an error boundary). No-op until
