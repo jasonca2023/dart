@@ -13,7 +13,8 @@ const PALETTE_KEYS: (keyof Palette)[] = ["stage", "panel", "accent", "text", "on
 const heroMotion = (s: AdSpec) => s.scenes.find((x) => x.type === "hero")?.motion;
 
 describe("buildAdSpec — structure & frames", () => {
-  it("scene frames sum exactly to duration*30, each >= min, across durations & prices", () => {
+  it("scene frames sum exactly to duration*fps, each >= min, across durations & prices", () => {
+    const FPS = 60;
     for (let d = 3; d <= 20; d++) {
       for (const price of ["", "$129", "$1,299.99", "€79"]) {
         const s = buildAdSpec({
@@ -23,8 +24,8 @@ describe("buildAdSpec — structure & frames", () => {
           durationSec: d,
         });
         const sum = s.scenes.reduce((a, b) => a + b.frames, 0);
-        expect(sum).toBe(Math.round(d * 30));
-        for (const sc of s.scenes) expect(sc.frames).toBeGreaterThanOrEqual(18);
+        expect(sum).toBe(Math.round(d * FPS));
+        for (const sc of s.scenes) expect(sc.frames).toBeGreaterThanOrEqual(Math.round(FPS * 0.6));
       }
     }
   });

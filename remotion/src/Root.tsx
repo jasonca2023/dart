@@ -2,7 +2,7 @@ import { Composition } from "remotion";
 import { ProductAd, productAdSchema } from "./ProductAd";
 import { buildAdSpec } from "./adSpec";
 
-const FPS = 30;
+const FPS = 60;
 const TITLE = "2026 Model HDMI DVD Player for TV";
 const IMAGE = "https://m.media-amazon.com/images/I/71Gqkj-OujL._AC_SL1500_.jpg";
 const PRICE = "$39.99";

@@ -52,7 +52,7 @@ export interface AdSpecInput {
   variant?: number;
 }
 
-const FPS = 30;
+const FPS = 60;
 
 // --- Variety tables -------------------------------------------------------
 

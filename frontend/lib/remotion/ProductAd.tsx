@@ -28,6 +28,12 @@ export interface ProductAdProps {
   spec?: AdSpec;
 }
 
+// Render frame rate. Kept in sync with lib/render.ts and lib/adSpec.ts (which
+// budget scene frames). Timing inside the renderer is authored in 30fps-frames
+// and scaled by fps/30, so this only changes smoothness, not motion speed.
+// Higher = smoother but ~proportionally slower to render in the browser.
+const FPS_APP = 60;
+
 const up = (s: string) => (s || "").toUpperCase();
 
 // Pick readable text (ink or white) for a filled accent — so a yellow CTA isn't
@@ -83,10 +89,13 @@ function margin(u: number, portrait: boolean) {
 }
 
 // Scene-relative spring (useCurrentFrame restarts at 0 inside a Sequence).
+// `start` and t.dur are authored in 30fps-frames and scaled to the real fps, so
+// every mood's reveal keeps the same wall-clock timing at any frame rate.
 function useReveal(start: number, t: Tempo) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  return spring({ frame: frame - start, fps, durationInFrames: t.dur, config: { damping: t.damping } });
+  const k = fps / 30;
+  return spring({ frame: frame - start * k, fps, durationInFrames: t.dur * k, config: { damping: t.damping } });
 }
 
 // --- Building blocks ------------------------------------------------------
@@ -105,6 +114,7 @@ const KineticText: React.FC<{
 }> = ({ text, start, t, fontSize, weight, color, letterSpacing, align, maxWidth }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const k = fps / 30;
   const words = (text || "").split(" ");
   return (
     <div
@@ -119,9 +129,9 @@ const KineticText: React.FC<{
     >
       {words.map((w, i) => {
         const s = spring({
-          frame: frame - start - i * t.stagger,
+          frame: frame - (start + i * t.stagger) * k,
           fps,
-          durationInFrames: t.dur,
+          durationInFrames: t.dur * k,
           config: { damping: t.damping },
         });
         return (
@@ -789,12 +799,14 @@ const SceneView: React.FC<SceneProps> = (props) => {
 // other five moods render unchanged through SceneView above.
 // ===========================================================================
 
-// Overshoot pop: a bouncy spring that shoots PAST 1 and settles (vs the shipped
-// high-damping ease-out). This is what makes a word/price "punch".
-function usePop(delay: number, damping = 11) {
+// Overshoot pop: a spring that shoots a little past 1 and settles (vs the shipped
+// high-damping ease-out). This is what makes a word/price "punch". `delay` is
+// authored in 30fps-frames and scaled to the real fps so timing holds at any
+// frame rate (springs themselves are already time-based).
+function usePop(delay: number, damping = 14) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  return spring({ frame: frame - delay, fps, config: { damping, stiffness: 130, mass: 0.7 } });
+  return spring({ frame: frame - delay * (fps / 30), fps, config: { damping, stiffness: 120, mass: 0.8 } });
 }
 
 // Character-stagger reveal — each glyph pops up in turn (typed energy, not a
@@ -810,10 +822,11 @@ const CharStagger: React.FC<{
 }> = ({ text, delay, per, fontSize, weight, color, letterSpacing = 0 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const k = fps / 30;
   return (
     <div style={{ display: "flex", flexWrap: "wrap" }}>
       {(text || "").split("").map((ch, i) => {
-        const s = spring({ frame: frame - delay - i * per, fps, config: { damping: 12, stiffness: 130, mass: 0.7 } });
+        const s = spring({ frame: frame - (delay + i * per) * k, fps, config: { damping: 15, stiffness: 120, mass: 0.8 } });
         return (
           <span
             key={i}
@@ -841,12 +854,13 @@ const CharStagger: React.FC<{
 // eye resolving the image) while a tracked kicker char-staggers and a rule wipes.
 const KFlashHook: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
   const u = useUnit();
+  const k = useVideoConfig().fps / 30;
   const { panel, accent, text } = spec.palette;
-  const pop = usePop(2, 13);
-  const blur = interpolate(pop, [0, 1], [22, 0]);
-  const scale = interpolate(pop, [0, 1], [1.18, 1.04]);
+  const pop = usePop(2, 17);
+  const blur = interpolate(pop, [0, 1], [20, 0]);
+  const scale = interpolate(pop, [0, 1], [1.16, 1.03]);
   const frame = useCurrentFrame();
-  const rule = interpolate(frame, [10, 20], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const rule = interpolate(frame, [10 * k, 22 * k], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const m = margin(u, portrait);
   return (
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
@@ -888,13 +902,19 @@ const KHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) =>
   const u = useUnit();
   const { fps, width } = useVideoConfig();
   const frame = useCurrentFrame();
+  const k = fps / 30;
   const { panel, accent, text } = spec.palette;
   const p = interpolate(frame, [0, scene.frames], [0, 1], { extrapolateRight: "clamp" });
   const cam = interpolate(p, [0, 1], [1.0, 1.12]);
-  const enter = usePop(2, 16);
   const bgX = interpolate(p, [0, 1], [40 * u, -90 * u]);
   const prodX = interpolate(p, [0, 1], [10 * u, -22 * u]);
-  const sweep = interpolate(frame, [8, 26], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Wipe reveal: a glowing accent edge sweeps across ONCE, revealing the product
+  // as it passes, then continues off-frame and fades. The line now has a purpose
+  // (it IS the reveal) and never parks on screen.
+  const rev = interpolate(frame, [4 * k, 22 * k], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const barPos = rev * 114; // % across the frame; ends off the right edge
+  const prodClip = `inset(0 ${Math.max(0, 100 - rev * 118)}% 0 0)`;
+  const barOpacity = interpolate(rev, [0, 0.06, 0.82, 1], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const words = up(spec.headline).split(" ").filter(Boolean);
   // Fit the slam to ANY headline: cap the size so the longest word can't overflow
   // the column (condensed caps advance ~0.5em/char). Long product-title headlines
@@ -932,17 +952,30 @@ const KHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) =>
             maxHeight: portrait ? "56%" : "64%",
             objectFit: "contain",
             filter: "drop-shadow(0 34px 64px rgba(0,0,0,0.55))",
-            transform: `translateX(${prodX}px) scale(${cam * interpolate(enter, [0, 1], [0.92, 1])})`,
-            opacity: interpolate(enter, [0, 0.5], [0, 1], { extrapolateRight: "clamp" }),
+            transform: `translateX(${prodX}px) scale(${cam})`,
+            clipPath: prodClip,
           }}
         />
       </AbsoluteFill>
-      <div style={{ position: "absolute", top: 0, bottom: 0, left: `${interpolate(sweep, [0, 1], [-10, 88])}%`, width: 8 * u, backgroundColor: accent, opacity: 0.9 }} />
+      <div
+        style={{
+          position: "absolute",
+          top: "-4%",
+          bottom: "-4%",
+          left: `${barPos}%`,
+          width: 6 * u,
+          marginLeft: -3 * u,
+          backgroundColor: accent,
+          opacity: barOpacity,
+          filter: `blur(${1.2 * u}px)`,
+          boxShadow: `0 0 ${28 * u}px ${accent}, 0 0 ${8 * u}px ${accent}`,
+        }}
+      />
       <AbsoluteFill style={{ backgroundImage: scrim }} />
       <AbsoluteFill style={{ justifyContent: "flex-end", padding: `0 ${margin(u, portrait)}px ${(portrait ? 90 : 64) * u}px` }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: `${hlSize * 0.04}px ${hlSize * 0.24}px`, maxWidth: "100%" }}>
           {words.map((w, i) => {
-            const s = spring({ frame: frame - 6 - i * 4, fps, config: { damping: 11, stiffness: 140, mass: 0.7 } });
+            const s = spring({ frame: frame - (6 + i * 4) * k, fps, config: { damping: 14, stiffness: 120, mass: 0.8 } });
             const accentWord = i === words.length - 1;
             return (
               <div key={i} style={{ overflow: "hidden", clipPath: `inset(0 ${interpolate(s, [0, 1], [100, 0])}% 0 0)`, paddingBottom: hlSize * 0.04 }}>
@@ -976,7 +1009,7 @@ const KFeature: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
   const { onStage, accent } = spec.palette;
   const frame = useCurrentFrame();
   const kb = interpolate(frame, [0, scene.frames], [1.0, 1.06], { extrapolateRight: "clamp" });
-  const chip = usePop(6, 14);
+  const chip = usePop(6, 16);
   return (
     <AbsoluteFill style={{ backgroundColor: onStage, overflow: "hidden" }}>
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
@@ -1038,10 +1071,11 @@ const KPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const { accent } = spec.palette;
   const ink = readableOn(accent);
   const frame = useCurrentFrame();
-  const flood = interpolate(frame, [0, 8], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const slam = usePop(7, 9);
-  const lead = usePop(4, 16);
-  const rule = interpolate(frame, [20, 30], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const k = useVideoConfig().fps / 30;
+  const flood = interpolate(frame, [0, 9 * k], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const slam = usePop(7, 13);
+  const lead = usePop(4, 17);
+  const rule = interpolate(frame, [20 * k, 32 * k], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   return (
     <AbsoluteFill
       style={{
@@ -1090,7 +1124,7 @@ const KOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnoc
   const { panel, accent, text } = spec.palette;
   const m = margin(u, portrait);
   const title = usePop(3, 18);
-  const pill = usePop(10, 12);
+  const pill = usePop(10, 15);
   const logoIn = usePop(3, 18);
   // Fit the sign-off title so a long product-title headline can't overflow.
   const words = up(spec.headline).split(" ").filter(Boolean);
@@ -1193,7 +1227,7 @@ function fallbackSpec(props: ProductAdProps): AdSpec {
     Number.isFinite(props.durationInSeconds) && props.durationInSeconds >= 3
       ? props.durationInSeconds
       : 10;
-  const total = Math.max(1, Math.round(seconds * 30));
+  const total = Math.max(1, Math.round(seconds * FPS_APP));
   const hook = Math.round(total * 0.18);
   const outro = Math.round(total * 0.2);
   return {
@@ -1229,12 +1263,13 @@ const SceneStage: React.FC<{
 }> = ({ index, frames, exit, children }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const e = spring({ frame, fps, durationInFrames: 14, config: { damping: 200 } });
+  const k = fps / 30;
+  const e = spring({ frame, fps, durationInFrames: 14 * k, config: { damping: 200 } });
   const mode = index % 3;
   // Cut-with-motion: in its last frames each beat eases out along its entry axis,
   // accelerating away (transform only — no opacity dip), so a cut reads as a
   // deliberate transition. The final scene (`exit` false) holds its frame.
-  const exitWindow = 7;
+  const exitWindow = 7 * k;
   const er = exit && frames > exitWindow ? Math.max(0, (frame - (frames - exitWindow)) / exitWindow) : 0;
   const ex = er * er; // ease-in → accelerate out
   const tx = mode === 0 ? interpolate(e, [0, 1], [26, 0]) : 0;

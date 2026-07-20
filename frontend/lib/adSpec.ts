@@ -52,7 +52,9 @@ export interface AdSpecInput {
   variant?: number;
 }
 
-const FPS = 30;
+// Render frame rate — must match lib/render.ts and the renderer (ProductAd).
+// 60 for smoother motion; renderer timing scales by fps/30 so speed is unchanged.
+const FPS = 60;
 
 // --- Variety tables -------------------------------------------------------
 

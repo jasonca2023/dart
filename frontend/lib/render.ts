@@ -1,7 +1,9 @@
 import type { ProductAdProps } from "./remotion/ProductAd";
 import type { AspectRatio } from "./types";
 
-const FPS = 30;
+// Must match lib/adSpec.ts (scene-frame budgeting) and the renderer. 60 for
+// smoother motion; ~doubles in-browser render time vs 30.
+const FPS = 60;
 
 export function dimsFor(aspectRatio: AspectRatio) {
   switch (aspectRatio) {
