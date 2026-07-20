@@ -32,8 +32,9 @@ images. It does no video generation.
   confirmation. `POST /auth/overview` reports storage usage for the account page (token
   only).
 - **`GET /health`** — liveness, which providers are wired, whether `/save-ad` is configured,
-  whether the Safari colour re-tag is ready (`video_retag_ready`), and whether signup code
-  emails are configured (`signup_email_ready`).
+  whether the Safari colour re-tag is ready (`video_retag_ready`), whether signup code
+  emails are configured (`signup_email_ready`), and whether error monitoring is active
+  (`monitoring_ready` — true when `SENTRY_DSN` is set).
 
 The public endpoints (`/proxy-image`, `/store-products`, `/save-ad`, `/auth/signup/*`,
 `/auth/reset/*`) are
@@ -60,7 +61,8 @@ app/
   store.py           # in-memory JobStore        (legacy pipeline)
   pipeline.py        # async orchestrator        (legacy pipeline)
   api/jobs.py        # /jobs routes              (legacy pipeline, auth-gated)
-  api/settings.py    # /settings routes          (legacy pipeline, auth-gated)
+  api/settings.py    # /settings routes          (legacy pipeline, admin-key-gated)
+  monitoring.py      # Sentry init (env-gated; inert without SENTRY_DSN)
   providers/         # scraper / script / video adapters (legacy, mock by default)
 tests/               # end-to-end API tests against the mock pipeline
 ```
@@ -92,7 +94,10 @@ sender). Without them, `/auth/signup/*` and `/auth/reset/*` return 503 — no
 accounts can be created and no passwords reset (sign-in for existing accounts
 still works).
 
-Optional tuning (sane defaults built in): `RATE_LIMIT_*` per-IP ceilings and
+Optional: `SENTRY_DSN` turns on error monitoring (with `SENTRY_ENVIRONMENT` and
+`SENTRY_TRACES_SAMPLE_RATE`, default `0.1` = 10% performance tracing) — fully inert
+without a DSN. `SETTINGS_ADMIN_KEY` enables the legacy `/settings` routes (disabled
+otherwise). Tuning knobs with sane defaults: `RATE_LIMIT_*` per-IP ceilings and
 `VIDEO_RETAG_ENABLED`. See `../.env.example`.
 
 The legacy provider vars (`VIDEO_PROVIDER`, `LTX_API_KEY`, `SCRAPER_PROVIDER`,
@@ -104,5 +109,8 @@ defaults.
 `/save-ad` requires a Supabase login: the frontend sends the user's access token (in
 the multipart body), and `auth.py` validates it by calling Supabase's `/auth/v1/user`
 — signing-algorithm agnostic, so it works regardless of the token format. The legacy
-`/jobs` and `/settings` write routes use the same check via `require_user`. Enforced
-only when `SUPABASE_URL` is set; unset locally → open for dev.
+`/jobs` write routes use the same check via `require_user` (enforced only when
+`SUPABASE_URL` is set; unset locally → open for dev). The legacy `/settings` routes
+are gated separately on the operator's `SETTINGS_ADMIN_KEY` (an `X-Admin-Key` header),
+since they mutate global provider config — a normal user login is not enough; they
+return `404` when that key is unset.

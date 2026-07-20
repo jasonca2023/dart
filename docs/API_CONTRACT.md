@@ -155,10 +155,12 @@ Read-only stats for the account page (no password confirmation needed).
   "save_ad_ready": true,
   "video_retag_ready": true,
   "signup_email_ready": true,
+  "monitoring_ready": true,
   "providers": { "scraper": "...", "script": "...", "video": "..." } }
 ```
 `video_retag_ready` is true only when ffmpeg is present **and** the re-tag is enabled;
-`signup_email_ready` when Brevo is configured (`BREVO_API_KEY` + `AUTH_EMAIL_FROM`).
+`signup_email_ready` when Brevo is configured (`BREVO_API_KEY` + `AUTH_EMAIL_FROM`);
+`monitoring_ready` when Sentry is configured (`SENTRY_DSN`).
 
 ---
 
@@ -179,5 +181,7 @@ An earlier server-side pipeline (`POST /jobs`, `GET /jobs/{id}`, `GET /jobs`,
 `POST /jobs/{id}/regenerate`, `POST /jobs/{id}/export`, `GET/POST /settings*`) still
 exists behind the same app and is covered by tests with all-mock providers, but the
 shipped product does not call it — generation and rendering happen in the browser, and
-persistence goes through `/save-ad`. These routes require a Supabase login when
-`SUPABASE_URL` is set, and are rate limited.
+persistence goes through `/save-ad`. The `/jobs` routes require a Supabase login when
+`SUPABASE_URL` is set; the `/settings` routes instead require the operator's
+`SETTINGS_ADMIN_KEY` (via an `X-Admin-Key` header) and return `404` when that key is
+unset. All are rate limited.

@@ -28,6 +28,9 @@ only persists finished ads and proxies images.
 - **Secrets are server-side only.** Never put the Supabase service-role key (or any
   secret) in `frontend/` or commit it. Only `NEXT_PUBLIC_*` reaches the browser, and
   the Supabase publishable/anon key is browser-safe.
+- **Error monitoring is env-gated.** Sentry (`backend/app/monitoring.py`,
+  `frontend/lib/monitoring.ts`) stays fully inert without a DSN — no init, no network,
+  no client bytes. Keep new monitoring code behind that gate; never hard-code a DSN.
 - **Don't hard-code model ids** — read them from config. Current Claude ids:
   `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`. Ad copy runs on
   Cloudflare Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`).

@@ -1,7 +1,7 @@
 # Dart — Product Requirements Document
 
 **Status:** Shipped v1
-**Last updated:** 2026-06-29
+**Last updated:** 2026-07-19
 **Owner:** @jasonca2023
 
 > This product pivoted from its original concept (paste a product URL → an LLM script
@@ -176,6 +176,8 @@ The brand kit (accent + logo) lives in browser `localStorage`, not the database.
   sanitises the client `id` and scopes each write to the token's user.
 - **Accessibility:** `:focus-visible` rings; motion gated behind
   `prefers-reduced-motion`.
+- **Observability:** optional Sentry error monitoring on both ends (env-gated — inert
+  without a DSN); CI runs typecheck, tests and a production build on every push.
 
 ---
 

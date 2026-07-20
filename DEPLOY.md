@@ -20,8 +20,12 @@ Deploy the **backend first** so you have its URL for the frontend build.
 New **Web Service** → connect the repo → **Root Directory** `backend`, **Runtime**
 Docker → add the env vars below → Create. Note the `*.onrender.com` URL.
 
-There's no `render.yaml`, so Render does **not** auto-deploy on push — redeploy with
-**Manual Deploy → "Deploy latest commit"**.
+There's no `render.yaml`, so Render does **not** auto-deploy on push — redeploy from the
+dashboard (**Manual Deploy → "Deploy latest commit"**) or with the Render CLI:
+
+```bash
+render deploys create <service-id> --commit <sha> --wait --confirm
+```
 
 **Env vars** (all server-side):
 
@@ -30,6 +34,7 @@ There's no `render.yaml`, so Render does **not** auto-deploy on push — redeplo
 | `SUPABASE_URL` | your Supabase project URL, e.g. `https://<ref>.supabase.co`. **Required** for `/save-ad`, and setting it makes the write endpoints require a valid login. |
 | `SUPABASE_SERVICE_KEY` | the Supabase **service-role** key. Used by `/save-ad` to upload the video/image and write the library row (Storage rejects user JWTs directly). **Secret — never expose to the browser.** |
 | `CORS_ORIGINS` | JSON array including the frontend origin, e.g. `'["https://dart-frontend.YOURNAME.workers.dev"]'` |
+| `SENTRY_DSN` | *(optional)* error monitoring. Set the DSN of a Python/FastAPI Sentry project to turn it on; unset → monitoring is fully inert. `SENTRY_TRACES_SAMPLE_RATE` defaults to `0.1` (10% performance tracing). |
 
 > The legacy `VIDEO_PROVIDER` / `LTX_API_KEY` / `SCRAPER_PROVIDER` / `ANTHROPIC_API_KEY`
 > vars belong to an older server-side video pipeline that the shipped app no longer
@@ -54,13 +59,16 @@ wrangler login                    # authorize Cloudflare
 export NEXT_PUBLIC_API_BASE_URL=https://<backend>.onrender.com
 export NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 export NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxx
+# optional — browser error monitoring (separate JavaScript/React Sentry project):
+export NEXT_PUBLIC_SENTRY_DSN=https://<key>@<org>.ingest.sentry.io/<project>
 
 npm run deploy                    # OpenNext build + wrangler deploy
 ```
 
 Or via the Cloudflare git integration: Workers → Create → connect the repo →
-**Root directory** `frontend`, **Build command** `npm run deploy` → add the three
-`NEXT_PUBLIC_*` vars as **build** environment variables.
+**Root directory** `frontend`, **Build command** `npm run deploy` → add the
+`NEXT_PUBLIC_*` vars (the three required, plus the optional Sentry DSN) as **build**
+environment variables.
 
 Note the Worker URL (e.g. `https://dart-frontend.YOURNAME.workers.dev`).
 Rendering needs WebCodecs, so visitors use a recent Chrome, Edge, Firefox, or Safari.

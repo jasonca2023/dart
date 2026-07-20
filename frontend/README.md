@@ -69,4 +69,8 @@ Storage, row-level secured) via the backend's `/save-ad`.
 - `components/app/` — the generate form, preview, review and library components
 - `lib/` — `adSpec.ts` (the brain), `remotion/` (the renderer + fonts), `copy.ts`,
   `render.ts`, `bgRemove.ts`, `logo.ts`, `brand.ts`, `ads.ts`, `supabase.ts` + `auth.tsx`,
-  `types.ts`, `format.ts`, `hooks.ts`, `mock.ts`
+  `types.ts`, `format.ts`, `hooks.ts`, `mock.ts`, `monitoring.ts` (env-gated Sentry)
+
+> Error monitoring is optional and env-gated: set `NEXT_PUBLIC_SENTRY_DSN` and the
+> browser SDK (`@sentry/react`) loads via `components/Monitoring.tsx` + the `app/error.tsx`
+> boundary. With no DSN nothing initialises and the SDK is never even downloaded.

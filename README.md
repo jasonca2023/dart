@@ -82,6 +82,10 @@ keeping rendering free, deterministic and entirely in the browser.
 - **Auth + storage** — Supabase email+password auth (signups and password resets confirmed by a 6-digit email code); per-user saved ads (Postgres +
   Storage, row-level secured). The backend derives the user from their Supabase token to
   scope each save.
+- **Error monitoring** *(optional)* — Sentry on both ends (FastAPI on the backend,
+  `@sentry/react` in the browser), fully **env-gated**: with no DSN it never initialises,
+  makes no network calls, and ships zero bytes to the client. CI runs typecheck, tests and
+  a production build on every push.
 
 ## Quick start
 
