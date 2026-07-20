@@ -778,9 +778,420 @@ const SceneView: React.FC<SceneProps> = (props) => {
   }
 };
 
+// ===========================================================================
+// Kinetic treatment (energetic mood only). A purpose-built motion vocabulary —
+// overshoot pop, blur-to-focus, line-wipe, character stagger, a virtual camera
+// push with parallax, and a color-flood price slam — mapped onto the SAME spec
+// scene list (hook/hero/feature/price/outro) so timing, duration and formats
+// still come from buildAdSpec. Only tone === "energetic" takes this path; the
+// other five moods render unchanged through SceneView above.
+// ===========================================================================
+
+// Overshoot pop: a bouncy spring that shoots PAST 1 and settles (vs the shipped
+// high-damping ease-out). This is what makes a word/price "punch".
+function usePop(delay: number, damping = 11) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  return spring({ frame: frame - delay, fps, config: { damping, stiffness: 130, mass: 0.7 } });
+}
+
+// Character-stagger reveal — each glyph pops up in turn (typed energy, not a
+// block fade).
+const CharStagger: React.FC<{
+  text: string;
+  delay: number;
+  per: number;
+  fontSize: number;
+  weight: number;
+  color: string;
+  letterSpacing?: number;
+}> = ({ text, delay, per, fontSize, weight, color, letterSpacing = 0 }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap" }}>
+      {(text || "").split("").map((ch, i) => {
+        const s = spring({ frame: frame - delay - i * per, fps, config: { damping: 12, stiffness: 130, mass: 0.7 } });
+        return (
+          <span
+            key={i}
+            style={{
+              display: "inline-block",
+              whiteSpace: "pre",
+              opacity: interpolate(s, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }),
+              transform: `translateY(${interpolate(s, [0, 1], [fontSize * 0.5, 0])}px) scale(${interpolate(s, [0, 1], [0.7, 1])})`,
+              color,
+              fontSize,
+              fontWeight: weight,
+              letterSpacing,
+              lineHeight: 1,
+            }}
+          >
+            {ch}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
+// K1 · Flash hook — product punches in out of a blur (blur-to-focus keeps the
+// eye resolving the image) while a tracked kicker char-staggers and a rule wipes.
+const KFlashHook: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
+  const u = useUnit();
+  const { panel, accent, text } = spec.palette;
+  const pop = usePop(2, 13);
+  const blur = interpolate(pop, [0, 1], [22, 0]);
+  const scale = interpolate(pop, [0, 1], [1.18, 1.04]);
+  const frame = useCurrentFrame();
+  const rule = interpolate(frame, [10, 20], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const m = margin(u, portrait);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+        <Img
+          src={productImage}
+          crossOrigin="anonymous"
+          style={{
+            width: portrait ? "82%" : "62%",
+            maxHeight: portrait ? "62%" : "76%",
+            objectFit: "contain",
+            filter: `blur(${blur}px) drop-shadow(0 30px 60px rgba(0,0,0,0.5))`,
+            transform: `scale(${scale})`,
+            opacity: interpolate(pop, [0, 0.4], [0, 1], { extrapolateRight: "clamp" }),
+          }}
+        />
+      </AbsoluteFill>
+      <AbsoluteFill
+        style={{
+          backgroundImage: portrait
+            ? `linear-gradient(to top, ${panel} 2%, ${panel}cc 20%, ${panel}00 46%)`
+            : `linear-gradient(to right, ${panel} 0%, ${panel}cc 22%, ${panel}00 46%)`,
+        }}
+      />
+      <AbsoluteFill style={{ justifyContent: portrait ? "flex-end" : "center", padding: portrait ? `0 ${m}px ${64 * u}px` : `0 ${m}px` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 * u }}>
+          <div style={{ width: interpolate(rule, [0, 1], [0, 70 * u]), height: 5 * u, backgroundColor: accent, flexShrink: 0 }} />
+          <CharStagger text={up(spec.eyebrow)} delay={6} per={1.4} fontSize={(portrait ? 24 : 30) * u} weight={800} color={text} letterSpacing={5 * u} />
+        </div>
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+
+// K2 · Kinetic hero — headline words slam in (overshoot + line-wipe) while the
+// product holds behind a VIRTUAL CAMERA push and a parallax wordmark; an accent
+// bar sweeps across. Depth + rhythm the flat cards never had.
+const KHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+  const u = useUnit();
+  const { fps, width } = useVideoConfig();
+  const frame = useCurrentFrame();
+  const { panel, accent, text } = spec.palette;
+  const p = interpolate(frame, [0, scene.frames], [0, 1], { extrapolateRight: "clamp" });
+  const cam = interpolate(p, [0, 1], [1.0, 1.12]);
+  const enter = usePop(2, 16);
+  const bgX = interpolate(p, [0, 1], [40 * u, -90 * u]);
+  const prodX = interpolate(p, [0, 1], [10 * u, -22 * u]);
+  const sweep = interpolate(frame, [8, 26], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const words = up(spec.headline).split(" ").filter(Boolean);
+  // Fit the slam to ANY headline: cap the size so the longest word can't overflow
+  // the column (condensed caps advance ~0.5em/char). Long product-title headlines
+  // then wrap across lines instead of clipping.
+  const avail = width - 2 * margin(u, portrait);
+  const longest = words.reduce((m, w) => Math.max(m, w.length), 1);
+  const hlSize = Math.min((portrait ? 90 : 118) * u, avail / (longest * 0.54));
+  // Product sits in the upper band, the slam hangs off the bottom over a strong
+  // scrim — so the headline is legible in EVERY format (a centered headline over
+  // a centered product goes unreadable on square/landscape).
+  const scrim = `linear-gradient(to top, ${panel} 10%, ${panel}e6 32%, ${panel}00 62%)`;
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: "4%" }}>
+        <div
+          style={{
+            transform: `translateX(${bgX}px) scale(${cam * 1.04})`,
+            color: text,
+            opacity: 0.05,
+            fontSize: 340 * u,
+            fontWeight: 800,
+            whiteSpace: "nowrap",
+            letterSpacing: -6 * u,
+          }}
+        >
+          {up(words[0] || "NEW")}
+        </div>
+      </AbsoluteFill>
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: portrait ? "8%" : "5%" }}>
+        <Img
+          src={productImage}
+          crossOrigin="anonymous"
+          style={{
+            width: portrait ? "78%" : "54%",
+            maxHeight: portrait ? "56%" : "64%",
+            objectFit: "contain",
+            filter: "drop-shadow(0 34px 64px rgba(0,0,0,0.55))",
+            transform: `translateX(${prodX}px) scale(${cam * interpolate(enter, [0, 1], [0.92, 1])})`,
+            opacity: interpolate(enter, [0, 0.5], [0, 1], { extrapolateRight: "clamp" }),
+          }}
+        />
+      </AbsoluteFill>
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: `${interpolate(sweep, [0, 1], [-10, 88])}%`, width: 8 * u, backgroundColor: accent, opacity: 0.9 }} />
+      <AbsoluteFill style={{ backgroundImage: scrim }} />
+      <AbsoluteFill style={{ justifyContent: "flex-end", padding: `0 ${margin(u, portrait)}px ${(portrait ? 90 : 64) * u}px` }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: `${hlSize * 0.04}px ${hlSize * 0.24}px`, maxWidth: "100%" }}>
+          {words.map((w, i) => {
+            const s = spring({ frame: frame - 6 - i * 4, fps, config: { damping: 11, stiffness: 140, mass: 0.7 } });
+            const accentWord = i === words.length - 1;
+            return (
+              <div key={i} style={{ overflow: "hidden", clipPath: `inset(0 ${interpolate(s, [0, 1], [100, 0])}% 0 0)`, paddingBottom: hlSize * 0.04 }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    transform: `translateY(${interpolate(s, [0, 1], [22, 0])}px) scale(${interpolate(s, [0, 1], [1.1, 1])})`,
+                    transformOrigin: "left bottom",
+                    color: accentWord ? accent : text,
+                    fontSize: hlSize,
+                    fontWeight: 800,
+                    letterSpacing: -2 * u,
+                    lineHeight: 0.9,
+                  }}
+                >
+                  {w}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+
+// K3 · Feature pin — a call-out chip WIPES in and pins to the product with a
+// connector dot; the product ken-burns behind it. The product is annotated.
+const KFeature: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+  const u = useUnit();
+  const { onStage, accent } = spec.palette;
+  const frame = useCurrentFrame();
+  const kb = interpolate(frame, [0, scene.frames], [1.0, 1.06], { extrapolateRight: "clamp" });
+  const chip = usePop(6, 14);
+  return (
+    <AbsoluteFill style={{ backgroundColor: onStage, overflow: "hidden" }}>
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+        <Img
+          src={productImage}
+          crossOrigin="anonymous"
+          style={{
+            width: portrait ? "74%" : "56%",
+            maxHeight: portrait ? "64%" : "78%",
+            objectFit: "contain",
+            filter: "drop-shadow(0 30px 60px rgba(0,0,0,0.5))",
+            transform: `scale(${kb})`,
+          }}
+        />
+      </AbsoluteFill>
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: portrait ? "34%" : "42%",
+          width: 14 * u,
+          height: 14 * u,
+          marginLeft: -7 * u,
+          borderRadius: "50%",
+          backgroundColor: accent,
+          opacity: chip,
+          boxShadow: `0 0 0 ${6 * u}px ${accent}33`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: margin(u, portrait),
+          bottom: (portrait ? 130 : 110) * u,
+          transform: `translateX(${interpolate(chip, [0, 1], [-40 * u, 0])}px)`,
+          clipPath: `inset(0 ${interpolate(chip, [0, 1], [100, 0])}% 0 0)`,
+          backgroundColor: accent,
+          color: readableOn(accent),
+          padding: `${20 * u}px ${28 * u}px`,
+          borderRadius: 3 * u,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8 * u,
+          maxWidth: "66%",
+        }}
+      >
+        <span style={{ fontSize: (portrait ? 17 : 20) * u, letterSpacing: 3 * u, fontWeight: 800, opacity: 0.8 }}>{up(scene.label || spec.eyebrow)}</span>
+        <span style={{ fontSize: (portrait ? 40 : 52) * u, fontWeight: 800, lineHeight: 0.98, letterSpacing: -0.5 * u }}>{scene.value || spec.subhead}</span>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// K4 · Price slam — THE SIGNATURE MOMENT. An accent field floods up, the price
+// punches in oversized on heavy overshoot and settles (tabular), a value tag
+// drops in above. The beat the ad is remembered by.
+const KPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
+  const u = useUnit();
+  const { accent } = spec.palette;
+  const ink = readableOn(accent);
+  const frame = useCurrentFrame();
+  const flood = interpolate(frame, [0, 8], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const slam = usePop(7, 9);
+  const lead = usePop(4, 16);
+  const rule = interpolate(frame, [20, 30], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  return (
+    <AbsoluteFill
+      style={{
+        backgroundColor: accent,
+        justifyContent: "center",
+        alignItems: "center",
+        overflow: "hidden",
+        clipPath: `inset(0 0 ${interpolate(flood, [0, 1], [100, 0])}% 0)`,
+      }}
+    >
+      <div
+        style={{
+          opacity: interpolate(lead, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }),
+          transform: `translateY(${interpolate(lead, [0, 1], [-20, 0])}px)`,
+          color: ink,
+          fontSize: (portrait ? 26 : 34) * u,
+          fontWeight: 800,
+          letterSpacing: 7 * u,
+        }}
+      >
+        {up(PRICE_LEAD[spec.tone])}
+      </div>
+      <div
+        style={{
+          transform: `scale(${interpolate(slam, [0, 1], [0.3, 1])})`,
+          color: ink,
+          fontSize: (portrait ? 220 : 320) * u,
+          fontWeight: 800,
+          lineHeight: 0.86,
+          letterSpacing: -8 * u,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {scene.value}
+      </div>
+      <div style={{ marginTop: 18 * u, width: interpolate(rule, [0, 1], [0, 200 * u]), height: 6 * u, backgroundColor: ink }} />
+    </AbsoluteFill>
+  );
+};
+
+// K5 · CTA card — a color flood carries out of the price into the sign-off:
+// brand logo (knockout) or title, plus a CTA pill that pops. Continuity, not a cut.
+const KOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnockout }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text } = spec.palette;
+  const m = margin(u, portrait);
+  const title = usePop(3, 18);
+  const pill = usePop(10, 12);
+  const logoIn = usePop(3, 18);
+  // Fit the sign-off title so a long product-title headline can't overflow.
+  const words = up(spec.headline).split(" ").filter(Boolean);
+  const longest = words.reduce((mx, w) => Math.max(mx, w.length), 1);
+  const titleSize = Math.min((portrait ? 74 : 104) * u, (width - 2 * m) / (longest * 0.54));
+  if (brandLogo) {
+    const knockout = brandLogoKnockout !== false;
+    return (
+      <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 42 * u, padding: `0 ${m}px`, overflow: "hidden" }}>
+        <Img
+          src={brandLogo}
+          crossOrigin="anonymous"
+          style={{
+            height: (portrait ? 60 : 84) * u,
+            width: "auto",
+            maxWidth: "66%",
+            objectFit: "contain",
+            opacity: interpolate(logoIn, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }),
+            transform: `scale(${interpolate(logoIn, [0, 1], [0.7, 1])})`,
+            ...(knockout ? { filter: "brightness(0) invert(1)" } : {}),
+          }}
+        />
+        <div
+          style={{
+            transform: `scale(${interpolate(pill, [0, 1], [0.6, 1])})`,
+            padding: `${18 * u}px ${40 * u}px`,
+            backgroundColor: accent,
+            color: readableOn(accent),
+            fontSize: 30 * u,
+            fontWeight: 800,
+            letterSpacing: 1 * u,
+            borderRadius: 6 * u,
+          }}
+        >
+          {`${up(spec.cta)}  →`}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "flex-start", padding: `0 ${m}px`, overflow: "hidden" }}>
+      <div
+        style={{
+          opacity: interpolate(title, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }),
+          transform: `translateY(${interpolate(title, [0, 1], [30, 0])}px)`,
+          color: text,
+          fontSize: titleSize,
+          fontWeight: 800,
+          lineHeight: 0.92,
+          letterSpacing: -2 * u,
+          maxWidth: "16ch",
+          marginBottom: 40 * u,
+        }}
+      >
+        {up(spec.headline)}
+      </div>
+      <div
+        style={{
+          transform: `scale(${interpolate(pill, [0, 1], [0.6, 1])})`,
+          transformOrigin: "left",
+          padding: `${18 * u}px ${40 * u}px`,
+          backgroundColor: accent,
+          color: readableOn(accent),
+          fontSize: (portrait ? 26 : 30) * u,
+          fontWeight: 800,
+          letterSpacing: 1 * u,
+          borderRadius: 6 * u,
+        }}
+      >
+        {`${up(spec.cta)}  →`}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// Dispatch a spec scene to its kinetic beat (energetic only).
+const KineticBeat: React.FC<SceneProps> = (props) => {
+  switch (props.scene.type) {
+    case "hook":
+      return <KFlashHook {...props} />;
+    case "feature":
+      return <KFeature {...props} />;
+    case "price":
+      return <KPrice {...props} />;
+    case "outro":
+      return <KOutro {...props} />;
+    case "benefit":
+      return <KFlashHook {...props} />;
+    default:
+      return <KHero {...props} />;
+  }
+};
+
 // Derive a clean banded spec when none is supplied (keeps old callers working).
 function fallbackSpec(props: ProductAdProps): AdSpec {
-  const total = Math.max(1, Math.round(props.durationInSeconds * 30));
+  // Same NaN/short-duration guard buildAdSpec carries: NaN propagates through
+  // Math.max/round into every scene's frames, and a sub-second duration
+  // rounds a scene to 0 frames — <Sequence durationInFrames={0}> throws.
+  const seconds =
+    Number.isFinite(props.durationInSeconds) && props.durationInSeconds >= 3
+      ? props.durationInSeconds
+      : 10;
+  const total = Math.max(1, Math.round(seconds * 30));
   const hook = Math.round(total * 0.18);
   const outro = Math.round(total * 0.2);
   return {
@@ -858,6 +1269,9 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
   const portrait = height > width;
   const wide = width > height * 1.2; // only 16:9 — square/vertical stack
   const ins = safeInsets(width, height);
+  // The energetic mood renders through the kinetic beat set (its own motion
+  // vocabulary + a signature price slam); every other mood keeps SceneView.
+  const kinetic = spec.tone === "energetic";
 
   let offset = 0;
 
@@ -882,8 +1296,8 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
           offset += scene.frames;
           return (
             <Sequence key={i} from={from} durationInFrames={scene.frames} layout="none">
-              <SceneStage index={i} frames={scene.frames} exit={i < spec.scenes.length - 1}>
-                <SceneView
+              {kinetic ? (
+                <KineticBeat
                   spec={spec}
                   scene={scene}
                   productImage={props.productImage}
@@ -892,7 +1306,19 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
                   brandLogo={props.brandLogo}
                   brandLogoKnockout={props.brandLogoKnockout}
                 />
-              </SceneStage>
+              ) : (
+                <SceneStage index={i} frames={scene.frames} exit={i < spec.scenes.length - 1}>
+                  <SceneView
+                    spec={spec}
+                    scene={scene}
+                    productImage={props.productImage}
+                    portrait={portrait}
+                    wide={wide}
+                    brandLogo={props.brandLogo}
+                    brandLogoKnockout={props.brandLogoKnockout}
+                  />
+                </SceneStage>
+              )}
             </Sequence>
           );
         })}
