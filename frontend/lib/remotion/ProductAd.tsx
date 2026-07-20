@@ -1481,10 +1481,284 @@ const LuxeBeat: React.FC<SceneProps> = (props) => {
   }
 };
 
+// ===========================================================================
+// TECHY — HUD / terminal. Monospace (JetBrains Mono), a faint measurement grid,
+// scanlines, the product framed by HUD corner brackets with a crosshair callout,
+// typewriter headlines with a blinking cursor, and a price that counts up like an
+// odometer. Snappy and precise — engineered, not athletic. Research: tech reads
+// through typewriter/terminal, scanlines, HUD panels and mechanical precision.
+// ===========================================================================
+
+// Faint measurement grid.
+const TechGrid: React.FC<{ color: string; u: number }> = ({ color, u }) => (
+  <AbsoluteFill
+    style={{
+      backgroundImage: `linear-gradient(${color}12 1px, transparent 1px), linear-gradient(90deg, ${color}12 1px, transparent 1px)`,
+      backgroundSize: `${46 * u}px ${46 * u}px`,
+    }}
+  />
+);
+
+// CRT scanline overlay.
+const Scanlines: React.FC<{ u: number }> = ({ u }) => (
+  <AbsoluteFill
+    style={{
+      backgroundImage: `repeating-linear-gradient(0deg, rgba(255,255,255,0.035), rgba(255,255,255,0.035) ${1 * u}px, transparent ${1 * u}px, transparent ${4 * u}px)`,
+      pointerEvents: "none",
+    }}
+  />
+);
+
+// Monospace typewriter with a blinking block cursor. `cps` = chars/second.
+const Typewriter: React.FC<{
+  text: string;
+  delay: number;
+  cps: number;
+  size: number;
+  color: string;
+  cursor: string;
+  weight?: number;
+  maxWidth?: number | string;
+}> = ({ text, delay, cps, size, color, cursor, weight = 500, maxWidth }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const k = fps / 30;
+  const n = Math.max(0, Math.floor(((frame - delay * k) * cps) / fps));
+  const shown = (text || "").slice(0, n);
+  const done = n >= (text || "").length;
+  const blink = Math.floor(frame / (fps * 0.4)) % 2 === 0;
+  return (
+    <div style={{ color, fontSize: size, fontWeight: weight, lineHeight: 1.18, maxWidth, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+      {shown}
+      <span style={{ color: cursor, opacity: !done || blink ? 1 : 0 }}>▊</span>
+    </div>
+  );
+};
+
+// HUD corner brackets that frame a region, scaling/fading in.
+const HudBrackets: React.FC<{ color: string; u: number; o: number }> = ({ color, u, o }) => {
+  const L = 34 * u;
+  const t = 2 * u;
+  const inset = interpolate(o, [0, 1], [24 * u, 0]);
+  const corner = (pos: React.CSSProperties): React.CSSProperties => ({ position: "absolute", width: L, height: L, opacity: o, ...pos });
+  return (
+    <>
+      <div style={{ ...corner({ top: inset, left: inset }), borderTop: `${t}px solid ${color}`, borderLeft: `${t}px solid ${color}` }} />
+      <div style={{ ...corner({ top: inset, right: inset }), borderTop: `${t}px solid ${color}`, borderRight: `${t}px solid ${color}` }} />
+      <div style={{ ...corner({ bottom: inset, left: inset }), borderBottom: `${t}px solid ${color}`, borderLeft: `${t}px solid ${color}` }} />
+      <div style={{ ...corner({ bottom: inset, right: inset }), borderBottom: `${t}px solid ${color}`, borderRight: `${t}px solid ${color}` }} />
+    </>
+  );
+};
+
+// Parse a price string into a countable number + its prefix/suffix/decimals.
+function parsePrice(s: string): { prefix: string; num: number; suffix: string; decimals: number } | null {
+  const m = String(s || "").match(/^(\D*)([\d,]+(?:\.\d+)?)(.*)$/);
+  if (!m) return null;
+  const num = parseFloat(m[2].replace(/,/g, ""));
+  if (!Number.isFinite(num)) return null;
+  return { prefix: m[1], num, suffix: m[3], decimals: (m[2].split(".")[1] || "").length };
+}
+
+// A snappy scene-relative spring for techy (fast, precise, minimal overshoot).
+function useSnap(delay: number) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  return spring({ frame: frame - delay * (fps / 30), fps, config: { damping: 22, stiffness: 200, mass: 0.6 } });
+}
+
+// T1 · Hook — a boot-up: product framed by HUD brackets over a grid + scanlines,
+// with a typewriter system line reading the product in.
+const TechHook: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
+  const u = useUnit();
+  const { panel, text } = spec.palette;
+  // On a light "blueprint" panel the neon accent is illegible, so HUD ink drops
+  // to the dark text colour; on a dark terminal panel it stays the neon accent.
+  const accent = readableOn(panel) === "#ffffff" ? spec.palette.accent : text;
+  const o = useSnap(2);
+  const m = margin(u, portrait);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+      <TechGrid color={text} u={u} />
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+        <div style={{ position: "relative", width: portrait ? "78%" : "56%", height: portrait ? "56%" : "68%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <HudBrackets color={accent} u={u} o={o} />
+          <Img
+            src={productImage}
+            crossOrigin="anonymous"
+            style={{ maxWidth: "82%", maxHeight: "82%", objectFit: "contain", opacity: interpolate(o, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }), filter: "drop-shadow(0 20px 44px rgba(0,0,0,0.5))" }}
+          />
+        </div>
+      </AbsoluteFill>
+      <AbsoluteFill style={{ justifyContent: "flex-end", padding: portrait ? `0 ${m}px ${70 * u}px` : `0 ${m}px ${60 * u}px` }}>
+        <Typewriter text={`> ${up(spec.eyebrow)}`} delay={8} cps={22} size={(portrait ? 20 : 24) * u} color={text} cursor={accent} weight={700} />
+      </AbsoluteFill>
+      <Scanlines u={u} />
+    </AbsoluteFill>
+  );
+};
+
+// T2 · Hero — product with a crosshair-pinned coordinate readout; the headline
+// types out in mono below. Grid + scanlines throughout.
+const TechHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, text } = spec.palette;
+  const accent = readableOn(panel) === "#ffffff" ? spec.palette.accent : text;
+  const frame = useCurrentFrame();
+  const o = useSnap(2);
+  const kb = interpolate(frame, [0, scene.frames], [1.0, 1.05], { extrapolateRight: "clamp" });
+  const m = margin(u, portrait);
+  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
+  const size = Math.min((portrait ? 40 : 52) * u, (width - 2 * m) / (Math.max(longest, 12) * 0.62));
+  const cross = interpolate(o, [0, 1], [0, 1]);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+      <TechGrid color={text} u={u} />
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: portrait ? "flex-start" : "center", paddingTop: portrait ? "8%" : 0 }}>
+        <div style={{ position: "relative" }}>
+          <Img
+            src={productImage}
+            crossOrigin="anonymous"
+            style={{ width: portrait ? "72%" : "auto", maxWidth: portrait ? "72%" : "46vw", maxHeight: portrait ? "48%" : "62%", objectFit: "contain", transform: `scale(${kb})`, filter: "drop-shadow(0 22px 48px rgba(0,0,0,0.5))" }}
+          />
+          {/* crosshair + coordinate tag */}
+          <div style={{ position: "absolute", top: "18%", right: "6%", opacity: cross }}>
+            <div style={{ width: 26 * u, height: 1.5 * u, backgroundColor: accent, position: "absolute", top: 0, left: -13 * u }} />
+            <div style={{ height: 26 * u, width: 1.5 * u, backgroundColor: accent, position: "absolute", top: -13 * u, left: 0 }} />
+            <div style={{ position: "absolute", left: 18 * u, top: -8 * u, color: accent, fontSize: 14 * u, fontWeight: 500, whiteSpace: "nowrap" }}>
+              [ VERIFIED ]
+            </div>
+          </div>
+        </div>
+      </AbsoluteFill>
+      <AbsoluteFill style={{ justifyContent: "flex-end", padding: portrait ? `0 ${m}px ${76 * u}px` : `0 ${m}px ${72 * u}px` }}>
+        <div style={{ color: accent, fontSize: 15 * u, fontWeight: 700, letterSpacing: 2 * u, marginBottom: 12 * u, opacity: o }}>{up(spec.eyebrow)}</div>
+        <Typewriter text={spec.headline} delay={6} cps={26} size={size} color={text} cursor={accent} weight={700} maxWidth={portrait ? "100%" : "22ch"} />
+      </AbsoluteFill>
+      <Scanlines u={u} />
+    </AbsoluteFill>
+  );
+};
+
+// T3 · Feature — the spec pinned as a HUD annotation: a crosshair on the product,
+// a connector, and a bracketed mono label + value.
+const TechFeature: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+  const u = useUnit();
+  const { text, onStage } = spec.palette;
+  const accent = readableOn(onStage) === "#ffffff" ? spec.palette.accent : text;
+  const frame = useCurrentFrame();
+  const o = useSnap(4);
+  const kb = interpolate(frame, [0, scene.frames], [1.02, 1.06], { extrapolateRight: "clamp" });
+  const m = margin(u, portrait);
+  const line = interpolate(o, [0, 1], [0, 1]);
+  return (
+    <AbsoluteFill style={{ backgroundColor: onStage, overflow: "hidden" }}>
+      <TechGrid color={text} u={u} />
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+        <Img src={productImage} crossOrigin="anonymous" style={{ width: portrait ? "70%" : "50%", maxHeight: portrait ? "56%" : "70%", objectFit: "contain", transform: `scale(${kb})`, filter: "drop-shadow(0 22px 48px rgba(0,0,0,0.5))" }} />
+      </AbsoluteFill>
+      {/* dot on product + connector to the callout */}
+      <div style={{ position: "absolute", left: "50%", top: portrait ? "34%" : "40%", width: 12 * u, height: 12 * u, marginLeft: -6 * u, borderRadius: "50%", backgroundColor: accent, opacity: o, boxShadow: `0 0 0 ${5 * u}px ${accent}33` }} />
+      <div style={{ position: "absolute", left: m, bottom: (portrait ? 120 : 108) * u, opacity: o, transform: `translateY(${interpolate(o, [0, 1], [16 * u, 0])}px)` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 * u, color: accent, fontSize: (portrait ? 15 : 18) * u, fontWeight: 700, marginBottom: 10 * u }}>
+          <span>{`[ ${up(scene.label || spec.eyebrow)} ]`}</span>
+        </div>
+        <div style={{ color: text, fontSize: (portrait ? 34 : 44) * u, fontWeight: 700, lineHeight: 1.08, maxWidth: "62%", letterSpacing: -0.5 * u }}>
+          {scene.value || spec.subhead}
+        </div>
+      </div>
+      <Scanlines u={u} />
+    </AbsoluteFill>
+  );
+};
+
+// T4 · Price — an odometer: the figure counts up to the price in mono, under a
+// system label, with a filling progress bar. Precise, not a slam.
+const TechPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
+  const u = useUnit();
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const k = fps / 30;
+  const { panel, text } = spec.palette;
+  const accent = readableOn(panel) === "#ffffff" ? spec.palette.accent : text;
+  const m = margin(u, portrait);
+  const roll = interpolate(frame, [6 * k, 34 * k], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+  const label = useSnap(2);
+  const p = parsePrice(scene.value ?? "");
+  let display = scene.value ?? "";
+  if (p) {
+    const v = p.num * roll;
+    const dec = roll >= 1 ? p.decimals : 0;
+    display = `${p.prefix}${v.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}${p.suffix}`;
+  }
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "flex-start", padding: `0 ${m}px`, overflow: "hidden" }}>
+      <TechGrid color={text} u={u} />
+      <div style={{ color: accent, fontSize: (portrait ? 18 : 22) * u, fontWeight: 700, letterSpacing: 3 * u, marginBottom: 18 * u, opacity: label }}>
+        {`// ${up(PRICE_LEAD[spec.tone])}`}
+      </div>
+      <div style={{ color: text, fontWeight: 700, fontSize: (portrait ? 150 : 220) * u, lineHeight: 0.9, letterSpacing: -4 * u, fontVariantNumeric: "tabular-nums" }}>
+        {display}
+      </div>
+      <div style={{ marginTop: 34 * u, width: portrait ? "70%" : "44%", height: 4 * u, backgroundColor: `${text}22` }}>
+        <div style={{ width: `${roll * 100}%`, height: "100%", backgroundColor: accent }} />
+      </div>
+      <Scanlines u={u} />
+    </AbsoluteFill>
+  );
+};
+
+// T5 · Outro — a terminal prompt sign-off: logo/name, then `> shop now_` typing
+// with a blinking cursor. Grid + scanlines.
+const TechOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnockout }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, text } = spec.palette;
+  const accent = readableOn(panel) === "#ffffff" ? spec.palette.accent : text;
+  const m = margin(u, portrait);
+  const o = useSnap(3);
+  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
+  const size = Math.min((portrait ? 40 : 56) * u, (width - 2 * m) / (Math.max(longest, 10) * 0.62));
+  const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "flex-start", padding: `0 ${m}px`, overflow: "hidden" }}>
+      <TechGrid color={text} u={u} />
+      {brandLogo ? (
+        <Img src={brandLogo} crossOrigin="anonymous" style={{ height: (portrait ? 52 : 72) * u, width: "auto", maxWidth: "62%", objectFit: "contain", opacity: o, marginBottom: 34 * u, ...(brandLogoKnockout !== false ? { filter: knockoutFilter } : {}) }} />
+      ) : (
+        <div style={{ opacity: o, color: text, fontWeight: 700, fontSize: size, lineHeight: 1.1, letterSpacing: -0.5 * u, maxWidth: "20ch", marginBottom: 30 * u }}>
+          {spec.headline}
+        </div>
+      )}
+      <Typewriter text={`> ${up(spec.cta)}`} delay={10} cps={20} size={(portrait ? 26 : 32) * u} color={accent} cursor={accent} weight={700} />
+      <Scanlines u={u} />
+    </AbsoluteFill>
+  );
+};
+
+const TechyBeat: React.FC<SceneProps> = (props) => {
+  switch (props.scene.type) {
+    case "hook":
+      return <TechHook {...props} />;
+    case "feature":
+      return <TechFeature {...props} />;
+    case "price":
+      return <TechPrice {...props} />;
+    case "outro":
+      return <TechOutro {...props} />;
+    case "benefit":
+      return <TechHook {...props} />;
+    default:
+      return <TechHero {...props} />;
+  }
+};
+
 // Moods with a bespoke kinetic treatment; the rest fall back to SceneView.
 const KINETIC_BEATS: Partial<Record<Tone, React.FC<SceneProps>>> = {
   energetic: KineticBeat,
   luxe: LuxeBeat,
+  techy: TechyBeat,
 };
 
 // Derive a clean banded spec when none is supplied (keeps old callers working).

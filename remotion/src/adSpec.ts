@@ -123,6 +123,10 @@ const PALETTES: Record<Tone, Palette[]> = {
     { stage: "#eef1f6", panel: "#06070d", accent: "#22e3d3", text: "#e9fffb", onStage: "#06070d" },
     { stage: "#ecedf5", panel: "#08080f", accent: "#8b5cff", text: "#efeaff", onStage: "#08080f" },
     { stage: "#eef3ef", panel: "#06080a", accent: "#2bd96b", text: "#eafff0", onStage: "#06080a" },
+    // Light "blueprint" variants — the HUD renders in dark ink on a pale grid
+    // (the renderer drops the neon accent to ink on light panels for legibility).
+    { stage: "#ffffff", panel: "#eef2f8", accent: "#0a84ff", text: "#0b1220", onStage: "#e7edf5" },
+    { stage: "#ffffff", panel: "#eef4f1", accent: "#0a9d6e", text: "#0b1512", onStage: "#e6efe9" },
   ],
   bold: [
     { stage: "#fffdf7", panel: "#101010", accent: "#ff3b1d", text: "#ffffff", onStage: "#101010" },
