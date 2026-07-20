@@ -1130,6 +1130,10 @@ const KOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnoc
   const titleSize = Math.min((portrait ? 74 : 104) * u, (width - 2 * m) / (longest * 0.54));
   if (brandLogo) {
     const knockout = brandLogoKnockout !== false;
+    // Knock the mark out to whatever reads on the panel: white on a dark panel,
+    // black on a light one (a plain invert-to-white would vanish on light bg).
+    const knockoutFilter =
+      readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
     return (
       <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 42 * u, padding: `0 ${m}px`, overflow: "hidden" }}>
         <Img
@@ -1142,7 +1146,7 @@ const KOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnoc
             objectFit: "contain",
             opacity: interpolate(logoIn, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }),
             transform: `scale(${interpolate(logoIn, [0, 1], [0.7, 1])})`,
-            ...(knockout ? { filter: "brightness(0) invert(1)" } : {}),
+            ...(knockout ? { filter: knockoutFilter } : {}),
           }}
         />
         <div

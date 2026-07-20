@@ -101,6 +101,11 @@ const PALETTES: Record<Tone, Palette[]> = {
     { stage: "#ffffff", panel: "#0a0d18", accent: "#ff5a1f", text: "#ffffff", onStage: "#080a12" },
     { stage: "#fbfdff", panel: "#091024", accent: "#1f6bff", text: "#ffffff", onStage: "#091024" },
     { stage: "#f7fffb", panel: "#08160f", accent: "#15c06a", text: "#ffffff", onStage: "#08160f" },
+    // Light-panel variants so the shuffle also lands on a bright, athletic look
+    // (dark ink on near-white), not only the dark register. The accent is
+    // overlaid from TONE_ACCENT_POOL, so these pair with any energetic accent.
+    { stage: "#ffffff", panel: "#f2f3f6", accent: "#ff5a1f", text: "#0b0e16", onStage: "#e9ebf0" },
+    { stage: "#ffffff", panel: "#f7f3ec", accent: "#ff5a1f", text: "#141019", onStage: "#efe9df" },
   ],
   playful: [
     { stage: "#fff6f1", panel: "#2a0f3a", accent: "#ff5da2", text: "#ffffff", onStage: "#2a0f3a" },
