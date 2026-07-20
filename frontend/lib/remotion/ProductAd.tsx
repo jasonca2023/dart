@@ -1,5 +1,6 @@
 import {
   AbsoluteFill,
+  Easing,
   Img,
   Sequence,
   interpolate,
@@ -1222,6 +1223,270 @@ const KineticBeat: React.FC<SceneProps> = (props) => {
   }
 };
 
+// ===========================================================================
+// LUXE — slow, editorial, restrained. The opposite of energetic: no overshoot,
+// no color-flood, no wipe. Everything eases in-out slowly; the serif tracks in
+// (letter-spacing contracts); thin gold hairlines draw; a soft specular light
+// glides over the product; beats cross-dissolve (content fades up over the
+// shared panel). Research: luxury reads through slow ease-in-out and restraint.
+// ===========================================================================
+
+const EASE_LUX = Easing.inOut(Easing.ease);
+
+// Slow eased 0..1 over [delay, delay+dur], authored at 30fps and fps-scaled.
+function useSlow(delay: number, dur: number) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const k = fps / 30;
+  return interpolate(frame, [delay * k, (delay + dur) * k], [0, 1], {
+    easing: EASE_LUX,
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+}
+
+// Serif headline that TRACKS IN: the line fades up while its letter-spacing
+// contracts from wide to set — an unhurried, couture reveal (never per-word pop).
+const LuxeSerif: React.FC<{
+  text: string;
+  size: number;
+  color: string;
+  delay: number;
+  u: number;
+  maxWidth?: number | string;
+  align?: "left" | "center";
+}> = ({ text, size, color, delay, u, maxWidth, align = "left" }) => {
+  const a = useSlow(delay, 34);
+  return (
+    <div
+      style={{
+        opacity: a,
+        transform: `translateY(${interpolate(a, [0, 1], [size * 0.16, 0])}px)`,
+        letterSpacing: interpolate(a, [0, 1], [size * 0.12, -size * 0.012]),
+        color,
+        fontWeight: 600,
+        fontSize: size,
+        lineHeight: 1.04,
+        maxWidth,
+        textAlign: align,
+        textWrap: "balance",
+      }}
+    >
+      {text}
+    </div>
+  );
+};
+
+// A soft specular highlight that glides once across the frame — light catching a
+// premium surface. Subtle (low opacity, blurred, skewed).
+const Specular: React.FC<{ u: number; delay?: number }> = ({ u, delay = 0 }) => {
+  const g = useSlow(delay, 46);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "-25%",
+        bottom: "-25%",
+        left: `${interpolate(g, [0, 1], [-45, 125])}%`,
+        width: "38%",
+        background: "linear-gradient(105deg, transparent, #ffffff 50%, transparent)",
+        opacity: 0.1,
+        filter: `blur(${18 * u}px)`,
+        transform: "skewX(-12deg)",
+        pointerEvents: "none",
+      }}
+    />
+  );
+};
+
+// Small tracked gold kicker, slow fade + tracking-in.
+const LuxeKicker: React.FC<{ text: string; accent: string; u: number; delay: number; align?: "left" | "center" }> = ({
+  text,
+  accent,
+  u,
+  delay,
+  align = "left",
+}) => {
+  const a = useSlow(delay, 30);
+  if (!text) return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 16 * u,
+        opacity: a,
+        justifyContent: align === "center" ? "center" : "flex-start",
+      }}
+    >
+      <span style={{ width: interpolate(a, [0, 1], [0, 40 * u]), height: 1 * u, backgroundColor: accent }} />
+      <span style={{ color: accent, fontSize: 15 * u, fontWeight: 600, letterSpacing: interpolate(a, [0, 1], [8 * u, 4 * u]) }}>
+        {up(text)}
+      </span>
+    </div>
+  );
+};
+
+// L1 · Hook — opens on the product, held quietly under a slow ken-burns and a
+// single specular glide; a whispered gold kicker tracks in beneath.
+const LuxeHook: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+  const u = useUnit();
+  const frame = useCurrentFrame();
+  const { panel, accent, text } = spec.palette;
+  const enter = useSlow(0, 30);
+  const kb = interpolate(frame, [0, scene.frames], [1.0, 1.06], { extrapolateRight: "clamp", easing: EASE_LUX });
+  const m = margin(u, portrait);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+        <div style={{ position: "relative", opacity: enter, transform: `scale(${kb})` }}>
+          <Img
+            src={productImage}
+            crossOrigin="anonymous"
+            style={{
+              width: portrait ? "76%" : "52%",
+              maxHeight: portrait ? "60%" : "72%",
+              objectFit: "contain",
+              filter: "drop-shadow(0 30px 60px rgba(0,0,0,0.4))",
+            }}
+          />
+        </div>
+      </AbsoluteFill>
+      <Specular u={u} delay={4} />
+      <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: portrait ? "center" : "flex-start", padding: portrait ? `0 0 ${72 * u}px` : `0 ${m}px ${66 * u}px` }}>
+        <LuxeKicker text={spec.eyebrow} accent={accent} u={u} delay={10} align={portrait ? "center" : "left"} />
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+
+// L2 · Hero — editorial: an oversized serif headline tracks in up top, a thin
+// gold hairline draws, and the product rests on a light stage strip below.
+const LuxeHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, stage, accent, text, onStage } = spec.palette;
+  const rule = useSlow(12, 26);
+  const m = margin(u, portrait);
+  const frame = useCurrentFrame();
+  const kb = interpolate(frame, [0, scene.frames], [1.04, 1.0], { extrapolateRight: "clamp", easing: EASE_LUX });
+  const words = spec.headline.split(" ").filter(Boolean);
+  const longest = words.reduce((mx, w) => Math.max(mx, w.length), 1);
+  const size = Math.min((portrait ? 72 : 100) * u, (width - 2 * m) / (longest * 0.5));
+  const topH = portrait ? "50%" : "54%";
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: topH, padding: `0 ${m}px`, display: "flex", flexDirection: "column", justifyContent: "center", overflow: "hidden" }}>
+        <LuxeKicker text={spec.eyebrow} accent={accent} u={u} delay={2} />
+        <div style={{ height: 20 * u }} />
+        <LuxeSerif text={spec.headline} size={size} color={text} delay={5} u={u} maxWidth={portrait ? "16ch" : "15ch"} />
+      </div>
+      <div style={{ position: "absolute", top: topH, left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: m, width: interpolate(rule, [0, 1], [0, 200 * u]), height: 1.5 * u, backgroundColor: accent, zIndex: 2 }} />
+        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", backgroundColor: stage, backgroundImage: `linear-gradient(176deg, ${onStage}08, ${stage} 60%)` }}>
+          <Img
+            src={productImage}
+            crossOrigin="anonymous"
+            style={{ width: portrait ? "72%" : "48%", maxHeight: "82%", objectFit: "contain", transform: `scale(${kb})`, filter: "drop-shadow(0 22px 40px rgba(0,0,0,0.16))" }}
+          />
+          <Specular u={u} delay={6} />
+        </AbsoluteFill>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// L3 · Price — understated value, never a slam: a tracked gold lead, a large
+// serif figure that fades and settles (no overshoot), a fine gold rule.
+const LuxePrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
+  const u = useUnit();
+  const { panel, accent, text } = spec.palette;
+  const lead = useSlow(2, 28);
+  const num = useSlow(8, 32);
+  const rule = useSlow(18, 26);
+  const m = margin(u, portrait);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "flex-start", padding: `0 ${m}px` }}>
+      <div style={{ opacity: lead, color: accent, fontSize: (portrait ? 20 : 24) * u, fontWeight: 600, letterSpacing: interpolate(lead, [0, 1], [8 * u, 4 * u]), marginBottom: 22 * u }}>
+        {up(PRICE_LEAD[spec.tone])}
+      </div>
+      <div
+        style={{
+          opacity: num,
+          transform: `scale(${interpolate(num, [0, 1], [0.96, 1])})`,
+          transformOrigin: "left",
+          color: text,
+          fontWeight: 600,
+          fontSize: (portrait ? 150 : 210) * u,
+          lineHeight: 0.9,
+          letterSpacing: -4 * u,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {scene.value}
+      </div>
+      <div style={{ marginTop: 34 * u, width: interpolate(rule, [0, 1], [0, 180 * u]), height: 1.5 * u, backgroundColor: accent }} />
+    </AbsoluteFill>
+  );
+};
+
+// L4 · Outro — a quiet sign-off: logo (knockout, panel-aware) or the serif name,
+// a drawn gold hairline, and a tracked "SHOP NOW" link (no loud filled button).
+const LuxeOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnockout }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text } = spec.palette;
+  const m = margin(u, portrait);
+  const inn = useSlow(3, 32);
+  const rule = useSlow(14, 24);
+  const cta = useSlow(20, 24);
+  const words = spec.headline.split(" ").filter(Boolean);
+  const longest = words.reduce((mx, w) => Math.max(mx, w.length), 1);
+  const size = Math.min((portrait ? 66 : 92) * u, (width - 2 * m) / (longest * 0.5));
+  const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "center", flexDirection: "column", padding: `0 ${m}px` }}>
+      {brandLogo ? (
+        <Img
+          src={brandLogo}
+          crossOrigin="anonymous"
+          style={{ height: (portrait ? 56 : 78) * u, width: "auto", maxWidth: "64%", objectFit: "contain", opacity: inn, ...(brandLogoKnockout !== false ? { filter: knockoutFilter } : {}) }}
+        />
+      ) : (
+        <div style={{ opacity: inn, transform: `translateY(${interpolate(inn, [0, 1], [14, 0])}px)`, color: text, fontWeight: 600, fontSize: size, lineHeight: 1.02, letterSpacing: -1 * u, textAlign: "center", maxWidth: "16ch" }}>
+          {spec.headline}
+        </div>
+      )}
+      <div style={{ marginTop: 30 * u, width: interpolate(rule, [0, 1], [0, 120 * u]), height: 1.5 * u, backgroundColor: accent }} />
+      <div style={{ marginTop: 26 * u, opacity: cta, color: accent, fontSize: (portrait ? 18 : 22) * u, fontWeight: 600, letterSpacing: 5 * u }}>
+        {`${up(spec.cta)}  →`}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// Dispatch a spec scene to its luxe beat (luxe has no feature beat).
+const LuxeBeat: React.FC<SceneProps> = (props) => {
+  switch (props.scene.type) {
+    case "hook":
+      return <LuxeHook {...props} />;
+    case "price":
+      return <LuxePrice {...props} />;
+    case "outro":
+      return <LuxeOutro {...props} />;
+    case "benefit":
+      return <LuxeHook {...props} />;
+    default:
+      return <LuxeHero {...props} />;
+  }
+};
+
+// Moods with a bespoke kinetic treatment; the rest fall back to SceneView.
+const KINETIC_BEATS: Partial<Record<Tone, React.FC<SceneProps>>> = {
+  energetic: KineticBeat,
+  luxe: LuxeBeat,
+};
+
 // Derive a clean banded spec when none is supplied (keeps old callers working).
 function fallbackSpec(props: ProductAdProps): AdSpec {
   // Same NaN/short-duration guard buildAdSpec carries: NaN propagates through
@@ -1308,9 +1573,9 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
   const portrait = height > width;
   const wide = width > height * 1.2; // only 16:9 — square/vertical stack
   const ins = safeInsets(width, height);
-  // The energetic mood renders through the kinetic beat set (its own motion
-  // vocabulary + a signature price slam); every other mood keeps SceneView.
-  const kinetic = spec.tone === "energetic";
+  // Moods with a bespoke kinetic treatment render through their own beat set;
+  // the rest keep the original SceneView + SceneStage entry.
+  const Beat = KINETIC_BEATS[spec.tone];
 
   let offset = 0;
 
@@ -1335,8 +1600,8 @@ export const ProductAd: React.FC<ProductAdProps> = (props) => {
           offset += scene.frames;
           return (
             <Sequence key={i} from={from} durationInFrames={scene.frames} layout="none">
-              {kinetic ? (
-                <KineticBeat
+              {Beat ? (
+                <Beat
                   spec={spec}
                   scene={scene}
                   productImage={props.productImage}

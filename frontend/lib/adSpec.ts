@@ -96,6 +96,10 @@ const PALETTES: Record<Tone, Palette[]> = {
     { stage: "#f3efe5", panel: "#0b0a08", accent: "#c8a24c", text: "#f5efe1", onStage: "#0b0a08" },
     { stage: "#efe9dc", panel: "#100d09", accent: "#bd9a55", text: "#f3ecdc", onStage: "#100d09" },
     { stage: "#f1ece2", panel: "#0c0a09", accent: "#9c6b52", text: "#f2ead9", onStage: "#0c0a09" },
+    // Light "heritage" variants — ivory panel, deep-ink serif, bronze accent —
+    // so the shuffle also lands on a bright gallery register, not only black+gold.
+    { stage: "#fbf8f1", panel: "#f2ece0", accent: "#8a6a2e", text: "#1c1710", onStage: "#ece3d3" },
+    { stage: "#f9f5ec", panel: "#efe7d6", accent: "#7c5a34", text: "#211a12", onStage: "#e7ddc9" },
   ],
   energetic: [
     { stage: "#ffffff", panel: "#0a0d18", accent: "#ff5a1f", text: "#ffffff", onStage: "#080a12" },
