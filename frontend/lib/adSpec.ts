@@ -120,6 +120,10 @@ const PALETTES: Record<Tone, Palette[]> = {
     { stage: "#f2f4f3", panel: "#222b2e", accent: "#3f9d86", text: "#eef5f2", onStage: "#222b2e" },
     { stage: "#f4f2ee", panel: "#2a2f3a", accent: "#6f8fd0", text: "#eef2fa", onStage: "#2a2f3a" },
     { stage: "#f5f1ec", panel: "#2b2724", accent: "#c08457", text: "#f3ece4", onStage: "#2b2724" },
+    // Light variants — soft sage / warm ivory, so the shuffle also lands on an
+    // airy spa register (calm reads as well or better light as dark).
+    { stage: "#f4f7f4", panel: "#eef3ef", accent: "#3f8f78", text: "#28322c", onStage: "#e6ece7" },
+    { stage: "#f8f5f0", panel: "#f2eee6", accent: "#a9744e", text: "#332a20", onStage: "#ebe3d7" },
   ],
   techy: [
     { stage: "#eef1f6", panel: "#06070d", accent: "#22e3d3", text: "#e9fffb", onStage: "#06070d" },

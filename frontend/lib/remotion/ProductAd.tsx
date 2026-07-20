@@ -1754,11 +1754,218 @@ const TechyBeat: React.FC<SceneProps> = (props) => {
   }
 };
 
+// ===========================================================================
+// CALM — soft, soothing, breathing. Newsreader serif. Nothing snaps: the product
+// resolves out of a blur, a big muted colour blob drifts behind it, everything
+// breathes (a slow sine drift), and type fades up gently. No hairlines, no hard
+// edges, no cuts. Research: calm reads through soft blur, muted palettes, slow
+// fluid movement with no hard stops. Distinct from luxe (crisp/editorial) by
+// being soft/rounded/hazy rather than sharp.
+// ===========================================================================
+
+// Gentle continuous "breathing" drift (deterministic sine on the timeline).
+function useBreath(ampPx: number, periodSec = 6) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  return Math.sin((frame / fps) * ((2 * Math.PI) / periodSec)) * ampPx;
+}
+
+// A large, soft, blurred colour blob that drifts behind the product.
+const SoftBlob: React.FC<{ color: string; u: number; delay: number; size?: string }> = ({ color, u, delay, size = "72%" }) => {
+  const a = useSlow(delay, 46);
+  const by = useBreath(10 * u, 9);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        width: size,
+        aspectRatio: "1 / 1",
+        borderRadius: "50%",
+        background: `radial-gradient(circle, ${color}, transparent 66%)`,
+        opacity: a * 0.34,
+        filter: `blur(${56 * u}px)`,
+        transform: `translateY(${by}px)`,
+      }}
+    />
+  );
+};
+
+// Serif line that resolves gently: soft fade + slight rise, no tracking gimmick.
+const CalmLine: React.FC<{ text: string; size: number; color: string; delay: number; u: number; maxWidth?: number | string; align?: "left" | "center"; weight?: number; opacityMax?: number }> = ({
+  text,
+  size,
+  color,
+  delay,
+  u,
+  maxWidth,
+  align = "left",
+  weight = 600,
+  opacityMax = 1,
+}) => {
+  const a = useSlow(delay, 34);
+  return (
+    <div style={{ opacity: a * opacityMax, transform: `translateY(${interpolate(a, [0, 1], [18 * u, 0])}px)`, color, fontSize: size, fontWeight: weight, lineHeight: 1.18, letterSpacing: -0.5 * u, maxWidth, textAlign: align, textWrap: "balance" }}>
+      {text}
+    </div>
+  );
+};
+
+// C1 · Hook — the product resolves out of a soft blur over a drifting blob;
+// a whispered serif kicker breathes in beneath.
+const CalmHook: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
+  const u = useUnit();
+  const { panel, accent, text } = spec.palette;
+  const foc = useSlow(0, 36);
+  const by = useBreath(9 * u, 8);
+  const m = margin(u, portrait);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+      <SoftBlob color={accent} u={u} delay={2} />
+      <Img
+        src={productImage}
+        crossOrigin="anonymous"
+        style={{
+          width: portrait ? "74%" : "50%",
+          maxHeight: portrait ? "58%" : "70%",
+          objectFit: "contain",
+          filter: `blur(${interpolate(foc, [0, 1], [16, 0])}px) drop-shadow(0 26px 54px rgba(0,0,0,0.26))`,
+          opacity: interpolate(foc, [0, 0.5], [0, 1], { extrapolateRight: "clamp" }),
+          transform: `translateY(${by}px) scale(${interpolate(foc, [0, 1], [1.04, 1])})`,
+        }}
+      />
+      <div style={{ position: "absolute", bottom: (portrait ? 76 : 66) * u, left: portrait ? 0 : m, right: portrait ? 0 : "auto", textAlign: portrait ? "center" : "left" }}>
+        <CalmLine text={up(spec.eyebrow)} size={(portrait ? 16 : 18) * u} color={accent} delay={10} u={u} align={portrait ? "center" : "left"} weight={600} />
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// C2 · Hero — product resting over a soft blob up top, a gentle serif headline
+// breathing in below. Product-forward and unhurried.
+const CalmHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text, stage } = spec.palette;
+  const foc = useSlow(0, 34);
+  const by = useBreath(8 * u, 9);
+  const m = margin(u, portrait);
+  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
+  const size = Math.min((portrait ? 60 : 82) * u, (width - 2 * m) / (longest * 0.5));
+  const topH = portrait ? "54%" : "58%";
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: topH, overflow: "hidden", alignItems: "center", justifyContent: "center", display: "flex", backgroundColor: stage }}>
+        <SoftBlob color={accent} u={u} delay={2} size="66%" />
+        <Img
+          src={productImage}
+          crossOrigin="anonymous"
+          style={{ width: portrait ? "66%" : "44%", maxHeight: "80%", objectFit: "contain", filter: `blur(${interpolate(foc, [0, 1], [12, 0])}px) drop-shadow(0 24px 46px rgba(0,0,0,0.18))`, transform: `translateY(${by}px)`, opacity: interpolate(foc, [0, 0.5], [0, 1], { extrapolateRight: "clamp" }) }}
+        />
+      </div>
+      <div style={{ position: "absolute", top: topH, left: 0, right: 0, bottom: 0, padding: `0 ${m}px`, display: "flex", flexDirection: "column", justifyContent: "center", backgroundColor: panel }}>
+        <CalmLine text={up(spec.eyebrow)} size={15 * u} color={accent} delay={4} u={u} weight={600} />
+        <div style={{ height: 16 * u }} />
+        <CalmLine text={spec.headline} size={size} color={text} delay={8} u={u} maxWidth={portrait ? "16ch" : "15ch"} />
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// C3 · Price — quiet value: a gentle serif lead and a soft serif figure that
+// fades and settles. No rule, no slam.
+const CalmPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
+  const u = useUnit();
+  const { panel, accent, text } = spec.palette;
+  const by = useBreath(6 * u, 9);
+  const num = useSlow(8, 34);
+  const m = margin(u, portrait);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "flex-start", padding: `0 ${m}px`, overflow: "hidden" }}>
+      <SoftBlob color={accent} u={u} delay={0} size="54%" />
+      <CalmLine text={PRICE_LEAD[spec.tone]} size={(portrait ? 22 : 27) * u} color={accent} delay={2} u={u} weight={600} />
+      <div style={{ height: 14 * u }} />
+      <div
+        style={{
+          opacity: num,
+          transform: `translateY(${by}px) scale(${interpolate(num, [0, 1], [0.97, 1])})`,
+          transformOrigin: "left",
+          color: text,
+          fontWeight: 600,
+          fontSize: (portrait ? 140 : 196) * u,
+          lineHeight: 0.92,
+          letterSpacing: -3 * u,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {scene.value}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// C4 · Outro — a calm sign-off: logo/serif name breathing in over a soft blob,
+// then a gently rounded, muted CTA pill.
+const CalmOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnockout }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text } = spec.palette;
+  const m = margin(u, portrait);
+  const inn = useSlow(3, 34);
+  const pill = useSlow(16, 30);
+  const by = useBreath(6 * u, 9);
+  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
+  const size = Math.min((portrait ? 58 : 80) * u, (width - 2 * m) / (longest * 0.5));
+  const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "center", flexDirection: "column", padding: `0 ${m}px`, overflow: "hidden" }}>
+      <SoftBlob color={accent} u={u} delay={0} size="60%" />
+      {brandLogo ? (
+        <Img src={brandLogo} crossOrigin="anonymous" style={{ height: (portrait ? 54 : 76) * u, width: "auto", maxWidth: "62%", objectFit: "contain", opacity: inn, transform: `translateY(${by}px)`, ...(brandLogoKnockout !== false ? { filter: knockoutFilter } : {}) }} />
+      ) : (
+        <div style={{ opacity: inn, transform: `translateY(${by}px)`, color: text, fontWeight: 600, fontSize: size, lineHeight: 1.1, letterSpacing: -0.5 * u, textAlign: "center", maxWidth: "16ch" }}>
+          {spec.headline}
+        </div>
+      )}
+      <div
+        style={{
+          marginTop: 40 * u,
+          opacity: pill,
+          transform: `translateY(${interpolate(pill, [0, 1], [12, 0])}px)`,
+          padding: `${16 * u}px ${38 * u}px`,
+          borderRadius: 999,
+          backgroundColor: accent,
+          color: readableOn(accent),
+          fontSize: (portrait ? 22 : 26) * u,
+          fontWeight: 600,
+        }}
+      >
+        {spec.cta}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const CalmBeat: React.FC<SceneProps> = (props) => {
+  switch (props.scene.type) {
+    case "hook":
+      return <CalmHook {...props} />;
+    case "price":
+      return <CalmPrice {...props} />;
+    case "outro":
+      return <CalmOutro {...props} />;
+    case "benefit":
+      return <CalmHook {...props} />;
+    default:
+      return <CalmHero {...props} />;
+  }
+};
+
 // Moods with a bespoke kinetic treatment; the rest fall back to SceneView.
 const KINETIC_BEATS: Partial<Record<Tone, React.FC<SceneProps>>> = {
   energetic: KineticBeat,
   luxe: LuxeBeat,
   techy: TechyBeat,
+  calm: CalmBeat,
 };
 
 // Derive a clean banded spec when none is supplied (keeps old callers working).
