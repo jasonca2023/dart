@@ -22,6 +22,14 @@ let sentry: SentryModule | null = null;
 // + init has actually finished).
 let initPromise: Promise<void> | null = null;
 
+// Parse a 0..1 sample rate from an env string, falling back to `fallback` for
+// anything missing, non-numeric, or out of range (a fat-fingered "10" must not
+// silently trace every session and blow the quota).
+function sampleRate(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return raw != null && Number.isFinite(n) && n >= 0 && n <= 1 ? n : fallback;
+}
+
 export function initMonitoring(): Promise<void> {
   if (!DSN || typeof window === "undefined") return Promise.resolve();
   if (!initPromise) {
@@ -31,9 +39,12 @@ export function initMonitoring(): Promise<void> {
       Sentry.init({
         dsn: DSN,
         environment: process.env.NEXT_PUBLIC_SENTRY_ENV ?? "production",
-        // Errors only by default — no performance tracing, no session replay —
-        // to keep quota and payload weight low. Turn these up later if wanted.
-        tracesSampleRate: 0,
+        // Performance tracing on 10% of sessions: browserTracingIntegration is
+        // what actually records page-load / navigation transactions (the sample
+        // rate alone captures nothing without it). Kept low to bound quota and
+        // the per-transaction payload weight; no session replay.
+        integrations: [Sentry.browserTracingIntegration()],
+        tracesSampleRate: sampleRate(process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE, 0.1),
         // Don't attach the user's IP or other default PII to events.
         sendDefaultPii: false,
       });

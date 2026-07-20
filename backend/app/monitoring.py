@@ -2,7 +2,8 @@
 
 No SENTRY_DSN → init_sentry() is a no-op: no SDK init, no network, no cost, so
 local dev and CI stay clean. Set SENTRY_DSN in the deploy environment to turn
-it on. Errors-only by default (traces_sample_rate 0) to keep quota low.
+it on. Performance tracing samples 10% of requests by default
+(traces_sample_rate) — enough signal on slow endpoints to stay inside quota.
 """
 
 from __future__ import annotations

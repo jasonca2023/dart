@@ -73,11 +73,12 @@ class Settings(BaseSettings):
 
     # --- Error monitoring (Sentry) ---
     # Unset (default) → monitoring is fully inert (no init, no network, no cost).
-    # Set SENTRY_DSN in the deploy env to turn it on. traces_sample_rate stays
-    # 0 by default (errors only, no performance tracing) to keep quota/cost low.
+    # Set SENTRY_DSN in the deploy env to turn it on. traces_sample_rate samples
+    # 10% of requests for performance tracing (slow endpoints, DB/HTTP spans) —
+    # low enough to stay well inside quota. Override via SENTRY_TRACES_SAMPLE_RATE.
     sentry_dsn: str | None = None
     sentry_environment: str = "production"
-    sentry_traces_sample_rate: float = 0.0
+    sentry_traces_sample_rate: float = 0.1
 
     # --- LLM (script generation) ---
     anthropic_api_key: str | None = None
