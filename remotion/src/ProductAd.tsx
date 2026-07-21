@@ -2357,10 +2357,28 @@ const BoldMarquee: React.FC<{
   );
 };
 
+// Average uppercase advance, in ems, for the heavy grotesque bold sets its type
+// in. Under-estimating this is how a word meant to overflow by 6% ends up
+// overflowing by half its length.
+const BOLD_CHAR_EM = 0.68;
+
 // Type set past the frame's capacity so it crops at the edges — bold's core
 // device. `overflowFactor` > 1 means the word is wider than the frame.
-function cropSize(width: number, word: string, overflowFactor: number): number {
-  return (width * overflowFactor) / Math.max(1, word.length * 0.58);
+//
+// The crop only works on SHORT words, where the missing tail is still
+// inferable ("DON'T" reading as "DON'"). A long word cropped at the same ratio
+// is just broken — "ENTERTAINMENT" becomes "ENTERTAINME" and the viewer gets
+// nothing — so past ~5 characters the overflow ramps down, and by 9 the word is
+// scaled to fit inside the frame instead of running past it.
+function cropSize(avail: number, word: string, overflowFactor: number): number {
+  const n = Math.max(1, word.length);
+  const ratio =
+    n <= 5
+      ? overflowFactor
+      : n >= 9
+        ? 0.98
+        : interpolate(n, [5, 9], [overflowFactor, 0.98]);
+  return (avail * ratio) / (n * BOLD_CHAR_EM);
 }
 
 // B1 · Hook — full accent flood. The hook reads one enormous word at a time on
@@ -2377,16 +2395,17 @@ const BoldHook: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const ink = inverted ? readableOn(accent) : text;
   const word = words[i] ?? "";
   const slam = useSlam(i * 11, 10 * u);
+  const m = margin(u, portrait);
   return (
     // Left-aligned, so the word only ever crops on the trailing edge — cropping
     // both sides eats the first letter and stops being readable.
-    <AbsoluteFill style={{ backgroundColor: bg, overflow: "hidden", alignItems: "flex-start", justifyContent: "center", paddingLeft: margin(u, portrait) }}>
+    <AbsoluteFill style={{ backgroundColor: bg, overflow: "hidden", alignItems: "flex-start", justifyContent: "center", paddingLeft: m }}>
       <div
         style={{
           color: ink,
           // The cap is a sanity bound, not the usual case — short words are meant
           // to run past the frame edge rather than sit politely inside it.
-          fontSize: Math.min(cropSize(width, word, portrait ? 1.15 : 1.06), (portrait ? 460 : 620) * u),
+          fontSize: Math.min(cropSize(width - m, word, portrait ? 1.15 : 1.06), (portrait ? 460 : 620) * u),
           fontWeight: 800,
           letterSpacing: -4 * u,
           lineHeight: 0.86,
@@ -2410,17 +2429,28 @@ const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
   const shown = useCut(2);
   const words = spec.headline.split(" ").filter(Boolean);
   const longest = words.reduce((mx, w) => (w.length > mx.length ? w : mx), words[0] ?? "");
-  const size = Math.min(cropSize(width, longest, portrait ? 1.24 : 1.1), (portrait ? 130 : 168) * u);
+  const m = margin(u, portrait);
   const slam = useSlam(2, 12 * u);
   const bandSize = (portrait ? 30 : 34) * u;
+  const cap = (portrait ? 130 : 168) * u;
+  const full = Math.min(cropSize(width - m, longest, portrait ? 1.24 : 1.1), cap);
+  // A long headline makes the type block span the whole frame, and the overlap
+  // stops working — difference blending over busy photo detail is mush, not
+  // contrast. When that happens landscape splits into columns instead: type
+  // left, product right, no overlap and no blend. The type is then re-fitted to
+  // its own column rather than the whole frame.
+  const split = !portrait && full * longest.length * BOLD_CHAR_EM > (width - 2 * m) * 0.55;
+  const size = split ? Math.min(cropSize(width * 0.58 - m, longest, 1.0), cap) : full;
+  const blend = !portrait && !split && readableOn(panel) === "#ffffff";
   return (
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: portrait ? "flex-start" : "center", paddingTop: portrait ? height * 0.08 : 0, paddingBottom: portrait ? 0 : height * 0.06 }}>
+      {/* AbsoluteFill is a column flex, so alignItems is the horizontal axis. */}
+      <AbsoluteFill style={{ alignItems: split ? "flex-end" : "center", justifyContent: portrait ? "flex-start" : "center", paddingTop: portrait ? height * 0.08 : 0, paddingRight: split ? m : 0, paddingBottom: portrait ? 0 : height * 0.06 }}>
         <Img
           src={productImage}
           crossOrigin="anonymous"
           style={{
-            width: portrait ? "84%" : "50%",
+            width: portrait ? "84%" : split ? "34%" : "50%",
             maxHeight: portrait ? "46%" : "82%",
             objectFit: "contain",
             opacity: shown ? 1 : 0,
@@ -2438,7 +2468,7 @@ const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
       <AbsoluteFill style={{ justifyContent: portrait ? "flex-end" : "center", paddingBottom: portrait ? height * 0.16 : 0, pointerEvents: "none" }}>
         <div
           style={{
-            marginLeft: margin(u, portrait),
+            marginLeft: m,
             color: text,
             fontSize: size,
             fontWeight: 800,
@@ -2449,7 +2479,7 @@ const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
             transform: `translate(${slam.x}px, ${slam.y}px)`,
             // Difference blending only reads over a dark ground; on a light
             // panel it washes the headline out to a ghost, so render flat.
-            ...(portrait || readableOn(panel) !== "#ffffff" ? {} : { mixBlendMode: "difference" as const }),
+            ...(blend ? { mixBlendMode: "difference" as const } : {}),
           }}
         >
           {words.slice(0, 3).map((w, wi) => (
@@ -2550,7 +2580,8 @@ const BoldOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoK
   const ctaIn = useCut(11);
   const words = spec.headline.split(" ").filter(Boolean);
   const longest = words.reduce((mx, w) => (w.length > mx.length ? w : mx), words[0] ?? "");
-  const size = Math.min(cropSize(width, longest, portrait ? 1.1 : 1.0), (portrait ? 110 : 150) * u);
+  // The outro is centre-aligned, so it loses a margin on BOTH sides.
+  const size = Math.min(cropSize(width - 2 * margin(u, portrait), longest, portrait ? 1.1 : 1.0), (portrait ? 110 : 150) * u);
   const slam = useSlam(2, 12 * u);
   const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
   return (
