@@ -89,6 +89,43 @@ function margin(u: number, portrait: boolean) {
   return (portrait ? 76 : 124) * u;
 }
 
+// --- Type fitting ---------------------------------------------------------
+// Every mood sizes headlines from copy it is handed at render time, and real
+// product titles run long ("2026 Model HDMI DVD Player for TV"), so a bad
+// estimate clips the ad. These used to be a dozen different magic numbers
+// scattered per mood; they are now one pair of constants and three helpers.
+//
+// The numbers are average glyph advances in ems, measured generously on
+// purpose: type set a little small is barely noticeable, type that overflows
+// the frame is a broken ad. Uppercase runs noticeably wider than mixed case.
+const CHAR_EM_UPPER = 0.68;
+const CHAR_EM_MIXED = 0.56;
+
+function longestWord(text: string): number {
+  return (text || "").split(/\s+/).reduce((mx, w) => Math.max(mx, w.length), 1);
+}
+
+// Largest size at which `chars` characters span at most `avail` px, bounded by
+// `cap` so a two-word headline doesn't balloon to fill the frame.
+function fitChars(avail: number, chars: number, cap: number, upper = false): number {
+  return Math.min(cap, avail / Math.max(1, chars * (upper ? CHAR_EM_UPPER : CHAR_EM_MIXED)));
+}
+
+// For text pinned to ONE line (a price, a nowrap value): the whole string fits.
+function fitLine(avail: number, text: string, cap: number, upper = false): number {
+  return fitChars(avail, (text || "").length, cap, upper);
+}
+
+// For a block allowed to WRAP: the whole string has to fit across `lines`
+// lines, AND no single word may overflow its line (the binding constraint for
+// a long word like "UNCOMPROMISING").
+function fitBlock(avail: number, text: string, cap: number, lines = 2, upper = false): number {
+  return Math.min(
+    fitChars(avail * lines, (text || "").length, cap, upper),
+    fitChars(avail, longestWord(text), cap, upper),
+  );
+}
+
 // Scene-relative spring (useCurrentFrame restarts at 0 inside a Sequence).
 // `start` and t.dur are authored in 30fps-frames and scaled to the real fps, so
 // every mood's reveal keeps the same wall-clock timing at any frame rate.
@@ -921,8 +958,7 @@ const KHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) =>
   // the column (condensed caps advance ~0.5em/char). Long product-title headlines
   // then wrap across lines instead of clipping.
   const avail = width - 2 * margin(u, portrait);
-  const longest = words.reduce((m, w) => Math.max(m, w.length), 1);
-  const hlSize = Math.min((portrait ? 90 : 118) * u, avail / (longest * 0.54));
+  const hlSize = fitBlock(avail, spec.headline, (portrait ? 90 : 118) * u, 3);
   // Product sits in the upper band, the slam hangs off the bottom over a strong
   // scrim — so the headline is legible in EVERY format (a centered headline over
   // a centered product goes unreadable on square/landscape).
@@ -1129,8 +1165,7 @@ const KOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnoc
   const logoIn = usePop(3, 18);
   // Fit the sign-off title so a long product-title headline can't overflow.
   const words = up(spec.headline).split(" ").filter(Boolean);
-  const longest = words.reduce((mx, w) => Math.max(mx, w.length), 1);
-  const titleSize = Math.min((portrait ? 74 : 104) * u, (width - 2 * m) / (longest * 0.54));
+  const titleSize = fitBlock(width - 2 * m, up(spec.headline), (portrait ? 74 : 104) * u, 3, true);
   if (brandLogo) {
     const knockout = brandLogoKnockout !== false;
     // Knock the mark out to whatever reads on the panel: white on a dark panel,
@@ -1371,8 +1406,7 @@ const LuxeHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
   const frame = useCurrentFrame();
   const kb = interpolate(frame, [0, scene.frames], [1.04, 1.0], { extrapolateRight: "clamp", easing: EASE_LUX });
   const words = spec.headline.split(" ").filter(Boolean);
-  const longest = words.reduce((mx, w) => Math.max(mx, w.length), 1);
-  const size = Math.min((portrait ? 72 : 100) * u, (width - 2 * m) / (longest * 0.5));
+  const size = fitBlock(width - 2 * m, spec.headline, (portrait ? 72 : 100) * u, 3);
   const topH = portrait ? "50%" : "54%";
   return (
     <AbsoluteFill style={{ backgroundColor: panel }}>
@@ -1441,8 +1475,7 @@ const LuxeOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoK
   const rule = useSlow(14, 24);
   const cta = useSlow(20, 24);
   const words = spec.headline.split(" ").filter(Boolean);
-  const longest = words.reduce((mx, w) => Math.max(mx, w.length), 1);
-  const size = Math.min((portrait ? 66 : 92) * u, (width - 2 * m) / (longest * 0.5));
+  const size = fitBlock(width - 2 * m, spec.headline, (portrait ? 66 : 92) * u, 3);
   const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
   return (
     <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "center", flexDirection: "column", padding: `0 ${m}px` }}>
@@ -1609,8 +1642,11 @@ const TechHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
   const o = useSnap(2);
   const kb = interpolate(frame, [0, scene.frames], [1.0, 1.05], { extrapolateRight: "clamp" });
   const m = margin(u, portrait);
-  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
-  const size = Math.min((portrait ? 40 : 52) * u, (width - 2 * m) / (Math.max(longest, 12) * 0.62));
+  const size = Math.min(
+    fitBlock(width - 2 * m, spec.headline, (portrait ? 40 : 52) * u, 3),
+    // Floor the assumed width so short titles stay restrained rather than huge.
+    fitChars(width - 2 * m, 12, (portrait ? 40 : 52) * u),
+  );
   const cross = interpolate(o, [0, 1], [0, 1]);
   return (
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
@@ -1718,8 +1754,10 @@ const TechOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoK
   const accent = readableOn(panel) === "#ffffff" ? spec.palette.accent : text;
   const m = margin(u, portrait);
   const o = useSnap(3);
-  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
-  const size = Math.min((portrait ? 40 : 56) * u, (width - 2 * m) / (Math.max(longest, 10) * 0.62));
+  const size = Math.min(
+    fitBlock(width - 2 * m, spec.headline, (portrait ? 40 : 56) * u, 3),
+    fitChars(width - 2 * m, 10, (portrait ? 40 : 56) * u),
+  );
   const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
   return (
     <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "flex-start", padding: `0 ${m}px`, overflow: "hidden" }}>
@@ -1849,8 +1887,7 @@ const CalmHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
   const foc = useSlow(0, 34);
   const by = useBreath(8 * u, 9);
   const m = margin(u, portrait);
-  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
-  const size = Math.min((portrait ? 60 : 82) * u, (width - 2 * m) / (longest * 0.5));
+  const size = fitBlock(width - 2 * m, spec.headline, (portrait ? 60 : 82) * u, 3);
   const topH = portrait ? "54%" : "58%";
   return (
     <AbsoluteFill style={{ backgroundColor: panel }}>
@@ -1913,8 +1950,7 @@ const CalmOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoK
   const inn = useSlow(3, 34);
   const pill = useSlow(16, 30);
   const by = useBreath(6 * u, 9);
-  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
-  const size = Math.min((portrait ? 58 : 80) * u, (width - 2 * m) / (longest * 0.5));
+  const size = fitBlock(width - 2 * m, spec.headline, (portrait ? 58 : 80) * u, 3);
   const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
   return (
     <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "center", flexDirection: "column", padding: `0 ${m}px`, overflow: "hidden" }}>
@@ -2119,8 +2155,7 @@ const PlayHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
   // Portrait stacks (blob up top, headline below); landscape splits so the
   // headline never has to sit on top of the blob.
   const colW = portrait ? width - 2 * m : (width - 2 * m) * 0.46;
-  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
-  const size = Math.min((portrait ? 66 : 78) * u, colW / (longest * 0.6));
+  const size = fitBlock(colW, spec.headline, (portrait ? 66 : 78) * u, 4);
   const art = (
     <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: portrait ? "100%" : "50%", height: portrait ? "56%" : "100%" }}>
       <div style={{ position: "absolute", width: portrait ? "80%" : "84%", aspectRatio: "1/1", borderRadius: "50%", backgroundColor: accent, opacity: 0.9, transform: `scale(${interpolate(b, [0, 1], [0.6, 1])})` }} />
@@ -2187,7 +2222,7 @@ const PlayPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   // Fit the price inside the blob — a long "$1,299.00" must not run off the edge
   // or collide with the lead line above it.
   const blobW = width * (portrait ? 0.7 : 0.42);
-  const priceSize = Math.min((portrait ? 100 : 132) * u, (blobW * 0.78) / Math.max(1, (scene.value || "").length * 0.56));
+  const priceSize = fitLine(blobW * 0.78, scene.value ?? "", (portrait ? 100 : 132) * u);
   return (
     <AbsoluteFill style={{ backgroundColor: panel, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
       <PopDot left="18%" top="26%" size={34 * u} color={accent} delay={10} />
@@ -2226,8 +2261,7 @@ const PlayOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoK
   const m = margin(u, portrait);
   const inn = useBounce(3, 8);
   const pill = useBounce(12, 7);
-  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
-  const size = Math.min((portrait ? 56 : 78) * u, (width - 2 * m) / (longest * 0.6));
+  const size = fitBlock(width - 2 * m, spec.headline, (portrait ? 56 : 78) * u, 3);
   const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
   return (
     <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "center", flexDirection: "column", padding: `0 ${m}px`, overflow: "hidden" }}>
@@ -2359,11 +2393,6 @@ const BoldMarquee: React.FC<{
   );
 };
 
-// Average uppercase advance, in ems, for the heavy grotesque bold sets its type
-// in. Under-estimating this is how a word meant to overflow by 6% ends up
-// overflowing by half its length.
-const BOLD_CHAR_EM = 0.68;
-
 // Type set past the frame's capacity so it crops at the edges — bold's core
 // device. `overflowFactor` > 1 means the word is wider than the frame.
 //
@@ -2380,7 +2409,7 @@ function cropSize(avail: number, word: string, overflowFactor: number): number {
       : n >= 9
         ? 0.98
         : interpolate(n, [5, 9], [overflowFactor, 0.98]);
-  return (avail * ratio) / (n * BOLD_CHAR_EM);
+  return (avail * ratio) / (n * CHAR_EM_UPPER);
 }
 
 // B1 · Hook — full accent flood. The hook reads one enormous word at a time on
@@ -2441,7 +2470,7 @@ const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
   // contrast. When that happens landscape splits into columns instead: type
   // left, product right, no overlap and no blend. The type is then re-fitted to
   // its own column rather than the whole frame.
-  const split = !portrait && full * longest.length * BOLD_CHAR_EM > (width - 2 * m) * 0.55;
+  const split = !portrait && full * longest.length * CHAR_EM_UPPER > (width - 2 * m) * 0.55;
   const size = split ? Math.min(cropSize(width * 0.58 - m, longest, 1.0), cap) : full;
   const blend = !portrait && !split && readableOn(panel) === "#ffffff";
   return (
@@ -2514,7 +2543,7 @@ const BoldFeature: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
       <div
         style={{
           color: ink,
-          fontSize: Math.min((width * 0.95) / Math.max(1, value.length * 0.42), (portrait ? 110 : 140) * u),
+          fontSize: fitBlock(width - 2 * margin(u, portrait), value, (portrait ? 110 : 140) * u, 2, true),
           fontWeight: 800,
           lineHeight: 0.9,
           letterSpacing: -4 * u,
@@ -2543,7 +2572,7 @@ const BoldPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const landed = d >= 3 * k;
   const slam = useSlam(7, 16 * u);
   const value = scene.value || "";
-  const size = Math.min((width * 0.72) / Math.max(1, value.length * 0.52), (portrait ? 150 : 200) * u);
+  const size = fitLine(width * 0.72, value, (portrait ? 150 : 200) * u, true);
   return (
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden", alignItems: "center", justifyContent: "center", transform: `translate(${slam.x}px, ${slam.y}px)` }}>
       {landed ? (
