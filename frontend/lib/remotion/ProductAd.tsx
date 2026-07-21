@@ -1108,7 +1108,8 @@ const KPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const { accent } = spec.palette;
   const ink = readableOn(accent);
   const frame = useCurrentFrame();
-  const k = useVideoConfig().fps / 30;
+  const { fps, width } = useVideoConfig();
+  const k = fps / 30;
   const flood = interpolate(frame, [0, 9 * k], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const slam = usePop(7, 13);
   const lead = usePop(4, 17);
@@ -1120,6 +1121,9 @@ const KPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
         justifyContent: "center",
         alignItems: "center",
         overflow: "hidden",
+        // The number's line box is shorter than its glyphs, so without a gap the
+        // digits ride up over the lead line.
+        gap: 12 * u,
         clipPath: `inset(0 0 ${interpolate(flood, [0, 1], [100, 0])}% 0)`,
       }}
     >
@@ -1139,10 +1143,11 @@ const KPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
         style={{
           transform: `scale(${interpolate(slam, [0, 1], [0.3, 1])})`,
           color: ink,
-          fontSize: (portrait ? 220 : 320) * u,
+          fontSize: fitLine(width - 2 * margin(u, portrait), scene.value ?? "", (portrait ? 220 : 320) * u),
           fontWeight: 800,
-          lineHeight: 0.86,
+          lineHeight: 1,
           letterSpacing: -8 * u,
+          whiteSpace: "nowrap",
           fontVariantNumeric: "tabular-nums",
         }}
       >
@@ -1434,32 +1439,43 @@ const LuxeHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
 // serif figure that fades and settles (no overshoot), a fine gold rule.
 const LuxePrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const u = useUnit();
+  const { width } = useVideoConfig();
   const { panel, accent, text } = spec.palette;
   const lead = useSlow(2, 28);
-  const num = useSlow(8, 32);
-  const rule = useSlow(18, 26);
+  // The number no longer just fades up — it LIFTS from behind the rule, masked,
+  // like a card being turned over. The rule draws first so there is something
+  // for the digits to emerge from, and a specular pass crosses them once they
+  // land. Slow and deliberate, but an actual moment rather than an opacity ramp.
+  // Timed so the number is fully landed with room to sit — the scene is only
+  // ~2s and a reveal that finishes at the cut isn't a reveal.
+  const rule = useSlow(4, 16);
+  const lift = useSlow(9, 26);
   const m = margin(u, portrait);
+  const value = scene.value ?? "";
+  const size = fitLine(width - 2 * m, value, (portrait ? 150 : 210) * u);
   return (
-    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "flex-start", padding: `0 ${m}px` }}>
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "flex-start", padding: `0 ${m}px`, overflow: "hidden" }}>
       <div style={{ opacity: lead, color: accent, fontSize: (portrait ? 20 : 24) * u, fontWeight: 600, letterSpacing: interpolate(lead, [0, 1], [8 * u, 4 * u]), marginBottom: 22 * u }}>
         {up(PRICE_LEAD[spec.tone])}
       </div>
-      <div
-        style={{
-          opacity: num,
-          transform: `scale(${interpolate(num, [0, 1], [0.96, 1])})`,
-          transformOrigin: "left",
-          color: text,
-          fontWeight: 600,
-          fontSize: (portrait ? 150 : 210) * u,
-          lineHeight: 0.9,
-          letterSpacing: -4 * u,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {scene.value}
+      <div style={{ width: interpolate(rule, [0, 1], [0, size * value.length * 0.5]), height: 1.5 * u, backgroundColor: accent, marginBottom: 18 * u }} />
+      {/* The mask: digits translate up from fully below the clip edge. */}
+      <div style={{ position: "relative", overflow: "hidden", paddingBottom: size * 0.08 }}>
+        <div
+          style={{
+            transform: `translateY(${interpolate(lift, [0, 1], [110, 0])}%)`,
+            color: text,
+            fontWeight: 600,
+            fontSize: size,
+            lineHeight: 1,
+            letterSpacing: -4 * u,
+            whiteSpace: "nowrap",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {value}
+        </div>
       </div>
-      <div style={{ marginTop: 34 * u, width: interpolate(rule, [0, 1], [0, 180 * u]), height: 1.5 * u, backgroundColor: accent }} />
     </AbsoluteFill>
   );
 };
@@ -1910,31 +1926,59 @@ const CalmHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
 
 // C3 · Price — quiet value: a gentle serif lead and a soft serif figure that
 // fades and settles. No rule, no slam.
+// Calm's price SETTLES rather than lands: each digit drifts down into place on
+// its own beat and comes to rest, the whole line riding the mood's breathing
+// offset. A reveal made of arrival, not impact — the opposite of bold's stamp.
+const CalmDigits: React.FC<{ text: string; size: number; color: string; delay: number; u: number }> = ({ text, size, color, delay, u }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const k = fps / 30;
+  return (
+    <div style={{ display: "flex", fontVariantNumeric: "tabular-nums" }}>
+      {(text || "").split("").map((ch, i) => {
+        const t = interpolate(frame, [(delay + i * 2.5) * k, (delay + i * 2.5 + 26) * k], [0, 1], {
+          easing: Easing.out(Easing.cubic),
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        });
+        return (
+          <span
+            key={i}
+            style={{
+              display: "inline-block",
+              opacity: t,
+              transform: `translateY(${interpolate(t, [0, 1], [-size * 0.16, 0])}px)`,
+              filter: `blur(${interpolate(t, [0, 1], [size * 0.02, 0])}px)`,
+              color,
+              fontSize: size,
+              fontWeight: 600,
+              lineHeight: 1,
+              letterSpacing: -3 * u,
+            }}
+          >
+            {ch}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 const CalmPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const u = useUnit();
+  const { width } = useVideoConfig();
   const { panel, accent, text } = spec.palette;
   const by = useBreath(6 * u, 9);
-  const num = useSlow(8, 34);
   const m = margin(u, portrait);
+  const value = scene.value ?? "";
+  const size = fitLine(width - 2 * m, value, (portrait ? 140 : 196) * u);
   return (
     <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "flex-start", padding: `0 ${m}px`, overflow: "hidden" }}>
       <SoftBlob color={accent} u={u} delay={0} size="54%" />
       <CalmLine text={PRICE_LEAD[spec.tone]} size={(portrait ? 22 : 27) * u} color={accent} delay={2} u={u} weight={600} />
       <div style={{ height: 14 * u }} />
-      <div
-        style={{
-          opacity: num,
-          transform: `translateY(${by}px) scale(${interpolate(num, [0, 1], [0.97, 1])})`,
-          transformOrigin: "left",
-          color: text,
-          fontWeight: 600,
-          fontSize: (portrait ? 140 : 196) * u,
-          lineHeight: 0.92,
-          letterSpacing: -3 * u,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {scene.value}
+      <div style={{ transform: `translateY(${by}px)` }}>
+        <CalmDigits text={value} size={size} color={text} delay={8} u={u} />
       </div>
     </AbsoluteFill>
   );
