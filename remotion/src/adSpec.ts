@@ -52,6 +52,8 @@ export interface AdSpecInput {
   variant?: number;
 }
 
+// Render frame rate — must match lib/render.ts and the renderer (ProductAd).
+// 60 for smoother motion; renderer timing scales by fps/30 so speed is unchanged.
 const FPS = 60;
 
 // --- Variety tables -------------------------------------------------------
@@ -113,6 +115,10 @@ const PALETTES: Record<Tone, Palette[]> = {
     { stage: "#fff6f1", panel: "#2a0f3a", accent: "#ff5da2", text: "#ffffff", onStage: "#2a0f3a" },
     { stage: "#fdf5ff", panel: "#141f4a", accent: "#ffb020", text: "#ffffff", onStage: "#141f4a" },
     { stage: "#f1fffb", panel: "#10243a", accent: "#00c2b8", text: "#ffffff", onStage: "#10243a" },
+    // Light variants — candy-bright panels with near-black ink, so the shuffle
+    // also lands on the sticker-book register instead of only night-time pop.
+    { stage: "#fff6f1", panel: "#ffe9dd", accent: "#ff4f8b", text: "#241019", onStage: "#ffdfcd" },
+    { stage: "#f4fbff", panel: "#e4f1ff", accent: "#7c5cff", text: "#131a2c", onStage: "#d7e8fb" },
   ],
   calm: [
     { stage: "#f2f4f3", panel: "#222b2e", accent: "#3f9d86", text: "#eef5f2", onStage: "#222b2e" },
@@ -414,7 +420,17 @@ const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 /** Guard a spec so the renderer can always trust it (valid colors, sane frames). */
 export function clampSpec(spec: AdSpec): AdSpec {
   const p = spec.palette;
-  const safe = (c: string, fallback: string) => (HEX.test(c) ? c : fallback);
+  // Expand #abc → #aabbcc: the renderer concatenates 2-digit alpha suffixes
+  // onto palette colors (e.g. `${panel}e6` for scrims), and a 3-digit token
+  // would turn those into invalid 5-digit colors — the browser drops the
+  // whole declaration and the text loses its legibility scrim.
+  const safe = (c: string, fallback: string) => {
+    if (!HEX.test(c)) return fallback;
+    if (c.length === 4) {
+      return `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`;
+    }
+    return c;
+  };
   const palette: Palette = {
     stage: safe(p.stage, "#ffffff"),
     panel: safe(p.panel, "#0b0b12"),

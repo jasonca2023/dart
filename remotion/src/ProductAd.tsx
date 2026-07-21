@@ -1958,12 +1958,328 @@ const CalmBeat: React.FC<SceneProps> = (props) => {
   }
 };
 
+// ===========================================================================
+// PLAYFUL — bouncy, fun, toy-like. Bricolage Grotesque. MORE bounce than
+// energetic: letters pop in with overshoot AND a little rotation, shapes/dots
+// pop around the product, and the price arrives as a SPINNING STICKER BADGE that
+// wobbles. Distinct from energetic (which slams/wipes) by being springy, round
+// and cheeky rather than athletic.
+// ===========================================================================
+
+// Heavy-overshoot bounce (springier than usePop). `delay` in 30fps-frames.
+function useBounce(delay: number, damping = 8) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  return spring({ frame: frame - delay * (fps / 30), fps, config: { damping, stiffness: 150, mass: 0.85 } });
+}
+
+// Per-letter bouncy headline: each glyph pops from 0 with overshoot and a small
+// alternating rotation that settles to upright.
+const BounceText: React.FC<{ text: string; delay: number; per: number; size: number; color: string; u: number; maxWidth?: number | string; align?: "left" | "center" }> = ({
+  text,
+  delay,
+  per,
+  size,
+  color,
+  u,
+  maxWidth,
+  align = "left",
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const k = fps / 30;
+  const words = (text || "").split(" ");
+  let idx = 0;
+  return (
+    // Row gap must exceed the per-letter entry travel (size*0.18 below) or
+    // wrapped lines collide mid-animation.
+    <div style={{ display: "flex", flexWrap: "wrap", gap: `${size * 0.3}px ${size * 0.28}px`, alignItems: "flex-end", justifyContent: align === "center" ? "center" : "flex-start", maxWidth }}>
+      {words.map((w, wi) => (
+        <span key={wi} style={{ display: "inline-flex" }}>
+          {w.split("").map((ch, ci) => {
+            const i = idx++;
+            const s = spring({ frame: frame - (delay + i * per) * k, fps, config: { damping: 8, stiffness: 150, mass: 0.85 } });
+            const dir = i % 2 === 0 ? 1 : -1;
+            return (
+              <span
+                key={ci}
+                style={{
+                  display: "inline-block",
+                  transformOrigin: "bottom center",
+                  transform: `translateY(${interpolate(s, [0, 1], [size * 0.18, 0])}px) scale(${interpolate(s, [0, 1], [0.2, 1])}) rotate(${interpolate(s, [0, 1], [10 * dir, 0])}deg)`,
+                  opacity: interpolate(s, [0, 0.5], [0, 1], { extrapolateRight: "clamp" }),
+                  color,
+                  fontSize: size,
+                  fontWeight: 800,
+                  lineHeight: 1.0,
+                }}
+              >
+                {ch}
+              </span>
+            );
+          })}
+        </span>
+      ))}
+    </div>
+  );
+};
+
+// A popping dot/shape at a fixed position.
+const PopDot: React.FC<{ left: string; top: string; size: number; color: string; delay: number; ring?: boolean }> = ({ left, top, size, color, delay, ring }) => {
+  const s = useBounce(delay, 7);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left,
+        top,
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        transform: `scale(${s})`,
+        ...(ring ? { border: `${size * 0.18}px solid ${color}`, background: "transparent" } : { backgroundColor: color }),
+      }}
+    />
+  );
+};
+
+// Playful accent used for TEXT drops to ink on a light panel (bright accents like
+// amber are illegible on white); filled shapes/badges keep the true accent.
+function playInk(palette: AdSpec["palette"]): string {
+  return readableOn(palette.panel) === "#ffffff" ? palette.accent : palette.text;
+}
+
+// Product photos are cut-outs on white, so dropping one straight onto a dark
+// playful panel shows a hard white rectangle. Playful's answer is a STICKER: the
+// photo lives on a fat rounded card in the light stage colour, tilted, with a
+// chunky offset shadow — scrapbook, not float. Doubles as the mood's signature.
+const StickerCard: React.FC<{
+  src: string;
+  spec: AdSpec;
+  size: string;
+  pop: number;
+  tilt?: number;
+  u: number;
+}> = ({ src, spec, size, pop, tilt = -3, u }) => {
+  const { stage, accent } = spec.palette;
+  return (
+    <div
+      style={{
+        width: size,
+        aspectRatio: "1 / 1",
+        borderRadius: 46 * u,
+        backgroundColor: stage,
+        border: `${6 * u}px solid ${accent}`,
+        boxShadow: `${12 * u}px ${14 * u}px 0 rgba(0,0,0,0.22)`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 22 * u,
+        overflow: "hidden",
+        transform: `scale(${interpolate(pop, [0, 1], [0.3, 1])}) rotate(${interpolate(pop, [0, 1], [tilt - 10, tilt])}deg)`,
+        opacity: interpolate(pop, [0, 0.45], [0, 1], { extrapolateRight: "clamp" }),
+      }}
+    >
+      <Img src={src} crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+    </div>
+  );
+};
+
+// P1 · Hook — product bounces in with a tilt, dots pop around it, bouncy kicker.
+const PlayHook: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
+  const u = useUnit();
+  const { panel, accent, text } = spec.palette;
+  const b = useBounce(2, 8);
+  const kick = useBounce(10, 9);
+  const m = margin(u, portrait);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+      <PopDot left="16%" top="24%" size={40 * u} color={accent} delay={8} />
+      <PopDot left="80%" top="30%" size={26 * u} color={accent} delay={12} ring />
+      <PopDot left="24%" top="72%" size={22 * u} color={accent} delay={14} ring />
+      <PopDot left="84%" top="70%" size={34 * u} color={accent} delay={10} />
+      <StickerCard src={productImage} spec={spec} size={portrait ? "72%" : "42%"} pop={b} tilt={-4} u={u} />
+      <div style={{ position: "absolute", bottom: (portrait ? 78 : 66) * u, left: portrait ? 0 : m, right: portrait ? 0 : "auto", textAlign: portrait ? "center" : "left", opacity: interpolate(kick, [0, 1], [0, 1]) }}>
+        <span style={{ color: playInk(spec.palette), fontSize: (portrait ? 20 : 24) * u, fontWeight: 800, letterSpacing: 1 * u }}>{up(spec.eyebrow)}</span>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// P2 · Hero — headline pops per-letter with wobble; product bounces on a big
+// round accent blob; dots scattered.
+const PlayHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text } = spec.palette;
+  const b = useBounce(2, 8);
+  const m = margin(u, portrait);
+  // Portrait stacks (blob up top, headline below); landscape splits so the
+  // headline never has to sit on top of the blob.
+  const colW = portrait ? width - 2 * m : (width - 2 * m) * 0.46;
+  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
+  const size = Math.min((portrait ? 66 : 78) * u, colW / (longest * 0.6));
+  const art = (
+    <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: portrait ? "100%" : "50%", height: portrait ? "56%" : "100%" }}>
+      <div style={{ position: "absolute", width: portrait ? "80%" : "84%", aspectRatio: "1/1", borderRadius: "50%", backgroundColor: accent, opacity: 0.9, transform: `scale(${interpolate(b, [0, 1], [0.6, 1])})` }} />
+      <StickerCard src={productImage} spec={spec} size={portrait ? "56%" : "58%"} pop={b} tilt={5} u={u} />
+    </div>
+  );
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+      <AbsoluteFill style={{ flexDirection: portrait ? "column" : "row", alignItems: "center", padding: `${(portrait ? 60 : 40) * u}px ${m}px` }}>
+        {art}
+        <div style={{ width: portrait ? "100%" : "50%", display: "flex", justifyContent: portrait ? "center" : "flex-start", paddingLeft: portrait ? 0 : 24 * u }}>
+          <BounceText text={spec.headline} delay={6} per={0.9} size={size} color={text} u={u} maxWidth={portrait ? "14ch" : "11ch"} align={portrait ? "center" : "left"} />
+        </div>
+      </AbsoluteFill>
+      <PopDot left="6%" top="14%" size={30 * u} color={accent} delay={12} ring />
+      <PopDot left="90%" top="78%" size={24 * u} color={accent} delay={16} />
+    </AbsoluteFill>
+  );
+};
+
+// P3 · Feature — a sticker callout badge bounces/tilts in, pinned near the product.
+const PlayFeature: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+  const u = useUnit();
+  const { panel, accent, text, onStage } = spec.palette;
+  const b = useBounce(4, 8);
+  const wob = useBreath(2, 5);
+  const m = margin(u, portrait);
+  return (
+    <AbsoluteFill style={{ backgroundColor: onStage, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+      <PopDot left="14%" top="20%" size={28 * u} color={accent} delay={10} ring />
+      <PopDot left="82%" top="74%" size={30 * u} color={accent} delay={13} />
+      <StickerCard src={productImage} spec={spec} size={portrait ? "64%" : "38%"} pop={b} tilt={-5} u={u} />
+      <div
+        style={{
+          position: "absolute",
+          left: portrait ? "50%" : m,
+          bottom: portrait ? (110 * u) : (86 * u),
+          transform: `translateX(${portrait ? "-50%" : "0"}) scale(${interpolate(b, [0, 1], [0.2, 1])}) rotate(${interpolate(b, [0, 1], [-14, -5])}deg) rotate(${wob}deg)`,
+          transformOrigin: "center",
+          backgroundColor: accent,
+          color: readableOn(accent),
+          padding: `${18 * u}px ${28 * u}px`,
+          borderRadius: 22 * u,
+          maxWidth: "66%",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: (portrait ? 15 : 17) * u, fontWeight: 800, opacity: 0.85, marginBottom: 6 * u }}>{up(scene.label || spec.eyebrow)}</div>
+        <div style={{ fontSize: (portrait ? 30 : 40) * u, fontWeight: 800, lineHeight: 1.0 }}>{scene.value || spec.subhead}</div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// P4 · Price — THE SIGNATURE: a spinning, wobbling STICKER BADGE lands with the
+// price. Starburst-ish rounded badge, confetti dots.
+const PlayPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
+  const u = useUnit();
+  const { panel, accent, text } = spec.palette;
+  const b = useBounce(4, 7);
+  const wob = useBreath(2.5, 4);
+  const spin = interpolate(b, [0, 1], [-40, 0]);
+  const { width } = useVideoConfig();
+  // Fit the price inside the blob — a long "$1,299.00" must not run off the edge
+  // or collide with the lead line above it.
+  const blobW = width * (portrait ? 0.7 : 0.42);
+  const priceSize = Math.min((portrait ? 100 : 132) * u, (blobW * 0.78) / Math.max(1, (scene.value || "").length * 0.56));
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <PopDot left="18%" top="26%" size={34 * u} color={accent} delay={10} />
+      <PopDot left="80%" top="24%" size={24 * u} color={accent} delay={13} ring />
+      <PopDot left="22%" top="74%" size={26 * u} color={accent} delay={15} ring />
+      <PopDot left="78%" top="76%" size={32 * u} color={accent} delay={11} />
+      <div
+        style={{
+          width: portrait ? "70%" : "42%",
+          aspectRatio: "1 / 1",
+          borderRadius: "42% 58% 55% 45% / 52% 44% 56% 48%",
+          backgroundColor: accent,
+          color: readableOn(accent),
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 14 * u,
+          boxShadow: `${14 * u}px ${16 * u}px 0 rgba(0,0,0,0.22)`,
+          transform: `scale(${interpolate(b, [0, 1], [0.2, 1])}) rotate(${spin + wob}deg)`,
+        }}
+      >
+        <div style={{ fontSize: (portrait ? 22 : 26) * u, fontWeight: 800, opacity: 0.9, letterSpacing: 1 * u }}>{up(PRICE_LEAD[spec.tone])}</div>
+        {/* lineHeight > 1 so the tall "$" glyph can't overflow up into the lead. */}
+        <div style={{ fontSize: priceSize, fontWeight: 800, lineHeight: 1.2, letterSpacing: -3 * u, whiteSpace: "nowrap" }}>{scene.value}</div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// P5 · Outro — bouncy name + a fat rounded CTA pill that pops; dots.
+const PlayOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnockout }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text } = spec.palette;
+  const m = margin(u, portrait);
+  const inn = useBounce(3, 8);
+  const pill = useBounce(12, 7);
+  const longest = spec.headline.split(" ").reduce((mx, w) => Math.max(mx, w.length), 1);
+  const size = Math.min((portrait ? 56 : 78) * u, (width - 2 * m) / (longest * 0.6));
+  const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, justifyContent: "center", alignItems: "center", flexDirection: "column", padding: `0 ${m}px`, overflow: "hidden" }}>
+      <PopDot left="14%" top="22%" size={30 * u} color={accent} delay={8} />
+      <PopDot left="84%" top="70%" size={26 * u} color={accent} delay={11} ring />
+      {brandLogo ? (
+        <Img src={brandLogo} crossOrigin="anonymous" style={{ height: (portrait ? 54 : 76) * u, width: "auto", maxWidth: "62%", objectFit: "contain", opacity: interpolate(inn, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }), transform: `scale(${interpolate(inn, [0, 1], [0.6, 1])})`, ...(brandLogoKnockout !== false ? { filter: knockoutFilter } : {}) }} />
+      ) : (
+        <div style={{ transform: `scale(${interpolate(inn, [0, 1], [0.6, 1])})`, color: text, fontWeight: 800, fontSize: size, lineHeight: 1.02, letterSpacing: -1 * u, textAlign: "center", maxWidth: "15ch" }}>
+          {spec.headline}
+        </div>
+      )}
+      <div
+        style={{
+          marginTop: 40 * u,
+          transform: `scale(${interpolate(pill, [0, 1], [0.2, 1])}) rotate(${interpolate(pill, [0, 1], [-6, 0])}deg)`,
+          padding: `${18 * u}px ${44 * u}px`,
+          borderRadius: 999,
+          backgroundColor: accent,
+          color: readableOn(accent),
+          fontSize: (portrait ? 24 : 28) * u,
+          fontWeight: 800,
+        }}
+      >
+        {spec.cta}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const PlayfulBeat: React.FC<SceneProps> = (props) => {
+  switch (props.scene.type) {
+    case "hook":
+      return <PlayHook {...props} />;
+    case "feature":
+      return <PlayFeature {...props} />;
+    case "price":
+      return <PlayPrice {...props} />;
+    case "outro":
+      return <PlayOutro {...props} />;
+    case "benefit":
+      return <PlayHook {...props} />;
+    default:
+      return <PlayHero {...props} />;
+  }
+};
+
 // Moods with a bespoke kinetic treatment; the rest fall back to SceneView.
 const KINETIC_BEATS: Partial<Record<Tone, React.FC<SceneProps>>> = {
   energetic: KineticBeat,
   luxe: LuxeBeat,
   techy: TechyBeat,
   calm: CalmBeat,
+  playful: PlayfulBeat,
 };
 
 // Derive a clean banded spec when none is supplied (keeps old callers working).
@@ -2047,8 +2363,6 @@ function safeInsets(width: number, height: number) {
 }
 
 export const ProductAd: React.FC<ProductAdProps> = (props) => {
-  // `spec` is z.any() in the schema; treat it as the real type so this mirror
-  // type-checks like the frontend source it mirrors.
   const spec: AdSpec = (props.spec as AdSpec | undefined) ?? fallbackSpec(props);
   const { width, height } = useVideoConfig();
   const portrait = height > width;

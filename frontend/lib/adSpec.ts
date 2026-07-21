@@ -115,6 +115,10 @@ const PALETTES: Record<Tone, Palette[]> = {
     { stage: "#fff6f1", panel: "#2a0f3a", accent: "#ff5da2", text: "#ffffff", onStage: "#2a0f3a" },
     { stage: "#fdf5ff", panel: "#141f4a", accent: "#ffb020", text: "#ffffff", onStage: "#141f4a" },
     { stage: "#f1fffb", panel: "#10243a", accent: "#00c2b8", text: "#ffffff", onStage: "#10243a" },
+    // Light variants — candy-bright panels with near-black ink, so the shuffle
+    // also lands on the sticker-book register instead of only night-time pop.
+    { stage: "#fff6f1", panel: "#ffe9dd", accent: "#ff4f8b", text: "#241019", onStage: "#ffdfcd" },
+    { stage: "#f4fbff", panel: "#e4f1ff", accent: "#7c5cff", text: "#131a2c", onStage: "#d7e8fb" },
   ],
   calm: [
     { stage: "#f2f4f3", panel: "#222b2e", accent: "#3f9d86", text: "#eef5f2", onStage: "#222b2e" },

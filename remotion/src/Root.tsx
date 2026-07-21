@@ -16,6 +16,7 @@ const VARIANTS = [
   { id: "ProductAd-genz", audience: "Gen Z tech enthusiasts" },
   { id: "ProductAd-luxe", audience: "Luxury gift shoppers" },
   { id: "ProductAd-outdoor", audience: "Outdoor adventurers" },
+  { id: "ProductAd-playful", audience: "Fun-loving kids and party creators" },
   { id: "ProductAd-bold", audience: "Bold streetwear statement" },
 ];
 
