@@ -142,6 +142,10 @@ const PALETTES: Record<Tone, Palette[]> = {
     { stage: "#fffdf7", panel: "#101010", accent: "#ff3b1d", text: "#ffffff", onStage: "#101010" },
     { stage: "#fbfbf9", panel: "#0f0f0f", accent: "#ffd400", text: "#ffffff", onStage: "#0f0f0f" },
     { stage: "#fafbff", panel: "#0d0d0f", accent: "#2b59ff", text: "#ffffff", onStage: "#0d0d0f" },
+    // Light variants — a newsprint poster, and a full accent flood as the panel
+    // itself (bold is the one mood where a screaming ground is on-message).
+    { stage: "#ffffff", panel: "#f2f0eb", accent: "#ff3b1d", text: "#0a0a0a", onStage: "#e8e5de" },
+    { stage: "#ffffff", panel: "#ffd400", accent: "#101010", text: "#101010", onStage: "#f5c800" },
   ],
 };
 

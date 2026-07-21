@@ -2273,6 +2273,348 @@ const PlayfulBeat: React.FC<SceneProps> = (props) => {
   }
 };
 
+// ===========================================================================
+// BOLD — the loud declarative language.
+//
+// Deliberately the inverse of every mood above: those all move on springs and
+// eases, so bold moves on NOTHING. State changes are hard cuts on a beat — no
+// interpolation, no overshoot, no fade. The other levers are scale and crop:
+// type is set so large the frame can't contain it, so words run off the edges
+// and the viewer reads the fragment. Corners are square everywhere (bold owns
+// radius 0 the way playful owns fat radii), and the frame periodically inverts
+// ink and accent wholesale rather than transitioning between them.
+// ===========================================================================
+
+// A hard on/off switch — no ramp. `delay` in 30fps-frames.
+function useCut(delay: number): boolean {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  return frame >= delay * (fps / 30);
+}
+
+// Which item of a list is showing, advancing on a hard beat. `hold` in
+// 30fps-frames. Clamps on the last item instead of looping back.
+function useBeatIndex(count: number, hold: number, delay = 0): number {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const k = fps / 30;
+  const t = Math.floor((frame - delay * k) / (hold * k));
+  return Math.max(0, Math.min(count - 1, t));
+}
+
+// Two-frame impact shake on the beat — the only "motion" bold allows itself,
+// and it's a jolt, not an ease.
+function useSlam(delay: number, amount: number): { x: number; y: number } {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const k = fps / 30;
+  const d = frame - delay * k;
+  if (d < 0 || d > 3 * k) return { x: 0, y: 0 };
+  const step = Math.floor(d / Math.max(1, k * 0.75));
+  const dir = step % 2 === 0 ? 1 : -1;
+  const decay = 1 - step / 4;
+  return { x: amount * dir * decay, y: amount * 0.4 * -dir * decay };
+}
+
+// A full-bleed band of repeated text sliding sideways at a constant rate — no
+// easing in or out, it's just always moving.
+const BoldMarquee: React.FC<{
+  text: string;
+  size: number;
+  ink: string;
+  bg: string;
+  speed: number;
+  tilt?: number;
+}> = ({ text, size, ink, bg, speed, tilt = 0 }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const reps = Array.from({ length: 8 });
+  const cell = `${text} ✦ `;
+  return (
+    <div
+      style={{
+        // Relative, not absolute, so the band contributes its height to the
+        // wrapper — a bottom-anchored wrapper would otherwise collapse to zero
+        // and push the band off-frame.
+        position: "relative",
+        left: "-10%",
+        width: "120%",
+        backgroundColor: bg,
+        transform: `rotate(${tilt}deg)`,
+        overflow: "hidden",
+        display: "flex",
+        padding: `${size * 0.16}px 0`,
+      }}
+    >
+      <div style={{ display: "flex", whiteSpace: "nowrap", transform: `translateX(${-((frame / fps) * speed) % 50}%)` }}>
+        {reps.map((_, i) => (
+          <span key={i} style={{ color: ink, fontSize: size, fontWeight: 800, letterSpacing: size * 0.02, lineHeight: 1 }}>
+            {cell}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Type set past the frame's capacity so it crops at the edges — bold's core
+// device. `overflowFactor` > 1 means the word is wider than the frame.
+function cropSize(width: number, word: string, overflowFactor: number): number {
+  return (width * overflowFactor) / Math.max(1, word.length * 0.58);
+}
+
+// B1 · Hook — full accent flood. The hook reads one enormous word at a time on
+// hard cuts, and the frame inverts between words.
+const BoldHook: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text } = spec.palette;
+  const words = (scene.text || spec.headline).split(" ").filter(Boolean);
+  const i = useBeatIndex(words.length, 11);
+  // Odd beats invert the whole frame: accent ground, ink type.
+  const inverted = i % 2 === 1;
+  const bg = inverted ? accent : panel;
+  const ink = inverted ? readableOn(accent) : text;
+  const word = words[i] ?? "";
+  const slam = useSlam(i * 11, 10 * u);
+  return (
+    // Left-aligned, so the word only ever crops on the trailing edge — cropping
+    // both sides eats the first letter and stops being readable.
+    <AbsoluteFill style={{ backgroundColor: bg, overflow: "hidden", alignItems: "flex-start", justifyContent: "center", paddingLeft: margin(u, portrait) }}>
+      <div
+        style={{
+          color: ink,
+          // The cap is a sanity bound, not the usual case — short words are meant
+          // to run past the frame edge rather than sit politely inside it.
+          fontSize: Math.min(cropSize(width, word, portrait ? 1.15 : 1.06), (portrait ? 460 : 620) * u),
+          fontWeight: 800,
+          letterSpacing: -4 * u,
+          lineHeight: 0.86,
+          whiteSpace: "nowrap",
+          textTransform: "uppercase",
+          transform: `translate(${slam.x}px, ${slam.y}px)`,
+        }}
+      >
+        {word}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// B2 · Hero — the product, with the headline oversized on top of it and running
+// clean off the left edge. A marquee band pins the bottom.
+const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
+  const u = useUnit();
+  const { width, height } = useVideoConfig();
+  const { panel, accent, text, stage } = spec.palette;
+  const shown = useCut(2);
+  const words = spec.headline.split(" ").filter(Boolean);
+  const longest = words.reduce((mx, w) => (w.length > mx.length ? w : mx), words[0] ?? "");
+  const size = Math.min(cropSize(width, longest, portrait ? 1.24 : 1.1), (portrait ? 130 : 168) * u);
+  const slam = useSlam(2, 12 * u);
+  const bandSize = (portrait ? 30 : 34) * u;
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: portrait ? "flex-start" : "center", paddingTop: portrait ? height * 0.08 : 0, paddingBottom: portrait ? 0 : height * 0.06 }}>
+        <Img
+          src={productImage}
+          crossOrigin="anonymous"
+          style={{
+            width: portrait ? "84%" : "50%",
+            maxHeight: portrait ? "46%" : "82%",
+            objectFit: "contain",
+            opacity: shown ? 1 : 0,
+            // A hard square plate behind the cut-out, so the photo's white
+            // background reads as a deliberate block rather than a stray edge.
+            backgroundColor: stage,
+            padding: 18 * u,
+          }}
+        />
+      </AbsoluteFill>
+      {/* Headline runs off the RIGHT edge — the crop is the point, but words
+          stay readable because their first letters are all still in frame. */}
+      {/* Portrait can't afford the overlap — the product owns the middle — so the
+          type drops below it and reads flat instead of blended. */}
+      <AbsoluteFill style={{ justifyContent: portrait ? "flex-end" : "center", paddingBottom: portrait ? height * 0.16 : 0, pointerEvents: "none" }}>
+        <div
+          style={{
+            marginLeft: margin(u, portrait),
+            color: text,
+            fontSize: size,
+            fontWeight: 800,
+            lineHeight: 0.84,
+            letterSpacing: -5 * u,
+            textTransform: "uppercase",
+            opacity: shown ? 1 : 0,
+            transform: `translate(${slam.x}px, ${slam.y}px)`,
+            // Difference blending only reads over a dark ground; on a light
+            // panel it washes the headline out to a ghost, so render flat.
+            ...(portrait || readableOn(panel) !== "#ffffff" ? {} : { mixBlendMode: "difference" as const }),
+          }}
+        >
+          {words.slice(0, 3).map((w, wi) => (
+            <div key={wi} style={{ whiteSpace: "nowrap" }}>{w}</div>
+          ))}
+        </div>
+      </AbsoluteFill>
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}>
+        <BoldMarquee text={up(spec.eyebrow)} size={bandSize} ink={readableOn(accent)} bg={accent} speed={14} />
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// B3 · Feature — a whole-frame colour flood carrying one claim, cut hard.
+const BoldFeature: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text } = spec.palette;
+  const flipped = useCut(9);
+  const bg = flipped ? accent : panel;
+  const ink = flipped ? readableOn(accent) : text;
+  const value = scene.value || spec.subhead;
+  const slam = useSlam(9, 14 * u);
+  return (
+    <AbsoluteFill style={{ backgroundColor: bg, overflow: "hidden", justifyContent: "center", padding: `0 ${margin(u, portrait)}px` }}>
+      <div style={{ color: ink, fontSize: (portrait ? 22 : 26) * u, fontWeight: 800, letterSpacing: 3 * u, marginBottom: 22 * u, textTransform: "uppercase" }}>
+        {up(scene.label || spec.eyebrow)}
+      </div>
+      <div
+        style={{
+          color: ink,
+          fontSize: Math.min((width * 0.95) / Math.max(1, value.length * 0.42), (portrait ? 110 : 140) * u),
+          fontWeight: 800,
+          lineHeight: 0.9,
+          letterSpacing: -4 * u,
+          textTransform: "uppercase",
+          transform: `translate(${slam.x}px, ${slam.y}px)`,
+        }}
+      >
+        {value}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// B4 · Price — THE SIGNATURE: the number is STAMPED. It cuts in at 2.4x and
+// snaps to 1x over three hard steps with no easing, then the frame jolts.
+const BoldPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text } = spec.palette;
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const k = fps / 30;
+  // Three discrete stamp steps, not an interpolation.
+  const d = frame - 4 * k;
+  const stampScale = d < 0 ? 0 : d < 1.5 * k ? 2.4 : d < 3 * k ? 1.35 : 1;
+  const landed = d >= 3 * k;
+  const slam = useSlam(7, 16 * u);
+  const value = scene.value || "";
+  const size = Math.min((width * 0.72) / Math.max(1, value.length * 0.52), (portrait ? 150 : 200) * u);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden", alignItems: "center", justifyContent: "center", transform: `translate(${slam.x}px, ${slam.y}px)` }}>
+      {landed ? (
+        <div style={{ position: "absolute", top: "16%", left: 0, right: 0 }}>
+          <BoldMarquee text={up(PRICE_LEAD[spec.tone])} size={(portrait ? 26 : 30) * u} ink={readableOn(accent)} bg={accent} speed={18} tilt={-4} />
+        </div>
+      ) : null}
+      <div
+        style={{
+          backgroundColor: accent,
+          color: readableOn(accent),
+          padding: `${20 * u}px ${40 * u}px`,
+          // Square corners, always — bold never rounds anything.
+          borderRadius: 0,
+          transform: `scale(${stampScale}) rotate(-2deg)`,
+          opacity: stampScale === 0 ? 0 : 1,
+        }}
+      >
+        <div style={{ fontSize: size, fontWeight: 800, lineHeight: 1.1, letterSpacing: -4 * u, whiteSpace: "nowrap" }}>{value}</div>
+      </div>
+      {landed ? (
+        <div style={{ position: "absolute", bottom: "14%", color: text, fontSize: (portrait ? 24 : 28) * u, fontWeight: 800, letterSpacing: 4 * u, textTransform: "uppercase" }}>
+          {up(spec.subhead.slice(0, 34))}
+        </div>
+      ) : null}
+    </AbsoluteFill>
+  );
+};
+
+// B5 · Outro — the name at crop scale, with a hard rectangular CTA block.
+const BoldOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoKnockout }) => {
+  const u = useUnit();
+  const { width } = useVideoConfig();
+  const { panel, accent, text } = spec.palette;
+  const shown = useCut(2);
+  const ctaIn = useCut(11);
+  const words = spec.headline.split(" ").filter(Boolean);
+  const longest = words.reduce((mx, w) => (w.length > mx.length ? w : mx), words[0] ?? "");
+  const size = Math.min(cropSize(width, longest, portrait ? 1.1 : 1.0), (portrait ? 110 : 150) * u);
+  const slam = useSlam(2, 12 * u);
+  const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden", alignItems: "center", justifyContent: "center", gap: 40 * u }}>
+      {brandLogo ? (
+        <Img
+          src={brandLogo}
+          crossOrigin="anonymous"
+          style={{ height: (portrait ? 60 : 84) * u, width: "auto", maxWidth: "70%", objectFit: "contain", opacity: shown ? 1 : 0, transform: `translate(${slam.x}px, ${slam.y}px)`, ...(brandLogoKnockout !== false ? { filter: knockoutFilter } : {}) }}
+        />
+      ) : (
+        <div
+          style={{
+            color: text,
+            fontSize: size,
+            fontWeight: 800,
+            lineHeight: 0.86,
+            letterSpacing: -4 * u,
+            textAlign: "center",
+            textTransform: "uppercase",
+            opacity: shown ? 1 : 0,
+            transform: `translate(${slam.x}px, ${slam.y}px)`,
+          }}
+        >
+          {words.slice(0, 4).map((w, wi) => (
+            <div key={wi} style={{ whiteSpace: "nowrap" }}>{w}</div>
+          ))}
+        </div>
+      )}
+      <div
+        style={{
+          backgroundColor: accent,
+          color: readableOn(accent),
+          padding: `${18 * u}px ${44 * u}px`,
+          borderRadius: 0,
+          fontSize: (portrait ? 26 : 30) * u,
+          fontWeight: 800,
+          letterSpacing: 2 * u,
+          textTransform: "uppercase",
+          opacity: ctaIn ? 1 : 0,
+        }}
+      >
+        {spec.cta}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const BoldBeat: React.FC<SceneProps> = (props) => {
+  switch (props.scene.type) {
+    case "hook":
+      return <BoldHook {...props} />;
+    case "feature":
+    case "benefit":
+      return <BoldFeature {...props} />;
+    case "price":
+      return <BoldPrice {...props} />;
+    case "outro":
+      return <BoldOutro {...props} />;
+    default:
+      return <BoldHero {...props} />;
+  }
+};
+
 // Moods with a bespoke kinetic treatment; the rest fall back to SceneView.
 const KINETIC_BEATS: Partial<Record<Tone, React.FC<SceneProps>>> = {
   energetic: KineticBeat,
@@ -2280,6 +2622,7 @@ const KINETIC_BEATS: Partial<Record<Tone, React.FC<SceneProps>>> = {
   techy: TechyBeat,
   calm: CalmBeat,
   playful: PlayfulBeat,
+  bold: BoldBeat,
 };
 
 // Derive a clean banded spec when none is supplied (keeps old callers working).
