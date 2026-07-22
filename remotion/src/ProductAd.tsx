@@ -1672,15 +1672,6 @@ const ScanSweep: React.FC<{ color: string; u: number; period?: number }> = ({ co
   );
 };
 
-// A compact HUD readout row: a small square tick + a mono label. Decorative
-// instrument chrome — never asserts a fact about the product.
-const HudRow: React.FC<{ color: string; ink: string; u: number; label: string; o: number }> = ({ color, ink, u, label, o }) => (
-  <div style={{ display: "flex", alignItems: "center", gap: 10 * u, opacity: o }}>
-    <div style={{ width: 8 * u, height: 8 * u, backgroundColor: color }} />
-    <span style={{ color: ink, fontSize: 14 * u, fontWeight: 600, letterSpacing: 2 * u }}>{label}</span>
-  </div>
-);
-
 // Parse a price string into a countable number + its prefix/suffix/decimals.
 function parsePrice(s: string): { prefix: string; num: number; suffix: string; decimals: number } | null {
   const m = String(s || "").match(/^(\D*)([\d,]+(?:\.\d+)?)(.*)$/);

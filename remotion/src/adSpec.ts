@@ -354,7 +354,15 @@ export function buildAdSpec(input: AdSpecInput): AdSpec {
   // each drawn from the tone's pool on independent seed shifts — so a batch of
   // many products doesn't collapse to a handful of identical looks.
   const base = pick(PALETTES[tone], seed);
-  const palette: Palette = { ...base, accent: pick(TONE_ACCENT_POOL[tone], seed >> 13) };
+  // The accent is overlaid from the pool for variety, but a bright panel (bold's
+  // accent-flood variant is #ffd400) can collide with a same-colour accent pick,
+  // making the kicker bar and marquee vanish. On a collision, take the next pool
+  // entry — only one entry can equal the panel, so +1 always resolves it.
+  let accent = pick(TONE_ACCENT_POOL[tone], seed >> 13);
+  if (accent.toLowerCase() === base.panel.toLowerCase()) {
+    accent = pick(TONE_ACCENT_POOL[tone], (seed >> 13) + 1);
+  }
+  const palette: Palette = { ...base, accent };
   const font = TONE_FONT[tone];
   const structure = TONE_STRUCTURE[tone];
   const layout = pick(TONE_LAYOUT_POOL[tone], seed >> 15);
