@@ -8,6 +8,7 @@ import { listAds, savedAdToJob } from "@/lib/ads";
 import { cost, relativeTime, isTerminal } from "@/lib/format";
 import type { Job } from "@/lib/types";
 import { StatusPill } from "../ui/StatusPill";
+import { ButtonLink } from "../ui/Button";
 import { Orb } from "../ui/Orb";
 import { TONE_ACCENTS } from "@/lib/adSpec";
 import { ArrowUpRight, Film } from "../icons";
@@ -87,8 +88,11 @@ export function RecentJobs() {
         </span>
         <p className="mt-5 text-[15px] font-medium text-ink">No ads yet</p>
         <p className="mt-1.5 max-w-xs text-[14px] text-driftwood">
-          Upload a product image above and your first cut will appear here.
+          Make your first ad from a product photo — every cut you save lands here.
         </p>
+        <ButtonLink href="/" size="sm" className="mt-5">
+          New ad
+        </ButtonLink>
       </div>
     );
   }

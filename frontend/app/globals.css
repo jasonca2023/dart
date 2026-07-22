@@ -652,6 +652,30 @@ h3 {
   background-size: 5px 5px;
 }
 
+/* Bloom whisper for the app's LIGHT mode — the working-UI counterpart to the
+ * dark canvas's halftone grain. Dark mode ties the signed-in app to the
+ * Broadsheet landing via that grain; light mode was tying to nothing (flat
+ * parchment) while the Bloom landing wears a soft violet↔ember wash. This
+ * mirrors that wash at a lighter weight (a working surface, not a marketing
+ * page): two top-anchored whisper blooms, fixed so they sit at the head of the
+ * viewport like the landing's, layered over the parchment bg-color. Scoped to
+ * "not night" so dark mode keeps its grain untouched. */
+:root:not([data-theme="night"]) .app-canvas {
+  background-image:
+    radial-gradient(
+      46% 26% at 14% -8%,
+      color-mix(in oklab, var(--color-violet) 7%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      40% 24% at 90% -4%,
+      color-mix(in oklab, var(--color-ember) 5%, transparent),
+      transparent 68%
+    );
+  background-attachment: fixed, fixed;
+  background-repeat: no-repeat;
+}
+
 /* ── Theme toggle (sun ⇄ moon morph) ──────────────────────── */
 /* One SVG: the core disc scales up while the masking "bite" slides in to
  * carve the crescent, and the rays retract. Transform/opacity only; the

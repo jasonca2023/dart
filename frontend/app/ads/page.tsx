@@ -8,9 +8,14 @@ export const metadata = {
 export default function AdsPage() {
   return (
     <AppShell>
-      <div className="mb-5 flex items-baseline justify-between">
-        <h1 className="text-[18px] font-medium text-ink">Your ads</h1>
-        <span className="text-[13px] text-fog">Newest first</span>
+      {/* Page title shares the dashboard's display-heading voice so the app
+          reads as one system, not a primary page + a plainer index. */}
+      <div className="mb-8">
+        <h1 className="t-heading">Your ads</h1>
+        <p className="mt-2 max-w-xl text-[16px] text-driftwood">
+          Every ad you&rsquo;ve saved, newest first. Open one to preview, edit, or
+          download it.
+        </p>
       </div>
       <RecentJobs />
     </AppShell>
