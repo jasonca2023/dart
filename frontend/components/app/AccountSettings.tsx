@@ -566,6 +566,10 @@ export function AccountSettings() {
   return (
     <div className="max-w-4xl">
       <h1 className="t-heading">Account Settings</h1>
+      <p className="mt-2 max-w-xl text-[16px] text-driftwood">
+        Manage your login and email, sign out other devices, export your data,
+        or close your account.
+      </p>
 
       {/* -- Who you are, at a glance ----------------------------------------- */}
       <Card className="mt-6 flex items-center gap-5 p-6">
