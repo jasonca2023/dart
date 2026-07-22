@@ -1367,44 +1367,60 @@ const LuxeKicker: React.FC<{ text: string; accent: string; u: number; delay: num
   );
 };
 
-// L1 · Hook — opens on the product, held quietly under a slow ken-burns and a
-// single specular glide; a whispered gold kicker tracks in beneath.
+// L1 · Hook — a lit gallery still-life. A thin gold frame contains the negative
+// space so it reads as curated, not empty; the product sits in a warm pool of
+// light on a soft horizon; a gold kicker + serif line anchor the lower-left.
 const LuxeHook: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
   const u = useUnit();
   const frame = useCurrentFrame();
-  const { panel, accent } = spec.palette;
+  const { panel, accent, text } = spec.palette;
+  const darkPanel = readableOn(panel) === "#ffffff";
   const enter = useSlow(0, 30);
-  const kb = interpolate(frame, [0, scene.frames], [1.0, 1.06], { extrapolateRight: "clamp", easing: EASE_LUX });
-  const m = margin(u, portrait);
-  // A soft pool of light behind the product so it sits on a lit stage rather than
-  // floating in a void. Warm ink on a dark panel; near-invisible on a light one.
-  const glow = readableOn(panel) === "#ffffff" ? "rgba(255,248,236,0.10)" : "rgba(20,16,10,0.06)";
+  const draw = useSlow(6, 34);
+  const line = useSlow(16, 26);
+  const kb = interpolate(frame, [0, scene.frames], [1.0, 1.05], { extrapolateRight: "clamp", easing: EASE_LUX });
+  // Warm pool of light on a dark panel; a soft dark vignette on a light one — so
+  // the product is lit from behind rather than floating on flat colour.
+  const pool = darkPanel ? "rgba(255,244,226,0.16)" : "rgba(38,28,14,0.07)";
+  // A soft horizon the product rests on, low and wide.
+  const horizon = darkPanel ? "rgba(255,240,214,0.12)" : "rgba(30,22,10,0.05)";
+  const inset = interpolate(draw, [0, 1], [(portrait ? 30 : 44) * u, (portrait ? 42 : 60) * u]);
+  const dim = darkPanel ? `${text}88` : `${text}aa`;
   return (
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
-      <AbsoluteFill style={{ background: `radial-gradient(ellipse 62% 58% at 50% 46%, ${glow}, transparent 70%)`, opacity: enter }} />
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+      {/* pool of light behind the product + a low horizon it sits on */}
+      <AbsoluteFill style={{ background: `radial-gradient(ellipse 58% 52% at 50% 44%, ${pool}, transparent 66%)`, opacity: enter }} />
+      <AbsoluteFill style={{ background: `radial-gradient(ellipse 70% 26% at 50% 66%, ${horizon}, transparent 72%)`, opacity: enter }} />
+      {/* thin gold gallery frame — contains the composition */}
+      <div style={{ position: "absolute", top: inset, left: inset, right: inset, bottom: inset, border: `${1 * u}px solid ${accent}`, opacity: draw * 0.6, pointerEvents: "none" }} />
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: portrait ? "6%" : "4%" }}>
         <div style={{ position: "relative", opacity: enter, transform: `scale(${kb})` }}>
           <Img
             src={productImage}
             crossOrigin="anonymous"
             style={{
-              width: portrait ? "84%" : "62%",
-              maxHeight: portrait ? "64%" : "76%",
+              width: portrait ? "86%" : "66%",
+              maxHeight: portrait ? "62%" : "74%",
               objectFit: "contain",
-              filter: "drop-shadow(0 30px 60px rgba(0,0,0,0.4))",
+              filter: "drop-shadow(0 34px 64px rgba(0,0,0,0.5))",
             }}
           />
         </div>
       </AbsoluteFill>
-      {/* Specular is clipped to a centred zone over the product so it reads as a
-          glint across the surface, not a band washing the whole black frame. */}
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-        <div style={{ position: "relative", width: portrait ? "84%" : "62%", height: portrait ? "64%" : "76%", overflow: "hidden" }}>
+      {/* Specular clipped to a centred zone over the product — a surface glint. */}
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: portrait ? "6%" : "4%", pointerEvents: "none" }}>
+        <div style={{ position: "relative", width: portrait ? "86%" : "66%", height: portrait ? "62%" : "74%", overflow: "hidden" }}>
           <Specular u={u} delay={4} />
         </div>
       </AbsoluteFill>
-      <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: portrait ? "center" : "flex-start", padding: portrait ? `0 0 ${72 * u}px` : `0 ${m}px ${66 * u}px` }}>
-        <LuxeKicker text={spec.eyebrow} accent={accent} u={u} delay={10} align={portrait ? "center" : "left"} />
+      {/* kicker + a quiet serif line, anchored inside the frame at lower-left */}
+      <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "flex-start", padding: `0 0 ${(portrait ? 78 : 74) * u}px ${inset + (portrait ? 22 : 30) * u}px` }}>
+        <LuxeKicker text={spec.eyebrow} accent={accent} u={u} delay={10} align="left" />
+        {spec.subhead ? (
+          <div style={{ marginTop: 16 * u, color: dim, fontWeight: 600, fontSize: (portrait ? 26 : 30) * u, lineHeight: 1.15, letterSpacing: -0.3 * u, maxWidth: portrait ? "80%" : "42%", opacity: line }}>
+            {spec.subhead}
+          </div>
+        ) : null}
       </AbsoluteFill>
     </AbsoluteFill>
   );
