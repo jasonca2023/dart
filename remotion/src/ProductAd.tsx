@@ -1808,8 +1808,14 @@ const BoldMarquee: React.FC<{
 }> = ({ text, size, ink, bg, speed, tilt = 0 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const reps = Array.from({ length: 8 });
+  // Enough repeats that the text ALWAYS fills the full 120%-wide band — with too
+  // few, the tail runs out and the bare band shows as a blank strip. The loop
+  // travels exactly one cell (seamless with identical cells); `speed * 8 / N`
+  // normalises the pixel rate so adding reps doesn't speed the scroll up.
+  const N = 24;
+  const reps = Array.from({ length: N });
   const cell = `${text} ✦ `;
+  const shift = -(((frame / fps) * speed * 8) / N) % (100 / N);
   return (
     <div
       style={{
@@ -1826,7 +1832,7 @@ const BoldMarquee: React.FC<{
         padding: `${size * 0.16}px 0`,
       }}
     >
-      <div style={{ display: "flex", whiteSpace: "nowrap", transform: `translateX(${-((frame / fps) * speed) % 50}%)` }}>
+      <div style={{ display: "flex", whiteSpace: "nowrap", transform: `translateX(${shift}%)` }}>
         {reps.map((_, i) => (
           <span key={i} style={{ color: ink, fontSize: size, fontWeight: 800, letterSpacing: size * 0.02, lineHeight: 1 }}>
             {cell}
