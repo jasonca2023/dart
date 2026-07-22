@@ -468,7 +468,7 @@ export const DEFAULT_SPEC: AdSpec = {
   headline: "Your product",
   subhead: "Everything you need, nothing you don’t.",
   cta: "Shop now",
-  eyebrow: "For everyone",
+  eyebrow: "New",
   scenes: [
     { type: "hook", frames: 36, text: "Your upgrade is here.", motion: "rise" },
     { type: "hero", frames: 132, text: "Your product", motion: "rise" },
