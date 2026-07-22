@@ -2588,7 +2588,7 @@ const BoldHook: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
 // clean off the left edge. A marquee band pins the bottom.
 const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
   const u = useUnit();
-  const { width, height } = useVideoConfig();
+  const { width } = useVideoConfig();
   const { panel, accent, text, stage } = spec.palette;
   const shown = useCut(2);
   const words = spec.headline.split(" ").filter(Boolean);
@@ -2596,63 +2596,57 @@ const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
   const m = margin(u, portrait);
   const slam = useSlam(2, 12 * u);
   const bandSize = (portrait ? 30 : 34) * u;
-  const cap = (portrait ? 130 : 168) * u;
-  const full = Math.min(cropSize(width - m, longest, portrait ? 1.24 : 1.1), cap);
-  // A long headline makes the type block span the whole frame, and the overlap
-  // stops working — difference blending over busy photo detail is mush, not
-  // contrast. When that happens landscape splits into columns instead: type
-  // left, product right, no overlap and no blend. The type is then re-fitted to
-  // its own column rather than the whole frame.
-  const split = !portrait && full * longest.length * CHAR_EM_UPPER > (width - 2 * m) * 0.55;
-  const size = split ? Math.min(cropSize(width * 0.58 - m, longest, 1.0), cap) : full;
-  const blend = !portrait && !split && readableOn(panel) === "#ffffff";
-  return (
-    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
-      {/* AbsoluteFill is a column flex, so alignItems is the horizontal axis. */}
-      <AbsoluteFill style={{ alignItems: split ? "flex-end" : "center", justifyContent: portrait ? "flex-start" : "center", paddingTop: portrait ? height * 0.08 : 0, paddingRight: split ? m : 0, paddingBottom: portrait ? 0 : height * 0.06 }}>
-        <Img
-          src={productImage}
-          crossOrigin="anonymous"
-          style={{
-            width: portrait ? "84%" : split ? "34%" : "50%",
-            maxHeight: portrait ? "46%" : "82%",
-            objectFit: "contain",
-            opacity: shown ? 1 : 0,
-            // A hard square plate behind the cut-out, so the photo's white
-            // background reads as a deliberate block rather than a stray edge.
-            backgroundColor: stage,
-            padding: 18 * u,
-          }}
-        />
-      </AbsoluteFill>
-      {/* Headline runs off the RIGHT edge — the crop is the point, but words
-          stay readable because their first letters are all still in frame. */}
-      {/* Portrait can't afford the overlap — the product owns the middle — so the
-          type drops below it and reads flat instead of blended. */}
-      <AbsoluteFill style={{ justifyContent: portrait ? "flex-end" : "center", paddingBottom: portrait ? height * 0.16 : 0, pointerEvents: "none" }}>
-        <div
-          style={{
-            marginLeft: m,
-            color: text,
-            fontSize: size,
-            fontWeight: 800,
-            lineHeight: 0.84,
-            letterSpacing: -5 * u,
-            textTransform: "uppercase",
-            opacity: shown ? 1 : 0,
-            transform: `translate(${slam.x}px, ${slam.y}px)`,
-            // Difference blending only reads over a dark ground; on a light
-            // panel it washes the headline out to a ghost, so render flat.
-            ...(blend ? { mixBlendMode: "difference" as const } : {}),
-          }}
-        >
-          {words.slice(0, 3).map((w, wi) => (
-            <div key={wi} style={{ whiteSpace: "nowrap" }}>{w}</div>
-          ))}
+  const cap = (portrait ? 120 : 150) * u;
+  // Color-blocked poster: the product lives on a solid `stage` block, so a
+  // white-background product photo reads as a deliberate panel rather than a
+  // raw box floating on black. The headline owns the opposing block.
+  const barIn = useCut(5);
+  const kicker = up(spec.eyebrow);
+  if (portrait) {
+    // Product block on top, type block below.
+    const size = Math.min(cropSize(width - 2 * m, longest, 1.02), cap);
+    return (
+      <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "52%", backgroundColor: stage, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          <Img src={productImage} crossOrigin="anonymous" style={{ width: "90%", maxHeight: "88%", objectFit: "contain", opacity: shown ? 1 : 0, transform: `scale(${shown ? 1 : 1.04})` }} />
+        </div>
+        <div style={{ position: "absolute", top: "52%", left: 0, right: 0, bottom: 0, padding: `${44 * u}px ${m}px`, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 * u, marginBottom: 20 * u, opacity: barIn ? 1 : 0 }}>
+            <div style={{ width: 34 * u, height: 8 * u, backgroundColor: accent }} />
+            <span style={{ color: text, fontSize: 24 * u, fontWeight: 800, letterSpacing: 2 * u, textTransform: "uppercase" }}>{kicker}</span>
+          </div>
+          <div style={{ color: text, fontSize: size, fontWeight: 800, lineHeight: 0.86, letterSpacing: -4 * u, textTransform: "uppercase", opacity: shown ? 1 : 0, transform: `translate(${slam.x}px, ${slam.y}px)` }}>
+            {words.slice(0, 3).map((w, wi) => (<div key={wi} style={{ whiteSpace: "nowrap" }}>{w}</div>))}
+          </div>
+        </div>
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}>
+          <BoldMarquee text={kicker} size={bandSize} ink={readableOn(accent)} bg={accent} speed={14} />
         </div>
       </AbsoluteFill>
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}>
-        <BoldMarquee text={up(spec.eyebrow)} size={bandSize} ink={readableOn(accent)} bg={accent} speed={14} />
+    );
+  }
+  // Landscape: product block right, headline block left.
+  const prodW = 0.44;
+  const colW = width * (1 - prodW) - m * 2;
+  const size = Math.min(cropSize(colW, longest, 1.04), cap);
+  return (
+    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+      {/* product block, solid stage, right */}
+      <div style={{ position: "absolute", top: 0, bottom: 0, right: 0, width: `${prodW * 100}%`, backgroundColor: stage, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        <Img src={productImage} crossOrigin="anonymous" style={{ width: "84%", maxHeight: "78%", objectFit: "contain", opacity: shown ? 1 : 0, transform: `scale(${shown ? 1 : 1.04})` }} />
+      </div>
+      {/* headline block, left */}
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${(1 - prodW) * 100}%`, padding: `0 ${m}px`, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 * u, marginBottom: 26 * u, opacity: barIn ? 1 : 0 }}>
+          <div style={{ width: 46 * u, height: 10 * u, backgroundColor: accent }} />
+          <span style={{ color: text, fontSize: 26 * u, fontWeight: 800, letterSpacing: 2 * u, textTransform: "uppercase" }}>{kicker}</span>
+        </div>
+        <div style={{ color: text, fontSize: size, fontWeight: 800, lineHeight: 0.84, letterSpacing: -5 * u, textTransform: "uppercase", opacity: shown ? 1 : 0, transform: `translate(${slam.x}px, ${slam.y}px)` }}>
+          {words.slice(0, 3).map((w, wi) => (<div key={wi} style={{ whiteSpace: "nowrap" }}>{w}</div>))}
+        </div>
+      </div>
+      <div style={{ position: "absolute", bottom: 0, left: 0, width: `${(1 - prodW) * 100}%` }}>
+        <BoldMarquee text={kicker} size={bandSize} ink={readableOn(accent)} bg={accent} speed={14} />
       </div>
     </AbsoluteFill>
   );
