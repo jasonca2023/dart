@@ -2005,39 +2005,47 @@ const BoldFeature: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
 const BoldPrice: React.FC<SceneProps> = ({ spec, scene, portrait }) => {
   const u = useUnit();
   const { width } = useVideoConfig();
-  const { panel, accent, text } = spec.palette;
+  const { panel, accent } = spec.palette;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const k = fps / 30;
+  // The whole frame floods with the accent so the beat fills and pops on ANY
+  // panel (a cyan stamp on a cream panel just floats). Price + copy render in
+  // the accent's readable ink; the lead band uses the panel colour so it reads
+  // as a hard slab across the flood.
+  const ink = readableOn(accent);
   // Three discrete stamp steps, not an interpolation.
   const d = frame - 4 * k;
   const stampScale = d < 0 ? 0 : d < 1.5 * k ? 2.4 : d < 3 * k ? 1.35 : 1;
   const landed = d >= 3 * k;
   const slam = useSlam(7, 16 * u);
   const value = scene.value || "";
-  const size = fitLine(width * 0.72, value, (portrait ? 150 : 200) * u, true);
+  // Fill most of the width; fitLine (uppercase advance) shrinks a long price so
+  // it never clips.
+  const size = fitLine(width * 0.84, value, (portrait ? 260 : 380) * u, true);
   return (
-    <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden", alignItems: "center", justifyContent: "center", transform: `translate(${slam.x}px, ${slam.y}px)` }}>
+    <AbsoluteFill style={{ backgroundColor: accent, overflow: "hidden", alignItems: "center", justifyContent: "center", transform: `translate(${slam.x}px, ${slam.y}px)` }}>
       {landed ? (
-        <div style={{ position: "absolute", top: "16%", left: 0, right: 0 }}>
-          <BoldMarquee text={up(PRICE_LEAD[spec.tone])} size={(portrait ? 26 : 30) * u} ink={readableOn(accent)} bg={accent} speed={18} tilt={-4} />
+        <div style={{ position: "absolute", top: "14%", left: 0, right: 0 }}>
+          <BoldMarquee text={up(PRICE_LEAD[spec.tone])} size={(portrait ? 30 : 36) * u} ink={readableOn(panel)} bg={panel} speed={18} tilt={-4} />
         </div>
       ) : null}
       <div
         style={{
-          backgroundColor: accent,
-          color: readableOn(accent),
-          padding: `${20 * u}px ${40 * u}px`,
-          // Square corners, always — bold never rounds anything.
-          borderRadius: 0,
           transform: `scale(${stampScale}) rotate(-2deg)`,
           opacity: stampScale === 0 ? 0 : 1,
+          color: ink,
+          fontSize: size,
+          fontWeight: 800,
+          lineHeight: 1,
+          letterSpacing: -6 * u,
+          whiteSpace: "nowrap",
         }}
       >
-        <div style={{ fontSize: size, fontWeight: 800, lineHeight: 1.1, letterSpacing: -4 * u, whiteSpace: "nowrap" }}>{value}</div>
+        {value}
       </div>
       {landed ? (
-        <div style={{ position: "absolute", bottom: "14%", color: text, fontSize: (portrait ? 24 : 28) * u, fontWeight: 800, letterSpacing: 4 * u, textTransform: "uppercase" }}>
+        <div style={{ position: "absolute", bottom: "12%", color: ink, fontSize: (portrait ? 26 : 32) * u, fontWeight: 800, letterSpacing: 4 * u, textTransform: "uppercase" }}>
           {up(spec.subhead.slice(0, 34))}
         </div>
       ) : null}
