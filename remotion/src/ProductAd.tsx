@@ -99,29 +99,63 @@ function margin(u: number, portrait: boolean) {
 const CHAR_EM_UPPER = 0.68;
 const CHAR_EM_MIXED = 0.56;
 
-function longestWord(text: string): number {
-  return (text || "").split(/\s+/).reduce((mx, w) => Math.max(mx, w.length), 1);
+// Per-glyph em-advances for the heavy uppercase grotesque the display type uses.
+// A char-count × average estimate underestimates words packed with wide caps
+// (M, W, G, O), so those still overflowed and clipped. These are measured a
+// touch generously on purpose — type set a hair small is invisible; type that
+// runs off the frame is a broken ad.
+const UPPER_ADV: Record<string, number> = {
+  A: 0.73, B: 0.70, C: 0.75, D: 0.77, E: 0.65, F: 0.62, G: 0.79, H: 0.79,
+  I: 0.30, J: 0.56, K: 0.72, L: 0.60, M: 0.95, N: 0.80, O: 0.81, P: 0.66,
+  Q: 0.82, R: 0.72, S: 0.68, T: 0.64, U: 0.78, V: 0.73, W: 1.02, X: 0.72,
+  Y: 0.70, Z: 0.66,
+  "0": 0.70, "1": 0.48, "2": 0.68, "3": 0.68, "4": 0.72, "5": 0.68, "6": 0.70,
+  "7": 0.64, "8": 0.70, "9": 0.70,
+  " ": 0.34, ".": 0.32, ",": 0.32, "$": 0.70, "%": 0.92, "&": 0.85, "-": 0.44,
+  "'": 0.26, "!": 0.34, "?": 0.60, "/": 0.46, ":": 0.32, "+": 0.60,
+};
+const UPPER_ADV_DEFAULT = 0.74;
+
+// Total em-advance of a string as it would render in uppercase.
+function upperAdvance(text: string): number {
+  let w = 0;
+  for (const ch of (text || "").toUpperCase()) w += UPPER_ADV[ch] ?? UPPER_ADV_DEFAULT;
+  return Math.max(0.5, w);
+}
+
+// The widest single word's advance — the binding constraint when a block wraps
+// (a long word like "UNCOMPROMISING" may not overflow its own line).
+function widestWordAdvance(text: string): number {
+  return (text || "").split(/\s+/).filter(Boolean).reduce((mx, wd) => Math.max(mx, upperAdvance(wd)), 0.5);
 }
 
 // Largest size at which `chars` characters span at most `avail` px, bounded by
-// `cap` so a two-word headline doesn't balloon to fill the frame.
+// `cap`. A count-based bound (no glyphs known) — used for conservative floors.
 function fitChars(avail: number, chars: number, cap: number, upper = false): number {
   return Math.min(cap, avail / Math.max(1, chars * (upper ? CHAR_EM_UPPER : CHAR_EM_MIXED)));
 }
 
 // For text pinned to ONE line (a price, a nowrap value): the whole string fits.
+// Uppercase uses the real per-glyph table so wide words don't clip.
 function fitLine(avail: number, text: string, cap: number, upper = false): number {
+  if (upper) return Math.min(cap, avail / upperAdvance(text));
   return fitChars(avail, (text || "").length, cap, upper);
 }
 
 // For a block allowed to WRAP: the whole string has to fit across `lines`
-// lines, AND no single word may overflow its line (the binding constraint for
-// a long word like "UNCOMPROMISING").
+// lines, AND no single word may overflow its line.
 function fitBlock(avail: number, text: string, cap: number, lines = 2, upper = false): number {
+  if (upper) {
+    return Math.min(cap, (avail * lines) / upperAdvance(text), avail / widestWordAdvance(text));
+  }
   return Math.min(
     fitChars(avail * lines, (text || "").length, cap, upper),
     fitChars(avail, longestWord(text), cap, upper),
   );
+}
+
+function longestWord(text: string): number {
+  return (text || "").split(/\s+/).reduce((mx, w) => Math.max(mx, w.length), 1);
 }
 
 // Scene-relative spring (useCurrentFrame restarts at 0 inside a Sequence).
@@ -2540,7 +2574,9 @@ function cropSize(avail: number, word: string, overflowFactor: number): number {
       : n >= 9
         ? 0.98
         : interpolate(n, [5, 9], [overflowFactor, 0.98]);
-  return (avail * ratio) / (n * CHAR_EM_UPPER);
+  // Size against the word's real per-glyph advance, not char-count × average —
+  // otherwise wide words (M/W/G-heavy) overflow and clip on the trailing edge.
+  return (avail * ratio) / upperAdvance(word);
 }
 
 // B1 · Hook — full accent flood. The hook reads one enormous word at a time on
@@ -2590,7 +2626,10 @@ const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
   const { panel, accent, text, stage } = spec.palette;
   const shown = useCut(2);
   const words = spec.headline.split(" ").filter(Boolean);
-  const longest = words.reduce((mx, w) => (w.length > mx.length ? w : mx), words[0] ?? "");
+  const shownWords = words.slice(0, 3);
+  // Bind on the WIDEST word by real glyph advance, not the longest by char count
+  // — "HDMI" is fewer letters than "MODEL" but wider, and it's what would clip.
+  const binder = shownWords.reduce((mx, w) => (upperAdvance(w) > upperAdvance(mx) ? w : mx), shownWords[0] ?? "");
   const m = margin(u, portrait);
   const slam = useSlam(2, 12 * u);
   const bandSize = (portrait ? 30 : 34) * u;
@@ -2602,7 +2641,7 @@ const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
   const kicker = up(spec.eyebrow);
   if (portrait) {
     // Product block on top, type block below.
-    const size = Math.min(cropSize(width - 2 * m, longest, 1.02), cap);
+    const size = Math.min(cropSize(width - 2 * m, binder, 1.0), cap);
     return (
       <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "52%", backgroundColor: stage, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
@@ -2626,7 +2665,7 @@ const BoldHero: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
   // Landscape: product block right, headline block left.
   const prodW = 0.44;
   const colW = width * (1 - prodW) - m * 2;
-  const size = Math.min(cropSize(colW, longest, 1.04), cap);
+  const size = Math.min(cropSize(colW, binder, 1.0), cap);
   return (
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
       {/* product block, solid stage, right */}
@@ -2735,9 +2774,10 @@ const BoldOutro: React.FC<SceneProps> = ({ spec, portrait, brandLogo, brandLogoK
   const shown = useCut(2);
   const ctaIn = useCut(11);
   const words = spec.headline.split(" ").filter(Boolean);
-  const longest = words.reduce((mx, w) => (w.length > mx.length ? w : mx), words[0] ?? "");
+  // Words stack one per line (nowrap), so the widest word by real advance binds.
+  const binder = words.slice(0, 4).reduce((mx, w) => (upperAdvance(w) > upperAdvance(mx) ? w : mx), words[0] ?? "");
   // The outro is centre-aligned, so it loses a margin on BOTH sides.
-  const size = Math.min(cropSize(width - 2 * margin(u, portrait), longest, portrait ? 1.1 : 1.0), (portrait ? 110 : 150) * u);
+  const size = Math.min(cropSize(width - 2 * margin(u, portrait), binder, 1.0), (portrait ? 110 : 150) * u);
   const slam = useSlam(2, 12 * u);
   const knockoutFilter = readableOn(panel) === "#ffffff" ? "brightness(0) invert(1)" : "brightness(0)";
   return (
