@@ -1370,27 +1370,37 @@ const LuxeKicker: React.FC<{ text: string; accent: string; u: number; delay: num
 const LuxeHook: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
   const u = useUnit();
   const frame = useCurrentFrame();
-  const { panel, accent, text } = spec.palette;
+  const { panel, accent } = spec.palette;
   const enter = useSlow(0, 30);
   const kb = interpolate(frame, [0, scene.frames], [1.0, 1.06], { extrapolateRight: "clamp", easing: EASE_LUX });
   const m = margin(u, portrait);
+  // A soft pool of light behind the product so it sits on a lit stage rather than
+  // floating in a void. Warm ink on a dark panel; near-invisible on a light one.
+  const glow = readableOn(panel) === "#ffffff" ? "rgba(255,248,236,0.10)" : "rgba(20,16,10,0.06)";
   return (
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
+      <AbsoluteFill style={{ background: `radial-gradient(ellipse 62% 58% at 50% 46%, ${glow}, transparent 70%)`, opacity: enter }} />
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
         <div style={{ position: "relative", opacity: enter, transform: `scale(${kb})` }}>
           <Img
             src={productImage}
             crossOrigin="anonymous"
             style={{
-              width: portrait ? "76%" : "52%",
-              maxHeight: portrait ? "60%" : "72%",
+              width: portrait ? "84%" : "62%",
+              maxHeight: portrait ? "64%" : "76%",
               objectFit: "contain",
               filter: "drop-shadow(0 30px 60px rgba(0,0,0,0.4))",
             }}
           />
         </div>
       </AbsoluteFill>
-      <Specular u={u} delay={4} />
+      {/* Specular is clipped to a centred zone over the product so it reads as a
+          glint across the surface, not a band washing the whole black frame. */}
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+        <div style={{ position: "relative", width: portrait ? "84%" : "62%", height: portrait ? "64%" : "76%", overflow: "hidden" }}>
+          <Specular u={u} delay={4} />
+        </div>
+      </AbsoluteFill>
       <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: portrait ? "center" : "flex-start", padding: portrait ? `0 0 ${72 * u}px` : `0 ${m}px ${66 * u}px` }}>
         <LuxeKicker text={spec.eyebrow} accent={accent} u={u} delay={10} align={portrait ? "center" : "left"} />
       </AbsoluteFill>
@@ -1598,6 +1608,29 @@ const HudBrackets: React.FC<{ color: string; u: number; o: number }> = ({ color,
   );
 };
 
+// A bright hairline that sweeps top→bottom across its (relative) parent, looping,
+// with a soft glow — the "scanning" motion that gives the instrument-panel life.
+const ScanSweep: React.FC<{ color: string; u: number; period?: number }> = ({ color, u, period = 2.6 }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const t = (frame % (fps * period)) / (fps * period);
+  const y = interpolate(t, [0, 1], [-6, 106]);
+  // Fade the line in at the top of its travel and out at the bottom.
+  const o = interpolate(t, [0, 0.08, 0.92, 1], [0, 0.9, 0.9, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, top: `${y}%`, height: 2 * u, backgroundColor: color, opacity: o, boxShadow: `0 0 ${18 * u}px ${2 * u}px ${color}`, pointerEvents: "none" }} />
+  );
+};
+
+// A compact HUD readout row: a small square tick + a mono label. Decorative
+// instrument chrome — never asserts a fact about the product.
+const HudRow: React.FC<{ color: string; ink: string; u: number; label: string; o: number }> = ({ color, ink, u, label, o }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 10 * u, opacity: o }}>
+    <div style={{ width: 8 * u, height: 8 * u, backgroundColor: color }} />
+    <span style={{ color: ink, fontSize: 14 * u, fontWeight: 600, letterSpacing: 2 * u }}>{label}</span>
+  </div>
+);
+
 // Parse a price string into a countable number + its prefix/suffix/decimals.
 function parsePrice(s: string): { prefix: string; num: number; suffix: string; decimals: number } | null {
   const m = String(s || "").match(/^(\D*)([\d,]+(?:\.\d+)?)(.*)$/);
@@ -1628,13 +1661,14 @@ const TechHook: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
       <TechGrid color={text} u={u} />
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
-        <div style={{ position: "relative", width: portrait ? "78%" : "56%", height: portrait ? "56%" : "68%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ position: "relative", width: portrait ? "80%" : "64%", height: portrait ? "60%" : "74%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           <HudBrackets color={accent} u={u} o={o} />
           <Img
             src={productImage}
             crossOrigin="anonymous"
-            style={{ maxWidth: "82%", maxHeight: "82%", objectFit: "contain", opacity: interpolate(o, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }), filter: "drop-shadow(0 20px 44px rgba(0,0,0,0.5))" }}
+            style={{ maxWidth: "84%", maxHeight: "84%", objectFit: "contain", opacity: interpolate(o, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }), filter: "drop-shadow(0 20px 44px rgba(0,0,0,0.5))" }}
           />
+          <ScanSweep color={accent} u={u} />
         </div>
       </AbsoluteFill>
       <AbsoluteFill style={{ justifyContent: "flex-end", padding: portrait ? `0 ${m}px ${70 * u}px` : `0 ${m}px ${60 * u}px` }}>
@@ -1645,47 +1679,86 @@ const TechHook: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
   );
 };
 
-// T2 · Hero — product with a crosshair-pinned coordinate readout; the headline
-// types out in mono below. Grid + scanlines throughout.
-const TechHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
+// T2 · Hero — an instrument panel. Landscape splits into a framed product bay
+// (HUD brackets, crosshair, a sweeping scan line) and a data column where the
+// headline types out under a live indicator. Portrait/square stack the two.
+const TechHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait, wide }) => {
   const u = useUnit();
   const { width } = useVideoConfig();
   const { panel, text } = spec.palette;
   const accent = readableOn(panel) === "#ffffff" ? spec.palette.accent : text;
+  const dim = readableOn(panel) === "#ffffff" ? `${text}99` : `${text}88`;
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
   const o = useSnap(2);
-  const kb = interpolate(frame, [0, scene.frames], [1.0, 1.05], { extrapolateRight: "clamp" });
+  const kb = interpolate(frame, [0, scene.frames], [1.0, 1.04], { extrapolateRight: "clamp" });
   const m = margin(u, portrait);
-  const size = Math.min(
-    fitBlock(width - 2 * m, spec.headline, (portrait ? 40 : 52) * u, 3),
-    // Floor the assumed width so short titles stay restrained rather than huge.
-    fitChars(width - 2 * m, 12, (portrait ? 40 : 52) * u),
-  );
   const cross = interpolate(o, [0, 1], [0, 1]);
+  const blink = Math.floor(frame / (fps * 0.5)) % 2 === 0;
+  // Text column width drives the headline size — full frame minus a margin when
+  // stacked, roughly the right ~44% when split.
+  const colW = wide ? width * 0.44 - m : width - 2 * m;
+  const size = Math.min(
+    fitBlock(colW, spec.headline, (portrait ? 44 : 58) * u, 3),
+    fitChars(colW, 11, (portrait ? 44 : 58) * u),
+  );
+
+  // The framed product bay + its HUD overlays, reused by both layouts.
+  const bay = (
+    <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <HudBrackets color={accent} u={u} o={o} />
+      <Img
+        src={productImage}
+        crossOrigin="anonymous"
+        style={{ maxWidth: "84%", maxHeight: "84%", objectFit: "contain", transform: `scale(${kb})`, filter: "drop-shadow(0 22px 48px rgba(0,0,0,0.5))", opacity: interpolate(o, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }) }}
+      />
+      <ScanSweep color={accent} u={u} />
+      {/* crosshair + status tag pinned near the top-right of the bay; inset more
+          in portrait so the label doesn't run off the narrower frame */}
+      <div style={{ position: "absolute", top: "16%", right: portrait ? "24%" : "12%", opacity: cross }}>
+        <div style={{ width: 26 * u, height: 1.5 * u, backgroundColor: accent, position: "absolute", top: 0, left: -13 * u }} />
+        <div style={{ height: 26 * u, width: 1.5 * u, backgroundColor: accent, position: "absolute", top: -13 * u, left: 0 }} />
+        <div style={{ position: "absolute", left: 18 * u, top: -8 * u, color: accent, fontSize: 13 * u, fontWeight: 600, letterSpacing: 1 * u, whiteSpace: "nowrap" }}>
+          [ SCANNING ]
+        </div>
+      </div>
+    </div>
+  );
+
+  // The data column: live indicator, eyebrow, typed headline, subhead, scan bar.
+  const dataCol = (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 * u, marginBottom: 16 * u, opacity: o }}>
+        <div style={{ width: 10 * u, height: 10 * u, borderRadius: "50%", backgroundColor: accent, opacity: blink ? 1 : 0.25, boxShadow: `0 0 ${10 * u}px ${accent}` }} />
+        <span style={{ color: accent, fontSize: 15 * u, fontWeight: 700, letterSpacing: 3 * u }}>{up(spec.eyebrow)}</span>
+      </div>
+      <Typewriter text={spec.headline} delay={6} cps={26} size={size} color={text} cursor={accent} weight={700} maxWidth="18ch" />
+      {spec.subhead ? (
+        <div style={{ color: dim, fontSize: (portrait ? 18 : 20) * u, fontWeight: 500, lineHeight: 1.35, marginTop: 20 * u, maxWidth: "26ch", opacity: interpolate(o, [0.4, 1], [0, 1], { extrapolateLeft: "clamp" }) }}>
+          {spec.subhead}
+        </div>
+      ) : null}
+      <div style={{ marginTop: 30 * u, width: wide ? "80%" : "64%", height: 3 * u, backgroundColor: `${text}22`, opacity: o }}>
+        <div style={{ width: `${interpolate(frame, [4 * (fps / 30), 40 * (fps / 30)], [0, 100], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}%`, height: "100%", backgroundColor: accent }} />
+      </div>
+    </>
+  );
+
   return (
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
       <TechGrid color={text} u={u} />
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: portrait ? "flex-start" : "center", paddingTop: portrait ? "8%" : 0 }}>
-        <div style={{ position: "relative" }}>
-          <Img
-            src={productImage}
-            crossOrigin="anonymous"
-            style={{ width: portrait ? "72%" : "auto", maxWidth: portrait ? "72%" : "46vw", maxHeight: portrait ? "48%" : "62%", objectFit: "contain", transform: `scale(${kb})`, filter: "drop-shadow(0 22px 48px rgba(0,0,0,0.5))" }}
-          />
-          {/* crosshair + coordinate tag */}
-          <div style={{ position: "absolute", top: "18%", right: "6%", opacity: cross }}>
-            <div style={{ width: 26 * u, height: 1.5 * u, backgroundColor: accent, position: "absolute", top: 0, left: -13 * u }} />
-            <div style={{ height: 26 * u, width: 1.5 * u, backgroundColor: accent, position: "absolute", top: -13 * u, left: 0 }} />
-            <div style={{ position: "absolute", left: 18 * u, top: -8 * u, color: accent, fontSize: 14 * u, fontWeight: 500, whiteSpace: "nowrap" }}>
-              [ VERIFIED ]
-            </div>
-          </div>
+      {wide ? (
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "stretch", padding: `${64 * u}px ${m}px` }}>
+          <div style={{ width: "52%", position: "relative" }}>{bay}</div>
+          <div style={{ width: 1.5 * u, backgroundColor: `${text}22`, margin: `${20 * u}px ${m * 0.5}px` }} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>{dataCol}</div>
         </div>
-      </AbsoluteFill>
-      <AbsoluteFill style={{ justifyContent: "flex-end", padding: portrait ? `0 ${m}px ${76 * u}px` : `0 ${m}px ${72 * u}px` }}>
-        <div style={{ color: accent, fontSize: 15 * u, fontWeight: 700, letterSpacing: 2 * u, marginBottom: 12 * u, opacity: o }}>{up(spec.eyebrow)}</div>
-        <Typewriter text={spec.headline} delay={6} cps={26} size={size} color={text} cursor={accent} weight={700} maxWidth={portrait ? "100%" : "22ch"} />
-      </AbsoluteFill>
+      ) : (
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", padding: `${72 * u}px ${m}px ${64 * u}px` }}>
+          <div style={{ flex: 1.15, position: "relative", minHeight: 0 }}>{bay}</div>
+          <div style={{ marginTop: 28 * u }}>{dataCol}</div>
+        </div>
+      )}
       <Scanlines u={u} />
     </AbsoluteFill>
   );
