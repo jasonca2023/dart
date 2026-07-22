@@ -675,8 +675,8 @@ def test_signup_flow_with_fakes(monkeypatch):
             "created_at": now.isoformat(),
         }
 
-    async def fake_bump(s, email, n):
-        store[email]["attempts"] = n
+    async def fake_bump(s, email):
+        store[email]["attempts"] += 1
 
     async def fake_delete(s, email):
         store.pop(email, None)
@@ -792,8 +792,8 @@ def test_reset_flow_with_fakes(monkeypatch):
             "created_at": now.isoformat(),
         }
 
-    async def fake_bump(s, email, n):
-        store[email]["attempts"] = n
+    async def fake_bump(s, email):
+        store[email]["attempts"] += 1
 
     async def fake_delete(s, email):
         store.pop(email, None)
@@ -925,8 +925,8 @@ def test_account_flow_with_fakes(monkeypatch):
             "created_at": now.isoformat(),
         }
 
-    async def fake_bump(s, email, n):
-        store[email]["attempts"] = n
+    async def fake_bump(s, email):
+        store[email]["attempts"] += 1
 
     async def fake_delete_code(s, email):
         store.pop(email, None)
@@ -1079,8 +1079,8 @@ def test_email_change_flow_with_fakes(monkeypatch):
             "created_at": now.isoformat(),
         }
 
-    async def fake_bump(s, email, n):
-        store[email]["attempts"] = n
+    async def fake_bump(s, email):
+        store[email]["attempts"] += 1
 
     async def fake_delete(s, email):
         store.pop(email, None)

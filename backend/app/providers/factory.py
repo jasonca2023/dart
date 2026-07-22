@@ -55,6 +55,10 @@ def build_video_generator(s: Settings) -> VideoGenerator:
             fps=s.ltx_fps,
             generate_audio=s.ltx_generate_audio,
             timeout=s.video_timeout_sec,
+            # Store renders in Supabase (durable) when configured; the deploy
+            # host's local disk is ephemeral and would 404 after a restart.
+            supabase_url=s.supabase_url,
+            supabase_service_key=s.supabase_service_key,
         )
     if s.video_provider == "kling":
         if not s.kling_secret_key:

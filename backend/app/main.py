@@ -45,6 +45,8 @@ from .store import JobStore
 _is_public_host = is_public_host
 _ssrf_safe_get = ssrf_safe_get
 
+log = logging.getLogger("dart.main")
+
 
 async def _fetch_store_logo(origin: str) -> str | None:
     """Best-effort: scrape the store homepage for its highest-resolution brand mark
@@ -554,7 +556,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     content=img_bytes,
                 )
                 if r.status_code >= 300:
-                    raise DartError(SCRAPE_FAILED, f"Image upload failed: {r.text}", status=502)
+                    # Don't echo the upstream body to the client — log it, return generic.
+                    log.warning("save-ad image upload failed (%s): %s", r.status_code, r.text)
+                    raise DartError(SCRAPE_FAILED, "Image upload failed.", status=502)
                 image_url = public_url(img_path)
 
             # The brand mark used for this ad, so editing it later can reproduce the
@@ -595,7 +599,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 content=vid_bytes,
             )
             if r.status_code >= 300:
-                raise DartError(SCRAPE_FAILED, f"Video upload failed: {r.text}", status=502)
+                log.warning("save-ad video upload failed (%s): %s", r.status_code, r.text)
+                raise DartError(SCRAPE_FAILED, "Video upload failed.", status=502)
             video_url = public_url(vid_path)
 
             row = {
@@ -677,7 +682,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     json=row,
                 )
             if r.status_code >= 300:
-                raise DartError(SCRAPE_FAILED, f"Saving the ad failed: {r.text}", status=502)
+                log.warning("save-ad row write failed (%s): %s", r.status_code, r.text)
+                raise DartError(SCRAPE_FAILED, "Saving the ad failed.", status=502)
 
         return {"video_url": video_url, "image_url": image_url}
 

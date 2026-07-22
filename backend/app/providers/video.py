@@ -20,6 +20,10 @@ from .base import VideoGenerator, VideoResult
 # (The old gtv-videos-bucket samples now 403; W3C-hosted media is stable + CORS-open.)
 _SAMPLE_VIDEO = "https://media.w3.org/2010/05/sintel/trailer.mp4"
 
+# Cap the provider response held in memory / written out — a hostile or broken
+# upstream streaming an unbounded body would otherwise exhaust memory or disk.
+_MAX_VIDEO_BYTES = 300 * 1024 * 1024
+
 
 class MockVideoGenerator(VideoGenerator):
     def __init__(self, delay: float = 0.0) -> None:
@@ -164,6 +168,9 @@ class LtxVideoGenerator(VideoGenerator):
         fps: int = 25,
         generate_audio: bool = False,
         timeout: float = 300.0,
+        supabase_url: str | None = None,
+        supabase_service_key: str | None = None,
+        storage_bucket: str = "dart-videos",
     ) -> None:
         self.api_key = api_key
         self.media_dir = Path(media_dir)
@@ -173,6 +180,11 @@ class LtxVideoGenerator(VideoGenerator):
         self.fps = fps
         self.generate_audio = generate_audio
         self.timeout = timeout
+        # When Supabase is configured, rendered mp4s are stored there (durable)
+        # rather than on the local disk, which is ephemeral on the deploy host.
+        self.supabase_url = supabase_url
+        self.supabase_service_key = supabase_service_key
+        self.storage_bucket = storage_bucket
 
     async def generate(
         self,
@@ -228,8 +240,45 @@ class LtxVideoGenerator(VideoGenerator):
                 retryable=resp.status_code in (429, 500, 503, 504),
             )
 
+        data = resp.content
+        if len(data) > _MAX_VIDEO_BYTES:
+            raise DartError(RENDER_FAILED, "Rendered video is too large.", status=502)
+
         filename = f"{uuid4().hex}.mp4"
-        (self.media_dir / filename).write_bytes(resp.content)
+        # Prefer durable object storage. The local media_dir is ephemeral on the
+        # deploy host (Render), so a URL served from /media would 404 after any
+        # restart; only fall back to it when Supabase isn't configured (dev).
+        if self.supabase_url and self.supabase_service_key:
+            base = self.supabase_url.rstrip("/")
+            key = self.supabase_service_key
+            path = f"renders/{filename}"
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    up = await client.post(
+                        f"{base}/storage/v1/object/{self.storage_bucket}/{path}",
+                        headers={
+                            "Authorization": f"Bearer {key}",
+                            "apikey": key,
+                            "x-upsert": "true",
+                            "Content-Type": "video/mp4",
+                        },
+                        content=data,
+                    )
+            except Exception as e:
+                raise DartError(
+                    RENDER_FAILED, "Could not store the rendered video.", status=502, retryable=True
+                ) from e
+            if up.status_code >= 300:
+                raise DartError(
+                    RENDER_FAILED, "Storing the rendered video failed.", status=502, retryable=True
+                )
+            return VideoResult(
+                video_url=f"{base}/storage/v1/object/public/{self.storage_bucket}/{path}",
+                cost_cents=0,
+            )
+
+        # Local fallback (dev). Off-thread so the multi-MB write doesn't block the loop.
+        await asyncio.to_thread((self.media_dir / filename).write_bytes, data)
         return VideoResult(video_url=f"{self.public_base_url}/media/{filename}", cost_cents=0)
 
 

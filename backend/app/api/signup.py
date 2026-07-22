@@ -152,7 +152,7 @@ async def _check_code(
             RATE_LIMITED, "Too many wrong attempts — request a new code.", status=429
         )
     if authcodes.hash_code(settings, email, code, purpose) != row["code_hash"]:
-        await authcodes.bump_attempts(settings, email, row["attempts"] + 1)
+        await authcodes.bump_attempts(settings, email)
         raise DartError(
             INVALID_CODE, "That code didn’t match — check for typos.", status=400
         )

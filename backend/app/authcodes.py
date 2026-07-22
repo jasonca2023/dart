@@ -119,17 +119,37 @@ async def store_code(
         r.raise_for_status()
 
 
-async def bump_attempts(settings: Settings, email: str, attempts: int) -> None:
+async def bump_attempts(settings: Settings, email: str) -> None:
     # Must not fail silently — the attempt counter is what enforces MAX_ATTEMPTS.
+    #
+    # Atomic increment via compare-and-swap. Writing an absolute `attempts+1`
+    # read moments earlier let two concurrent wrong guesses both store the same
+    # value, so parallel guessing could slip past MAX_ATTEMPTS. Instead, PATCH
+    # only the row whose `attempts` still equals what we read (the eq filter), and
+    # retry on a lost race so every wrong guess counts exactly once.
     base, auth = _sb(settings)
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        r = await client.patch(
-            f"{base}/rest/v1/auth_codes",
-            headers=auth,
-            params={"email": f"eq.{email}"},
-            json={"attempts": attempts},
-        )
-        r.raise_for_status()
+        for _ in range(MAX_ATTEMPTS + 3):
+            r = await client.get(
+                f"{base}/rest/v1/auth_codes",
+                headers=auth,
+                params={"email": f"eq.{email}", "select": "attempts", "limit": "1"},
+            )
+            r.raise_for_status()
+            rows = r.json()
+            if not rows:
+                return  # row gone (expired/consumed) — nothing to bump
+            current = rows[0]["attempts"]
+            pr = await client.patch(
+                f"{base}/rest/v1/auth_codes",
+                headers={**auth, "Prefer": "return=representation"},
+                params={"email": f"eq.{email}", "attempts": f"eq.{current}"},
+                json={"attempts": current + 1},
+            )
+            pr.raise_for_status()
+            if pr.json():  # a row matched attempts==current → our increment won
+                return
+            # else: another request incremented first — re-read and try again
 
 
 async def delete_code(settings: Settings, email: str) -> None:

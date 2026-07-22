@@ -229,9 +229,18 @@ class WebProductScraper(ProductScraper):
                 retryable=True,
             ) from e
 
-        parser = _MetaParser()
-        parser.feed(html)
-        product = _from_ld(parser.ld_blocks, url) or _from_page(html, parser.meta, parser.title, url)
+        # HTMLParser can raise on malformed markup; keep that a clean 502, not a 500.
+        try:
+            parser = _MetaParser()
+            parser.feed(html)
+            product = _from_ld(parser.ld_blocks, url) or _from_page(html, parser.meta, parser.title, url)
+        except Exception as e:
+            raise DartError(
+                SCRAPE_FAILED,
+                "Could not parse product data from the page.",
+                status=502,
+                retryable=True,
+            ) from e
         if product is None or not product.images:
             raise DartError(
                 NO_PRODUCT_IMAGE,
