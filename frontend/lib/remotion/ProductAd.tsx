@@ -1010,7 +1010,6 @@ const TechHook: React.FC<SceneProps> = ({ spec, productImage, portrait }) => {
             crossOrigin="anonymous"
             style={{ maxWidth: "84%", maxHeight: "84%", objectFit: "contain", opacity: interpolate(o, [0, 0.6], [0, 1], { extrapolateRight: "clamp" }), filter: "drop-shadow(0 20px 44px rgba(0,0,0,0.5))" }}
           />
-          <ScanSweep color={accent} u={u} />
         </div>
       </AbsoluteFill>
       <AbsoluteFill style={{ justifyContent: "flex-end", padding: portrait ? `0 ${m}px ${70 * u}px` : `0 ${m}px ${60 * u}px` }}>
