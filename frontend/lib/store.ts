@@ -161,11 +161,50 @@ export function logoSources(storeUrl: string): string[] {
 // 0.59 or below.
 export const MAX_LOGO_FILL = 0.65;
 
+// The end-card scales the mark to a fixed height (60px portrait / 84px landscape
+// at 1080). A favicon that arrives smaller is upscaled, and a curved stroke
+// stair-steps visibly at ~2x — confirmed by rendering glossier.com's 26x32
+// cutout through the real end-card. Reject rather than upscale: the fallback is
+// the store name set large in the ad's own face, which reads better than a soft
+// mark anyway. Costs the logo on stores that only publish a 32px favicon.
+export const MIN_LOGO_EDGE = 64;
+
+// A resolved mark can be a *generated placeholder* rather than a brand at all:
+// icon.horse answers 200 for a domain with no discoverable icon by synthesising
+// a grey letter tile, and our own backdrop stripper keys its flat field out into
+// a clean, perfectly silhouette-able glyph — so it sails through every gate that
+// only asks "will this render well". It renders beautifully; it just isn't the
+// merchant's logo, and a generic "E" is strictly worse than their store name.
+//
+// Separate it by ink colour. A real mark is either chromatic, or achromatic and
+// pushed to an extreme (near-black or near-white) — that's what a logo IS. An
+// achromatic MID-grey mark is the placeholder's signature. Measured: the two
+// placeholder tiles sit at sat 0 / lum 0.471, while every real mark tested is
+// either chromatic (bombas, sat 107) or near-black (lum <= 0.234).
+//
+// This is a heuristic, and it fails OPEN — if icon.horse restyles its tile we
+// are back to today's behaviour (accepting it), not to something worse.
+export const MAX_NEUTRAL_INK_SAT = 12;
+export const PLACEHOLDER_LUM_MIN = 0.3;
+export const PLACEHOLDER_LUM_MAX = 0.7;
+
+function isPlaceholderMark(p: PreparedLogo): boolean {
+  return (
+    p.inkSat <= MAX_NEUTRAL_INK_SAT &&
+    p.inkLum >= PLACEHOLDER_LUM_MIN &&
+    p.inkLum <= PLACEHOLDER_LUM_MAX
+  );
+}
+
 // Pulled out of prepareStoreLogo so the accept/reject call is unit-testable on
 // plain data — prepareLogo itself needs a real <canvas>, which jsdom doesn't
 // have, so this is the part of the decision that CAN run without a browser.
 export function isUsableStoreLogo(prepared: PreparedLogo | null): boolean {
-  return !!prepared && prepared.transparent && prepared.fill <= MAX_LOGO_FILL;
+  if (!prepared || !prepared.transparent) return false;
+  if (prepared.fill > MAX_LOGO_FILL) return false;
+  if (Math.max(prepared.width, prepared.height) < MIN_LOGO_EDGE) return false;
+  if (isPlaceholderMark(prepared)) return false;
+  return true;
 }
 
 // Prepare the store's brand mark (a knockout-ready cutout) for the ad end-cards.

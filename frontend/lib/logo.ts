@@ -15,6 +15,18 @@ export interface PreparedLogo {
   // is near 1 — and knocking one of those out to a flat colour just yields a
   // featureless blob, so callers can reject on this. 1 for an opaque image.
   fill: number;
+  // The cutout's real pixel size. The end-card scales the mark to a fixed height,
+  // so a favicon that arrives at 32px is upscaled and renders visibly jagged;
+  // callers gate on this. Falls back to the source size for an opaque image.
+  width: number;
+  height: number;
+  // Mean colour of the mark's own ink (opaque pixels only), split into
+  // saturation (0–255) and luminance (0–1). Real brand marks land at one of two
+  // extremes: chromatic, or achromatic and near-black/near-white. An achromatic
+  // MID-grey mark is the signature of a generated placeholder rather than a
+  // logo. Both 0 for an opaque image (no cutout to measure).
+  inkSat: number;
+  inkLum: number;
 }
 
 const MAX = 800;
@@ -132,23 +144,48 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
   const transparentNow = hasAlpha || removed;
   let cutout = original;
   let fill = 1; // opaque image ⇒ fully filled; a real cutout overwrites this
+  let outW = w;
+  let outH = h;
+  let inkSat = 0;
+  let inkLum = 0;
   if (transparentNow) {
     let minX = w,
       minY = h,
       maxX = -1,
       maxY = -1;
     let ln = 0;
+    // Ink colour is averaged over solidly-opaque pixels only: the feathered
+    // boundary band carries the backdrop's colour at partial alpha and would
+    // drag the mean toward the backdrop.
+    let sr = 0,
+      sg = 0,
+      sb = 0,
+      sn = 0;
     const cur = ctx.getImageData(0, 0, w, h).data;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        if (cur[(y * w + x) * 4 + 3] > 24) {
+        const a = cur[(y * w + x) * 4 + 3];
+        if (a > 24) {
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
           if (y < minY) minY = y;
           if (y > maxY) maxY = y;
           ln++;
+          if (a > 200) {
+            sr += cur[(y * w + x) * 4];
+            sg += cur[(y * w + x) * 4 + 1];
+            sb += cur[(y * w + x) * 4 + 2];
+            sn++;
+          }
         }
       }
+    }
+    if (sn > 0) {
+      const r = sr / sn,
+        g = sg / sn,
+        b = sb / sn;
+      inkSat = Math.max(r, g, b) - Math.min(r, g, b);
+      inkLum = lum(r, g, b);
     }
     if (maxX >= minX && maxY >= minY && ln > 0) {
       // Fill = ink over the tight bounding box: how "solid" the mark is.
@@ -165,9 +202,21 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
       if (cctx) {
         cctx.drawImage(canvas, cx, cy, cw, chh, 0, 0, cw, chh);
         cutout = crop.toDataURL("image/png");
+        outW = cw;
+        outH = chh;
       }
     }
   }
 
-  return { original, cutout, removed, transparent: transparentNow, fill };
+  return {
+    original,
+    cutout,
+    removed,
+    transparent: transparentNow,
+    fill,
+    width: outW,
+    height: outH,
+    inkSat,
+    inkLum,
+  };
 }
