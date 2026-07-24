@@ -19,7 +19,7 @@ import { JobActions } from "./JobActions";
 import { AdEditor } from "./AdEditor";
 import { AdPager } from "./AdPager";
 import { getBatch } from "@/lib/batch";
-import { downloadUrl, adFileName } from "@/lib/download";
+import { downloadUrl, adFileName, videoExt } from "@/lib/download";
 import { Button } from "../ui/Button";
 import { ArrowRight, Alert, Download, Refresh, Spinner, Wand } from "../icons";
 
@@ -128,7 +128,7 @@ function SavedAdView({ ad: initialAd }: { ad: SavedAd }) {
       const a = await getAd(batchIds[i]);
       if (
         a?.video_url &&
-        (await downloadUrl(a.video_url, adFileName(a.product_title, a.aspect_ratio, a.id)))
+        (await downloadUrl(a.video_url, adFileName(a.product_title, a.aspect_ratio, a.id, videoExt(a.video_url))))
       ) {
         ok++;
       }
@@ -148,7 +148,7 @@ function SavedAdView({ ad: initialAd }: { ad: SavedAd }) {
       const u = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = u;
-      a.download = `dart-ad-${ad.id.slice(0, 8)}.mp4`;
+      a.download = `dart-ad-${ad.id.slice(0, 8)}.${videoExt(videoUrl, blob.type)}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -272,7 +272,7 @@ function ClientActions({ src, jobId }: { src: string; jobId: string }) {
       const u = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = u;
-      a.download = `dart-ad-${jobId.slice(0, 8)}.mp4`;
+      a.download = `dart-ad-${jobId.slice(0, 8)}.${videoExt(src, blob.type)}`;
       document.body.appendChild(a);
       a.click();
       a.remove();

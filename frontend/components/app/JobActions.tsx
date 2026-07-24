@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { videoExt } from "@/lib/download";
 import type { ExportDestination } from "@/lib/types";
 import { Button } from "../ui/Button";
 import { Download, Refresh, ArrowUpRight, Check } from "../icons";
@@ -59,7 +60,7 @@ export function JobActions({
         const objUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = objUrl;
-        a.download = `dart-ad-${jobId.slice(0, 8)}.mp4`;
+        a.download = `dart-ad-${jobId.slice(0, 8)}.${videoExt(res.handoff_url, blob.type)}`;
         document.body.appendChild(a);
         a.click();
         a.remove();

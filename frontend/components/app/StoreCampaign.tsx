@@ -11,7 +11,7 @@ import { removeProductBackground } from "@/lib/bgRemove";
 import { renderAdInBrowser, canRenderInBrowser, isLikelySafari } from "@/lib/render";
 import { saveRenderedAdViaBackend } from "@/lib/ads";
 import { setBatch } from "@/lib/batch";
-import { downloadUrl, adFileName } from "@/lib/download";
+import { downloadUrl, adFileName, videoExt } from "@/lib/download";
 import type { AspectRatio, Duration, Job } from "@/lib/types";
 import { Field, Input } from "../ui/Field";
 import { Button, ButtonLink } from "../ui/Button";
@@ -277,7 +277,7 @@ export function StoreCampaign() {
     for (let i = 0; i < result.made.length; i++) {
       const m = result.made[i];
       setDlMsg(`Downloading ${i + 1}/${result.made.length}…`);
-      if (await downloadUrl(m.video, adFileName(m.title, m.fmt, m.id))) ok++;
+      if (await downloadUrl(m.video, adFileName(m.title, m.fmt, m.id, videoExt(m.video)))) ok++;
     }
     setDlBusy(false);
     setDlMsg(ok === result.made.length ? "All downloaded" : `Downloaded ${ok} of ${result.made.length}`);
