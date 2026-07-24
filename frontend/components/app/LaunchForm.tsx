@@ -351,9 +351,14 @@ export function LaunchForm() {
           // take 1 matches the preview the user shuffled to. Nearby seeds can
           // collide on the same accent/layout combo, so probe forward and keep
           // only unique looks (bounded scan; tiny pools just repeat the last).
+          // One look per copy angle. Derived from `variants`, never a hardcoded
+          // 3: the two must stay in lockstep, and the render loop below indexes
+          // takeSpecs by the angle index — a fourth angle would otherwise read
+          // past the end and throw halfway through an already-saving batch.
+          const wanted = Math.max(1, variants.length);
           const takeSpecs: (typeof baseSpec)[] = [];
           const seenLooks = new Set<string>();
-          for (let v = variant; takeSpecs.length < 3 && v < variant + 16; v++) {
+          for (let v = variant; takeSpecs.length < wanted && v < variant + 16; v++) {
             const s = buildAdSpec({
               title: title.trim(),
               audience: audience.trim(),
@@ -367,7 +372,7 @@ export function LaunchForm() {
             seenLooks.add(sig);
             takeSpecs.push(s);
           }
-          while (takeSpecs.length < 3)
+          while (takeSpecs.length < wanted)
             takeSpecs.push(takeSpecs[takeSpecs.length - 1]);
           labels = [];
           for (let i = 0; i < variants.length; i++) {
