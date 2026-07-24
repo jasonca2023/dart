@@ -48,42 +48,6 @@ _ssrf_safe_get = ssrf_safe_get
 log = logging.getLogger("dart.main")
 
 
-async def _fetch_store_logo(origin: str) -> str | None:
-    """Best-effort: scrape the store homepage for its highest-resolution brand mark
-    (apple-touch-icon / icon link). Returns an absolute URL, or None. Free — just an
-    HTTP fetch + a regex over the <link> tags.
-    """
-    import re
-
-    import httpx
-
-    try:
-        r = await _ssrf_safe_get(origin)
-        r.raise_for_status()
-        html = r.text[:1_000_000]
-    except Exception:
-        return None
-
-    best: tuple[int, str] | None = None  # (size, href)
-    for m in re.finditer(r"<link\b[^>]*>", html, re.IGNORECASE):
-        tag = m.group(0)
-        rel = re.search(r'rel=["\']([^"\']+)["\']', tag, re.IGNORECASE)
-        href = re.search(r'href=["\']([^"\']+)["\']', tag, re.IGNORECASE)
-        if not rel or not href or "icon" not in rel.group(1).lower():
-            continue
-        sz = re.search(r'sizes=["\']?(\d+)', tag, re.IGNORECASE)
-        # apple-touch-icon is usually a clean 180px brand mark; weight it high.
-        size = int(sz.group(1)) if sz else (180 if "apple-touch-icon" in rel.group(1).lower() else 32)
-        if best is None or size > best[0]:
-            best = (size, href.group(1))
-    if not best:
-        return None
-    try:
-        return str(httpx.URL(origin).join(best[1]))
-    except Exception:
-        return None
-
-
 async def _fetch_shopify_product(netloc: str, handle: str) -> dict | None:
     """A Shopify product page also exposes `/products/<handle>.json` — fetch just
     that product, so pasting a product link imports one product, not the catalogue.
@@ -420,8 +384,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if handle:
             product = await _fetch_shopify_product(parsed.netloc, handle.group(1))
             if product:
-                logo = await _fetch_store_logo(f"https://{parsed.netloc}")
-                return {"products": [product], "logo": logo}
+                return {"products": [product]}
 
         feed = f"https://{parsed.netloc}/products.json?limit=100"
         try:
@@ -442,8 +405,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             page_url = url if "://" in url else f"https://{url}"
             product = await _fetch_product_page(page_url)
             if product:
-                logo = await _fetch_store_logo(f"https://{parsed.netloc}")
-                return {"products": [product], "logo": logo}
+                return {"products": [product]}
             raise DartError(
                 SCRAPE_FAILED,
                 "Couldn't read that link — paste a Shopify store URL, or a product page that publishes its product data.",
@@ -465,8 +427,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         "price": f"${price}" if price else "",
                     }
                 )
-        logo = await _fetch_store_logo(f"https://{parsed.netloc}")
-        return {"products": out, "logo": logo}
+        return {"products": out}
 
     @app.post("/save-ad", dependencies=[Depends(save_rl)])
     async def save_ad(

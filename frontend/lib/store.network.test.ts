@@ -13,7 +13,7 @@
 // still reds the build. Skips cleanly when there's no network at all.
 
 import { beforeAll, describe, expect, it } from "vitest";
-import { fetchStoreProducts, type StoreProduct } from "./store";
+import { fetchStoreProducts, logoSources, type StoreProduct } from "./store";
 
 // Independent merchants on Shopify. If all of these are simultaneously
 // unreachable, the failure is ours or the network's, not theirs.
@@ -54,7 +54,7 @@ describe("store import against live Shopify stores", () => {
 
       for (const store of STORES) {
         try {
-          const { products } = await fetchStoreProducts(store);
+          const products = await fetchStoreProducts(store);
           if (products.length > 1) {
             wins++;
             products.forEach(expectUsable);
@@ -101,10 +101,35 @@ describe("store import against live Shopify stores", () => {
       }
       if (!productUrl) return; // every store throttled us; covered by the test above
 
-      const { products } = await fetchStoreProducts(productUrl);
+      const products = await fetchStoreProducts(productUrl);
       expect(products, `product link imported the wrong count from ${productUrl}`)
         .toHaveLength(1);
       expectUsable(products[0]);
+    },
+    NET_TIMEOUT,
+  );
+
+  // The logo scraper's reachability, decoupled from the canvas cutout (jsdom has
+  // no 2D context, so prepareStoreLogo/prepareLogo can't run here). This asserts
+  // the thing that actually breaks in the wild: icon.horse still resolving a real
+  // store's mark to a decodable image. If it 404s, rebrands, or dies, this reds.
+  it(
+    "resolves a real brand mark from the primary logo source",
+    async () => {
+      if (!online) return;
+      const [primary] = logoSources("gymshark.com");
+      expect(primary).toContain("icon.horse");
+
+      const r = await fetch(primary);
+      expect(r.ok, `icon.horse returned ${r.status}`).toBe(true);
+      const buf = new Uint8Array(await r.arrayBuffer());
+      // PNG (\x89PNG), JPEG (\xFF\xD8\xFF), or ICO (\x00\x00\x01\x00) magic bytes.
+      const isImage =
+        (buf[0] === 0x89 && buf[1] === 0x50) ||
+        (buf[0] === 0xff && buf[1] === 0xd8) ||
+        (buf[0] === 0x00 && buf[1] === 0x00 && buf[2] === 0x01);
+      expect(isImage, `not an image: first bytes ${buf.slice(0, 4)}`).toBe(true);
+      expect(buf.length).toBeGreaterThan(100);
     },
     NET_TIMEOUT,
   );

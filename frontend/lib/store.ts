@@ -4,10 +4,10 @@
 // Read from the BROWSER first, backend second. Shopify serves /products.json with
 // `access-control-allow-origin: *`, so the merchant's own browser can read their
 // own store's public feed cross-origin. That is not a nicety — Shopify's edge
-// fast-403s datacenter IPs (~0.3s, TLS handshake completes and the edge refuses),
-// so the server-side path fails for most real stores while the same URL returns
-// 200 from a normal browser. The backend stays as the fallback: it can parse a
-// non-Shopify product page's JSON-LD, which CORS won't let us read here.
+// rate-limits our server's IP (a fast 429, TLS handshake completes and the edge
+// refuses), so the server-side path fails for most real stores while the same URL
+// returns 200 from a normal browser. The backend stays as the fallback: it can
+// parse a non-Shopify product page's JSON-LD, which CORS won't let us read here.
 
 import { API_BASE } from "./api";
 import { prepareLogo, type PreparedLogo } from "./logo";
@@ -16,11 +16,6 @@ export interface StoreProduct {
   title: string;
   image: string; // product image URL (Shopify CDN)
   price: string; // formatted, e.g. "$45.00", or "" if none
-}
-
-export interface StoreImport {
-  products: StoreProduct[];
-  logo: string | null; // the store's brand-mark URL, if one was found
 }
 
 const FEED_TIMEOUT_MS = 15_000;
@@ -115,15 +110,12 @@ async function fetchFeedInBrowser(raw: string): Promise<StoreProduct[] | null> {
   return mapped.length ? mapped : null;
 }
 
-export async function fetchStoreProducts(storeUrl: string): Promise<StoreImport> {
+export async function fetchStoreProducts(storeUrl: string): Promise<StoreProduct[]> {
   const url = storeUrl.trim();
   if (!url) throw new Error("Enter your store URL.");
 
-  // The store's own brand mark needs the homepage HTML, which sends no CORS
-  // header — so the browser path returns no logo and prepareStoreLogo falls back
-  // to the favicon service.
   const direct = await fetchFeedInBrowser(url);
-  if (direct) return { products: direct, logo: null };
+  if (direct) return direct;
 
   if (!API_BASE) throw new Error("Backend URL is not configured.");
   const res = await fetch(`${API_BASE}/store-products?url=${encodeURIComponent(url)}`);
@@ -131,30 +123,40 @@ export async function fetchStoreProducts(storeUrl: string): Promise<StoreImport>
     const body = await res.json().catch(() => null);
     throw new Error(body?.error?.message || `Couldn't read that store (${res.status}).`);
   }
-  const data = (await res.json()) as { products?: StoreProduct[]; logo?: string | null };
-  return { products: data.products ?? [], logo: data.logo ?? null };
+  const data = (await res.json()) as { products?: StoreProduct[] };
+  return data.products ?? [];
+}
+
+// The store's brand mark can't be scraped directly: its homepage HTML sends no
+// CORS header (so the browser can't read it) and Shopify's edge rate-limits our
+// server the same way it blocks the product feed (so the backend can't either).
+// icon.horse resolves the store's real apple-touch-icon on its OWN infrastructure
+// — which Shopify doesn't throttle — and hands back an image we CAN fetch through
+// the proxy. Google's favicon service is the fallback. Ordered best-first; the
+// domain is all either needs.
+export function logoSources(storeUrl: string): string[] {
+  let host: string;
+  try {
+    host = new URL(storeUrl.includes("://") ? storeUrl : `https://${storeUrl}`).hostname;
+  } catch {
+    return [];
+  }
+  // icon.horse keys on the bare registrable domain; a leading www. just misses.
+  const domain = host.replace(/^www\./i, "");
+  if (!domain) return [];
+  return [
+    `https://icon.horse/icon/${domain}`,
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=256`,
+  ];
 }
 
 // Prepare the store's brand mark (a knockout-ready cutout) for the ad end-cards.
-// Tries the scraped logo first (a higher-res apple-touch-icon / favicon from the
-// store itself), then Google's favicon service as a fallback — both go through the
-// SSRF-guarded image proxy. Returns null if none can be prepared.
-export async function prepareStoreLogo(
-  logoUrl: string | null,
-  storeUrl: string,
-): Promise<PreparedLogo | null> {
+// Resolves the mark via logoSources and runs the first that yields a usable cutout
+// through the SSRF-guarded image proxy + prepareLogo. Returns null if none work —
+// the end-card then falls back to the store name, so the logo stays optional.
+export async function prepareStoreLogo(storeUrl: string): Promise<PreparedLogo | null> {
   if (!API_BASE) return null;
-  const sources: string[] = [];
-  if (logoUrl) sources.push(logoUrl);
-  try {
-    const host = new URL(
-      storeUrl.includes("://") ? storeUrl : `https://${storeUrl}`,
-    ).hostname;
-    sources.push(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`);
-  } catch {
-    /* bad url — skip the favicon fallback */
-  }
-  for (const src of sources) {
+  for (const src of logoSources(storeUrl)) {
     try {
       const res = await fetch(`${API_BASE}/proxy-image?url=${encodeURIComponent(src)}`);
       if (!res.ok) continue;

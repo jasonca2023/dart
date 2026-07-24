@@ -105,15 +105,15 @@ export function StoreCampaign() {
     setError(null);
     setImporting(true);
     try {
-      const { products: list, logo } = await fetchStoreProducts(storeUrl);
+      const list = await fetchStoreProducts(storeUrl);
       setProducts(list);
       setPicked(new Set()); // start empty — the user picks what to turn into ads
-      // Pull the store's own brand mark for the end-card (best-effort). Guard
+      // Resolve the store's brand mark for the end-card (best-effort). Guard
       // against a slow earlier import landing after a newer one and attaching
       // the wrong store's logo.
       setStoreLogo(null);
       const seq = ++importSeq.current;
-      prepareStoreLogo(logo, storeUrl).then((l) => {
+      prepareStoreLogo(storeUrl).then((l) => {
         if (seq === importSeq.current) setStoreLogo(l);
       });
       if (list.length === 0) setError("No products found in that store's public feed.");
