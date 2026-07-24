@@ -365,8 +365,11 @@ const KHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) =>
   );
 };
 
-// K3 · Feature pin — a call-out chip WIPES in and pins to the product with a
-// connector dot; the product ken-burns behind it. The product is annotated.
+// K3 · Feature pin — a call-out chip WIPES in over the ken-burning product.
+// No annotation dot: a marker has to sit ON the product to mean anything, and we
+// can't know where that is — the product is objectFit:contain inside a centered
+// box, so a wide, short product (a shoe) occupies a thin band around the middle
+// and a fixed 34% lands in empty space above it. It read as a stray speck.
 const KFeature: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
   const u = useUnit();
   const { onStage, accent } = spec.palette;
@@ -388,20 +391,6 @@ const KFeature: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
           }}
         />
       </AbsoluteFill>
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: portrait ? "34%" : "42%",
-          width: 14 * u,
-          height: 14 * u,
-          marginLeft: -7 * u,
-          borderRadius: "50%",
-          backgroundColor: accent,
-          opacity: chip,
-          boxShadow: `0 0 0 ${6 * u}px ${accent}33`,
-        }}
-      />
       <div
         style={{
           position: "absolute",
@@ -1105,8 +1094,8 @@ const TechHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait, w
   );
 };
 
-// T3 · Feature — the spec pinned as a HUD annotation: a crosshair on the product,
-// a connector, and a bracketed mono label + value.
+// T3 · Feature — the spec as a HUD readout over the ken-burning product: a
+// bracketed mono label + value. No annotation dot, for the reason in K3.
 const TechFeature: React.FC<SceneProps> = ({ spec, scene, productImage, portrait }) => {
   const u = useUnit();
   const { text, onStage } = spec.palette;
@@ -1121,8 +1110,6 @@ const TechFeature: React.FC<SceneProps> = ({ spec, scene, productImage, portrait
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
         <Img src={productImage} crossOrigin="anonymous" style={{ width: portrait ? "70%" : "50%", maxHeight: portrait ? "56%" : "70%", objectFit: "contain", transform: `scale(${kb})`, filter: "drop-shadow(0 22px 48px rgba(0,0,0,0.5))" }} />
       </AbsoluteFill>
-      {/* dot on product + connector to the callout */}
-      <div style={{ position: "absolute", left: "50%", top: portrait ? "34%" : "40%", width: 12 * u, height: 12 * u, marginLeft: -6 * u, borderRadius: "50%", backgroundColor: accent, opacity: o, boxShadow: `0 0 0 ${5 * u}px ${accent}33` }} />
       <div style={{ position: "absolute", left: m, bottom: (portrait ? 120 : 108) * u, opacity: o, transform: `translateY(${interpolate(o, [0, 1], [16 * u, 0])}px)` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 * u, color: accent, fontSize: (portrait ? 15 : 18) * u, fontWeight: 700, marginBottom: 10 * u }}>
           <span>{`[ ${up(scene.label || spec.eyebrow)} ]`}</span>
