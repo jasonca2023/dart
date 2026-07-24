@@ -150,10 +150,29 @@ export function logoSources(storeUrl: string): string[] {
   ];
 }
 
+// The end-card knocks the logo out to a single flat colour so it's legible on any
+// panel. That only works for a mark that's a shape — a wordmark, a swoosh. A
+// favicon that's a logo on a solid disc/tile is opaque edge to edge, so knockout
+// flattens the whole badge to a featureless blob (a black circle — confirmed by
+// rendering deathwishcoffee.com's scraped favicon through the actual ad renderer).
+// Reject those: a scraped mark is only worth showing if it silhouettes cleanly.
+// Measured across real stores, that badge sits at 0.82 fill while five other
+// stores' genuine marks (Nike, Gymshark, Allbirds, Glossier, Bombas) all sit at
+// 0.59 or below.
+export const MAX_LOGO_FILL = 0.65;
+
+// Pulled out of prepareStoreLogo so the accept/reject call is unit-testable on
+// plain data — prepareLogo itself needs a real <canvas>, which jsdom doesn't
+// have, so this is the part of the decision that CAN run without a browser.
+export function isUsableStoreLogo(prepared: PreparedLogo | null): boolean {
+  return !!prepared && prepared.transparent && prepared.fill <= MAX_LOGO_FILL;
+}
+
 // Prepare the store's brand mark (a knockout-ready cutout) for the ad end-cards.
-// Resolves the mark via logoSources and runs the first that yields a usable cutout
-// through the SSRF-guarded image proxy + prepareLogo. Returns null if none work —
-// the end-card then falls back to the store name, so the logo stays optional.
+// Resolves the mark via logoSources and runs the first that yields a clean,
+// silhouette-able cutout through the SSRF-guarded image proxy + prepareLogo.
+// Returns null when nothing usable resolves — the end-card then falls back to the
+// store name, so the logo stays optional (and a solid badge doesn't become a blob).
 export async function prepareStoreLogo(storeUrl: string): Promise<PreparedLogo | null> {
   if (!API_BASE) return null;
   for (const src of logoSources(storeUrl)) {
@@ -164,7 +183,7 @@ export async function prepareStoreLogo(storeUrl: string): Promise<PreparedLogo |
       const prepared = await prepareLogo(
         new File([blob], "logo.png", { type: blob.type || "image/png" }),
       );
-      if (prepared) return prepared;
+      if (isUsableStoreLogo(prepared)) return prepared;
     } catch {
       /* try the next source */
     }

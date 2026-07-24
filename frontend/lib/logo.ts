@@ -10,6 +10,11 @@ export interface PreparedLogo {
   cutout: string; // background-removed + cropped (or === original if nothing removed)
   removed: boolean; // did we actually strip a backdrop?
   transparent: boolean; // is the result transparent (a real cutout) vs an opaque image?
+  // Opaque-pixel fraction within the mark's bounding box. A thin, detailed mark
+  // (a wordmark, a swoosh) is low; a solid badge (a logo on a filled disc/tile)
+  // is near 1 — and knocking one of those out to a flat colour just yields a
+  // featureless blob, so callers can reject on this. 1 for an opaque image.
+  fill: number;
 }
 
 const MAX = 800;
@@ -126,6 +131,7 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
   // Crop the (transparent) logo to its content box + small padding.
   const transparentNow = hasAlpha || removed;
   let cutout = original;
+  let fill = 1; // opaque image ⇒ fully filled; a real cutout overwrites this
   if (transparentNow) {
     let minX = w,
       minY = h,
@@ -145,6 +151,8 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
       }
     }
     if (maxX >= minX && maxY >= minY && ln > 0) {
+      // Fill = ink over the tight bounding box: how "solid" the mark is.
+      fill = ln / ((maxX - minX + 1) * (maxY - minY + 1));
       const pad = Math.round(Math.min(w, h) * 0.04);
       const cx = Math.max(0, minX - pad);
       const cy = Math.max(0, minY - pad);
@@ -161,5 +169,5 @@ export async function prepareLogo(file: File): Promise<PreparedLogo | null> {
     }
   }
 
-  return { original, cutout, removed, transparent: transparentNow };
+  return { original, cutout, removed, transparent: transparentNow, fill };
 }
