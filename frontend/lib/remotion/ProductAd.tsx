@@ -711,6 +711,10 @@ const LuxeHook: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
   const horizon = darkPanel ? "rgba(255,240,214,0.12)" : "rgba(30,22,10,0.05)";
   const inset = interpolate(draw, [0, 1], [(portrait ? 30 : 44) * u, (portrait ? 42 : 60) * u]);
   const dim = darkPanel ? `${text}88` : `${text}aa`;
+  // Product box, sized off the frame and lifted clear of the caption band.
+  const PROD_W = portrait ? "82%" : "58%";
+  const PROD_H = portrait ? "52%" : "70%";
+  const PROD_PAD = portrait ? "14%" : "8%";
   return (
     <AbsoluteFill style={{ backgroundColor: panel, overflow: "hidden" }}>
       {/* pool of light behind the product + a low horizon it sits on */}
@@ -718,23 +722,27 @@ const LuxeHook: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
       <AbsoluteFill style={{ background: `radial-gradient(ellipse 70% 26% at 50% 66%, ${horizon}, transparent 72%)`, opacity: enter }} />
       {/* thin gold gallery frame — contains the composition */}
       <div style={{ position: "absolute", top: inset, left: inset, right: inset, bottom: inset, border: `${1 * u}px solid ${accent}`, opacity: draw * 0.6, pointerEvents: "none" }} />
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: portrait ? "6%" : "4%" }}>
-        <div style={{ position: "relative", opacity: enter, transform: `scale(${kb})` }}>
+      {/* The product sits in a box sized against the FRAME. It must be the box,
+          not the image: a percentage width on an <Img> inside an auto-width
+          wrapper resolves against the image's own intrinsic box, which rendered
+          the product at a fraction of the intended size (a speck in the void). */}
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: PROD_PAD }}>
+        <div style={{ position: "relative", width: PROD_W, height: PROD_H, display: "flex", alignItems: "center", justifyContent: "center", opacity: enter, transform: `scale(${kb})` }}>
           <Img
             src={productImage}
             crossOrigin="anonymous"
             style={{
-              width: portrait ? "86%" : "66%",
-              maxHeight: portrait ? "62%" : "74%",
+              maxWidth: "100%",
+              maxHeight: "100%",
               objectFit: "contain",
               filter: "drop-shadow(0 34px 64px rgba(0,0,0,0.5))",
             }}
           />
         </div>
       </AbsoluteFill>
-      {/* Specular clipped to a centred zone over the product — a surface glint. */}
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: portrait ? "6%" : "4%", pointerEvents: "none" }}>
-        <div style={{ position: "relative", width: portrait ? "86%" : "66%", height: portrait ? "62%" : "74%", overflow: "hidden" }}>
+      {/* Specular clipped to the product's own box — a surface glint. */}
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: PROD_PAD, pointerEvents: "none" }}>
+        <div style={{ position: "relative", width: PROD_W, height: PROD_H, overflow: "hidden" }}>
           <Specular u={u} delay={4} />
         </div>
       </AbsoluteFill>
@@ -762,7 +770,9 @@ const LuxeHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
   const frame = useCurrentFrame();
   const kb = interpolate(frame, [0, scene.frames], [1.04, 1.0], { extrapolateRight: "clamp", easing: EASE_LUX });
   const size = fitBlock(width - 2 * m, spec.headline, (portrait ? 72 : 100) * u, 3);
-  const topH = portrait ? "50%" : "54%";
+  // The headline needs far less than half the frame; give the rest to the stage
+  // so the product reads as the subject rather than a thumbnail on a shelf.
+  const topH = portrait ? "44%" : "46%";
   return (
     <AbsoluteFill style={{ backgroundColor: panel }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: topH, padding: `0 ${m}px`, display: "flex", flexDirection: "column", justifyContent: "center", overflow: "hidden" }}>
@@ -776,7 +786,7 @@ const LuxeHero: React.FC<SceneProps> = ({ spec, scene, productImage, portrait })
           <Img
             src={productImage}
             crossOrigin="anonymous"
-            style={{ width: portrait ? "72%" : "48%", maxHeight: "82%", objectFit: "contain", transform: `scale(${kb})`, filter: "drop-shadow(0 22px 40px rgba(0,0,0,0.16))" }}
+            style={{ width: portrait ? "78%" : "58%", height: "88%", objectFit: "contain", transform: `scale(${kb})`, filter: "drop-shadow(0 22px 40px rgba(0,0,0,0.16))" }}
           />
           <Specular u={u} delay={6} />
         </AbsoluteFill>
